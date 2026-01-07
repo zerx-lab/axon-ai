@@ -6,7 +6,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { User, Bot, Loader2, AlertCircle } from "lucide-react";
-import { PartRenderer } from "./parts";
+import { PartRenderer, MarkdownRenderer } from "./parts";
 import type { 
   Message, 
   Part,
@@ -136,14 +136,9 @@ function UserMessageContent({ parts }: UserMessageContentProps) {
   }
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
+    <div className="space-y-2">
       {textParts.map((part) => (
-        <p 
-          key={part.id} 
-          className="text-sm text-foreground whitespace-pre-wrap break-words"
-        >
-          {part.text}
-        </p>
+        <MarkdownRenderer key={part.id} content={part.text} />
       ))}
     </div>
   );

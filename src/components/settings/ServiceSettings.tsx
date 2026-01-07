@@ -145,19 +145,19 @@ export function ServiceSettings() {
     
     switch (backendStatus.type) {
       case "running":
-        return { text: `运行中 (端口: ${backendStatus.port})`, canStart: false, canStop: true };
+        return { text: t("settings.serviceSettings.backendRunning", { port: backendStatus.port }), canStart: false, canStop: true };
       case "starting":
-        return { text: "启动中...", canStart: false, canStop: false };
+        return { text: t("settings.serviceSettings.backendStarting"), canStart: false, canStop: false };
       case "downloading":
-        return { text: `下载中 (${Math.round(backendStatus.progress * 100)}%)`, canStart: false, canStop: false };
+        return { text: t("settings.serviceSettings.backendDownloading", { progress: Math.round(backendStatus.progress * 100) }), canStart: false, canStop: false };
       case "ready":
-        return { text: "就绪", canStart: true, canStop: false };
+        return { text: t("settings.serviceSettings.backendReady"), canStart: true, canStop: false };
       case "stopped":
-        return { text: "已停止", canStart: true, canStop: false };
+        return { text: t("settings.serviceSettings.backendStopped"), canStart: true, canStop: false };
       case "error":
-        return { text: `错误: ${backendStatus.message}`, canStart: true, canStop: false };
+        return { text: t("settings.serviceSettings.backendError", { message: backendStatus.message }), canStart: true, canStop: false };
       default:
-        return { text: "未初始化", canStart: false, canStop: false };
+        return { text: t("settings.serviceSettings.backendNotInitialized"), canStart: false, canStop: false };
     }
   };
 
@@ -292,7 +292,7 @@ export function ServiceSettings() {
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">后端服务</p>
+                  <p className="text-sm font-medium">{t("settings.serviceSettings.backendService")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {backendStatus.text}
                   </p>

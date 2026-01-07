@@ -17,19 +17,19 @@ export function AppearanceSettings() {
     {
       value: "light" as Theme,
       label: t("titlebar.theme.light"),
-      description: "明亮的白色背景",
+      description: t("settings.appearanceSettings.lightDescription"),
       icon: Sun,
     },
     {
       value: "dark" as Theme,
       label: t("titlebar.theme.dark"),
-      description: "深色背景，护眼模式",
+      description: t("settings.appearanceSettings.darkDescription"),
       icon: Moon,
     },
     {
       value: "system" as Theme,
       label: t("titlebar.theme.system"),
-      description: "跟随系统设置自动切换",
+      description: t("settings.appearanceSettings.systemDescription"),
       icon: Monitor,
     },
   ];

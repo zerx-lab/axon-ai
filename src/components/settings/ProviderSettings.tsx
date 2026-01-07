@@ -148,10 +148,10 @@ export function ProviderSettings() {
     
     try {
       await navigator.clipboard.writeText(textToCopy);
-      toast.success("验证码已复制");
+      toast.success(t("settings.providerSettings.copySuccess"));
     } catch (error) {
       console.error("复制失败:", error);
-      toast.error("复制失败");
+      toast.error(t("settings.providerSettings.copyFailed"));
     }
   };
 
@@ -205,7 +205,7 @@ export function ProviderSettings() {
     
     const apiKey = apiKeys[providerId];
     if (!apiKey?.trim()) {
-      toast.error("请输入 API Key");
+      toast.error(t("settings.providerSettings.enterApiKey"));
       return;
     }
     
@@ -240,7 +240,7 @@ export function ProviderSettings() {
       
       if (result.error) {
         console.error("OAuth 授权失败:", result.error);
-        toast.error(`授权失败: ${JSON.stringify(result.error)}`);
+        toast.error(`${t("settings.providerSettings.authFailed")}: ${JSON.stringify(result.error)}`);
         return;
       }
       
@@ -256,11 +256,11 @@ export function ProviderSettings() {
         const authorization: OAuthAuthorization = data.authorization || {
           url: data.url || "",
           method: data.method || "code",
-          instructions: data.instructions || "请在浏览器中完成授权，然后输入授权码",
+          instructions: data.instructions || t("settings.providerSettings.authDialogDescription"),
         };
         
         if (!authorization.url) {
-          toast.error("未获取到授权链接");
+          toast.error(t("settings.providerSettings.noAuthUrl"));
           return;
         }
         
@@ -306,12 +306,12 @@ export function ProviderSettings() {
       
       if (result.error) {
         console.error("OAuth 回调失败:", result.error);
-        toast.error(`授权失败: ${JSON.stringify(result.error)}`);
+        toast.error(`${t("settings.providerSettings.authFailed")}: ${JSON.stringify(result.error)}`);
         setOAuthDialog((prev) => ({ ...prev, isSubmitting: false }));
         return;
       }
       
-      toast.success(`${oauthDialog.providerName} 授权成功`);
+      toast.success(t("settings.providerSettings.authSuccess", { name: oauthDialog.providerName }));
       setOAuthDialog(initialOAuthDialogState);
       await loadProviders();
     } catch (error) {
@@ -334,13 +334,13 @@ export function ProviderSettings() {
       
       if (result.error) {
         console.error("OAuth 授权失败:", result.error);
-        toast.error(`授权失败: ${JSON.stringify(result.error)}`);
+        toast.error(`${t("settings.providerSettings.authFailed")}: ${JSON.stringify(result.error)}`);
         setOAuthDialog((prev) => ({ ...prev, isSubmitting: false }));
         return;
       }
       
       // 授权成功
-      toast.success(`${providerName} 授权成功`);
+      toast.success(t("settings.providerSettings.authSuccess", { name: providerName }));
       setOAuthDialog(initialOAuthDialogState);
       await loadProviders();
     } catch (error) {
@@ -356,10 +356,10 @@ export function ProviderSettings() {
     
     try {
       await navigator.clipboard.writeText(oauthDialog.authorization.url);
-      toast.success("授权链接已复制到剪贴板");
+      toast.success(t("settings.providerSettings.authLinkCopied"));
     } catch (error) {
       console.error("复制失败:", error);
-      toast.error("复制失败，请手动复制");
+      toast.error(t("settings.providerSettings.copyFailed"));
     }
   };
 
@@ -371,7 +371,7 @@ export function ProviderSettings() {
       await openUrl(oauthDialog.authorization.url);
     } catch (error) {
       console.error("打开浏览器失败:", error);
-      toast.error("无法打开浏览器");
+      toast.error(t("settings.providerSettings.openBrowserFailed"));
     }
   };
 
@@ -392,21 +392,21 @@ export function ProviderSettings() {
     // 正在初始化/连接中（显示 loading）
     if (isInitializing) {
       // 根据不同阶段显示不同的提示文字
-      let loadingMessage = "正在连接到 OpenCode 服务...";
+      let loadingMessage = t("settings.providerSettings.connecting");
       if (backendStatus === "downloading") {
-        loadingMessage = "正在下载 OpenCode...";
+        loadingMessage = t("settings.providerSettings.downloading");
       } else if (backendStatus === "starting") {
-        loadingMessage = "正在启动 OpenCode 服务...";
+        loadingMessage = t("settings.providerSettings.starting");
       } else if (backendStatus === "uninitialized") {
-        loadingMessage = "正在初始化...";
+        loadingMessage = t("settings.providerSettings.initializing");
       }
       
       return (
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              配置 AI 模型服务提供商的 API Key
+              {t("settings.providerSettings.description")}
             </p>
           </div>
           <Card>
@@ -424,20 +424,20 @@ export function ProviderSettings() {
       return (
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              配置 AI 模型服务提供商的 API Key
+              {t("settings.providerSettings.description")}
             </p>
           </div>
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-8">
               <AlertCircle className="h-6 w-6 text-destructive" />
               <p className="mt-3 text-sm text-muted-foreground">
-                {errorMessage || "无法连接到 OpenCode 服务"}
+                {errorMessage || t("settings.providerSettings.serviceUnavailable")}
               </p>
               <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                重试连接
+                {t("settings.providerSettings.retry")}
               </Button>
             </CardContent>
           </Card>
@@ -459,9 +459,9 @@ export function ProviderSettings() {
       {/* 标题和刷新按钮 */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            配置 AI 模型服务提供商的 API Key
+            {t("settings.providerSettings.description")}
           </p>
         </div>
         <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isLoadingProviders}>
@@ -473,7 +473,7 @@ export function ProviderSettings() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="搜索服务商..."
+          placeholder={t("settings.providerSettings.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
@@ -488,7 +488,7 @@ export function ProviderSettings() {
           </div>
         ) : filteredProviders.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            {searchQuery ? "未找到匹配的服务商" : "暂无可用的服务商"}
+            {searchQuery ? t("settings.providerSettings.noProvidersFound") : t("settings.providerSettings.noProviders")}
           </div>
         ) : (
           filteredProviders.map((provider) => {
@@ -527,11 +527,11 @@ export function ProviderSettings() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{modelCount} 模型</span>
+                      <span>{modelCount} {t("settings.providerSettings.models")}</span>
                       {isConnected && (
                         <span className="flex items-center gap-0.5 text-green-500">
                           <Check className="h-3 w-3" />
-                          已配置
+                          {t("settings.providerSettings.configured")}
                         </span>
                       )}
                     </div>
@@ -550,17 +550,17 @@ export function ProviderSettings() {
                     {/* 环境变量提示 */}
                     {provider.env.length > 0 && (
                       <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
-                        环境变量: {provider.env.join(", ")}
+                        {t("settings.providerSettings.envVar")}: {provider.env.join(", ")}
                       </p>
                     )}
 
                     {/* API Key 输入 */}
                     <div className="space-y-2">
-                      <Label className="text-xs">API Key</Label>
+                      <Label className="text-xs">{t("settings.providerSettings.apiKey")}</Label>
                       <div className="flex gap-2">
                         <Input
                           type="password"
-                          placeholder={isConnected ? "已配置 (输入新值更新)" : "输入 API Key"}
+                          placeholder={isConnected ? t("settings.providerSettings.apiKeyConfigured") : t("settings.providerSettings.apiKeyPlaceholder")}
                           value={apiKeys[provider.id] || ""}
                           onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))}
                           className="h-8 text-sm"
@@ -595,14 +595,14 @@ export function ProviderSettings() {
                         ) : (
                           <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                         )}
-                        {method.label || "OAuth 授权"}
+                        {method.label || t("settings.providerSettings.oauthAuthorize")}
                       </Button>
                     ))}
 
                     {/* 模型预览 */}
                     {modelCount > 0 && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs">模型</Label>
+                        <Label className="text-xs">{t("settings.providerSettings.models")}</Label>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(provider.models).slice(0, 6).map(([id, model]) => (
                             <span key={id} className="rounded bg-muted px-1.5 py-0.5 text-xs">
@@ -629,7 +629,7 @@ export function ProviderSettings() {
       <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
         <Key className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          访问服务商官网获取 API Key，或使用环境变量配置。部分服务商支持 OAuth 一键授权。
+          {t("settings.providerSettings.hint")}
         </p>
       </div>
 
@@ -639,11 +639,11 @@ export function ProviderSettings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5" />
-              {oauthDialog.providerName} 授权
+              {t("settings.providerSettings.authDialogTitle", { name: oauthDialog.providerName })}
             </DialogTitle>
             {oauthDialog.authorization?.method !== "auto" && (
               <DialogDescription>
-                请在浏览器中完成授权，然后输入授权码
+                {t("settings.providerSettings.authDialogDescription")}
               </DialogDescription>
             )}
           </DialogHeader>
@@ -653,7 +653,7 @@ export function ProviderSettings() {
             {oauthDialog.authorization?.method === "auto" && oauthDialog.authorization?.instructions && (
               <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-2">
-                  请在浏览器中输入以下验证码
+                  {t("settings.providerSettings.deviceCodeHint")}
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-2xl font-mono font-bold tracking-wider text-primary select-all">
@@ -664,7 +664,7 @@ export function ProviderSettings() {
                     variant="ghost"
                     size="icon-sm"
                     onClick={handleCopyDeviceCode}
-                    title="复制验证码"
+                    title={t("settings.providerSettings.copyUrl")}
                     className="shrink-0"
                   >
                     <Copy className="h-4 w-4" />
@@ -678,7 +678,7 @@ export function ProviderSettings() {
 
             {/* 授权链接 */}
             <div className="space-y-2">
-              <Label className="text-sm">授权链接</Label>
+              <Label className="text-sm">{t("settings.providerSettings.authUrl")}</Label>
               <div className="flex gap-2">
                 <Input
                   readOnly
@@ -690,7 +690,7 @@ export function ProviderSettings() {
                   size="icon"
                   className="h-9 w-9 shrink-0"
                   onClick={handleCopyUrl}
-                  title="复制链接"
+                  title={t("settings.providerSettings.copyUrl")}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -702,23 +702,23 @@ export function ProviderSettings() {
                 onClick={handleOpenInBrowser}
               >
                 <Globe className="mr-2 h-4 w-4" />
-                在浏览器中打开
+                {t("settings.providerSettings.openInBrowser")}
               </Button>
             </div>
 
             {/* code 模式：授权码输入 */}
             {oauthDialog.authorization?.method === "code" && (
               <div className="space-y-2">
-                <Label className="text-sm">授权码</Label>
+                <Label className="text-sm">{t("settings.providerSettings.authCode")}</Label>
                 <Input
-                  placeholder="粘贴授权码..."
+                  placeholder={t("settings.providerSettings.authCodePlaceholder")}
                   value={oauthDialog.authCode}
                   onChange={(e) => setOAuthDialog((prev) => ({ ...prev, authCode: e.target.value }))}
                   disabled={oauthDialog.isSubmitting}
                   className="h-9"
                 />
                 <p className="text-xs text-muted-foreground">
-                  在浏览器完成授权后，复制授权码并粘贴到上方输入框
+                  {t("settings.providerSettings.authCodeHint")}
                 </p>
               </div>
             )}
@@ -727,7 +727,7 @@ export function ProviderSettings() {
             {oauthDialog.authorization?.method === "auto" && (
               <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>等待浏览器授权完成...</span>
+                <span>{t("settings.providerSettings.waitingAuth")}</span>
               </div>
             )}
           </div>
@@ -738,7 +738,7 @@ export function ProviderSettings() {
               onClick={handleCloseOAuthDialog}
               disabled={oauthDialog.isSubmitting}
             >
-              {oauthDialog.authorization?.method === "auto" ? "关闭" : "取消"}
+              {oauthDialog.authorization?.method === "auto" ? t("common.close") : t("common.cancel")}
             </Button>
             {oauthDialog.authorization?.method === "code" && (
               <Button
@@ -748,12 +748,12 @@ export function ProviderSettings() {
                 {oauthDialog.isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    验证中...
+                    {t("settings.providerSettings.verifying")}
                   </>
                 ) : (
                   <>
                     <Check className="mr-2 h-4 w-4" />
-                    完成授权
+                    {t("settings.providerSettings.completeAuth")}
                   </>
                 )}
               </Button>

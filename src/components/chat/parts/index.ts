@@ -6,3 +6,4 @@ export {
   StepStartPartView,
   StepFinishPartView,
 } from "./PartRenderer";
+export { MarkdownRenderer } from "./MarkdownRenderer";

@@ -97,10 +97,10 @@ export function AboutSettings() {
           {/* 版权信息 */}
           <div className="text-center space-y-2">
             <p className="text-xs text-muted-foreground">
-              Built with Tauri, React & OpenCode
+              {t("settings.aboutSettings.builtWith")}
             </p>
             <p className="text-xs text-muted-foreground">
-              MIT License
+              {t("settings.aboutSettings.mitLicense")}
             </p>
           </div>
         </CardContent>

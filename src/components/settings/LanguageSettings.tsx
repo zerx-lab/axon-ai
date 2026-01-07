@@ -59,7 +59,7 @@ export function LanguageSettings() {
                 <div className="space-y-1">
                   <p className="font-medium">{nativeName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {code === "zh" ? "简体中文" : "English (US)"}
+                    {t(`settings.languageSettings.${code === "zh" ? "chineseDesc" : "englishDesc"}`)}
                   </p>
                 </div>
                 {currentLanguage === code && (

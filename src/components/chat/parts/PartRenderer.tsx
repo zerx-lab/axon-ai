@@ -38,6 +38,7 @@ import type {
   AssistantMessageInfo,
 } from "@/types/chat";
 import { getToolDisplayName } from "@/types/chat";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 // ============== Part 渲染器 ==============
 
@@ -76,13 +77,7 @@ interface TextPartViewProps {
 function TextPartView({ part }: TextPartViewProps) {
   if (!part.text || part.ignored) return null;
   
-  return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
-      <p className="whitespace-pre-wrap break-words text-foreground">
-        {part.text}
-      </p>
-    </div>
-  );
+  return <MarkdownRenderer content={part.text} />;
 }
 
 // ============== Reasoning Part ==============

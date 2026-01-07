@@ -1,18 +1,19 @@
 /**
  * 设置页面组件
- * 包含服务设置、AI 渠道商设置、语言设置、外观设置等
+ * 包含服务设置、AI 渠道商设置、MCP设置、语言设置、外观设置等
  * 采用左侧导航 + 右侧内容的双栏布局
  * Tab 状态通过 URL search params 记录，支持刷新保持状态
  */
 
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Server, Globe, Palette, Info, Sparkles } from "lucide-react";
+import { ArrowLeft, Server, Globe, Palette, Info, Sparkles, Blocks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ServiceSettings } from "./ServiceSettings";
 import { ProviderSettings } from "./ProviderSettings";
+import { McpSettings } from "./McpSettings";
 import { LanguageSettings } from "./LanguageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { AboutSettings } from "./AboutSettings";
@@ -46,7 +47,8 @@ export function SettingsPage() {
 
   const navItems: NavItem[] = [
     { id: "service", label: t("settings.service"), icon: Server },
-    { id: "provider", label: "AI 服务商", icon: Sparkles },
+    { id: "provider", label: t("settings.provider"), icon: Sparkles },
+    { id: "mcp", label: t("settings.mcp"), icon: Blocks },
     { id: "language", label: t("settings.language"), icon: Globe },
     { id: "appearance", label: t("settings.appearance"), icon: Palette },
     { id: "about", label: t("settings.about"), icon: Info },
@@ -58,6 +60,8 @@ export function SettingsPage() {
         return <ServiceSettings />;
       case "provider":
         return <ProviderSettings />;
+      case "mcp":
+        return <McpSettings />;
       case "language":
         return <LanguageSettings />;
       case "appearance":
