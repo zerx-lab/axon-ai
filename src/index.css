@@ -224,10 +224,10 @@
     scroll-behavior: smooth;
   }
 
-  /* Custom scrollbar - Zed style */
+  /* Custom scrollbar - 细滚动条样式 */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
@@ -237,6 +237,7 @@
   ::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
     opacity: 0.3;
+    border-radius: 2px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -249,6 +250,93 @@
 
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #5a5a5a;
+  }
+
+  /* 侧边栏滚动区域 - overlay 样式滚动条，避免与拖拽手柄冲突 */
+  .sidebar-scroll-area {
+    /* 使用 overlay 滚动条，不占用内容空间 */
+    overflow-y: overlay;
+    scrollbar-gutter: stable;
+  }
+
+  /* 侧边栏滚动条 - 悬浮变宽效果 */
+  .sidebar-scroll-area::-webkit-scrollbar {
+    width: 4px;
+    transition: width 0.2s ease;
+  }
+
+  .sidebar-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar-scroll-area::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 2px;
+    transition: background 0.2s ease, width 0.2s ease;
+  }
+
+  /* 容器悬浮时显示滚动条 */
+  .sidebar-scroll-area:hover::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    opacity: 0.4;
+  }
+
+  .dark .sidebar-scroll-area:hover::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+  }
+
+  /* 滚动条悬浮时变宽 - 便于快速拖拽 */
+  .sidebar-scroll-area:hover::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar-scroll-area:hover::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+    opacity: 0.6;
+  }
+
+  .dark .sidebar-scroll-area:hover::-webkit-scrollbar-thumb:hover {
+    background: #6a6a6a;
+  }
+
+  /* 聊天内容区域滚动条 - 悬浮变宽效果 */
+  .chat-scroll-area::-webkit-scrollbar {
+    width: 4px;
+    transition: width 0.2s ease;
+  }
+
+  .chat-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .chat-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    opacity: 0.3;
+    border-radius: 2px;
+    transition: background 0.2s ease, width 0.2s ease;
+  }
+
+  /* 容器悬浮时滚动条变宽 */
+  .chat-scroll-area:hover::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .chat-scroll-area:hover::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    opacity: 0.5;
+  }
+
+  .chat-scroll-area:hover::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+    opacity: 0.6;
+  }
+
+  .dark .chat-scroll-area::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+  }
+
+  .dark .chat-scroll-area:hover::-webkit-scrollbar-thumb:hover {
+    background: #6a6a6a;
   }
 }
 

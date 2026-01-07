@@ -35,7 +35,8 @@
     "older": "更早",
     "noChats": "暂无对话",
     "deleteChat": "删除对话",
-    "renameChat": "重命名对话"
+    "renameChat": "重命名对话",
+    "refresh": "刷新会话列表"
   },
   "chat": {
     "inputPlaceholder": "输入消息...",
@@ -46,7 +47,21 @@
     "copied": "已复制",
     "thinking": "思考中...",
     "welcome": "你好！我是 Axon AI 助手，有什么可以帮助你的吗？",
-    "errorMessage": "抱歉，发生了错误，请重试。"
+    "errorMessage": "抱歉，发生了错误，请重试。",
+    "emptyState": {
+      "title": "开始对话",
+      "description": "发送一条消息，开始与 Axon AI 助手聊天。"
+    },
+    "inputHint": "按 Enter 发送，Shift + Enter 换行",
+    "user": "你",
+    "assistant": "Axon",
+    "selectModel": "选择模型",
+    "noModels": "暂无可用模型",
+    "loadingModels": "加载模型中...",
+    "modelRequired": "请先选择模型",
+    "connecting": "正在连接服务...",
+    "disconnected": "服务未连接",
+    "emptyResponse": "（空响应）"
   },
   "settings": {
     "title": "设置",
@@ -131,7 +146,18 @@
     "serviceUnavailable": "服务不可用",
     "invalidUrl": "无效的 URL",
     "networkError": "网络错误",
-    "unknownError": "未知错误"
+    "unknownError": "未知错误",
+    "sendMessageFailed": "发送消息失败",
+    "sendMessageFailedWithDetail": "发送消息失败: {{detail}}",
+    "sessionError": "会话错误",
+    "sessionErrorWithDetail": "会话错误: {{detail}}",
+    "serviceNotConnected": "服务未连接或无活动会话",
+    "modelRequired": "请先选择模型",
+    "createSessionFailed": "创建会话失败",
+    "loadSessionsFailed": "加载会话失败",
+    "deleteSessionFailed": "删除会话失败",
+    "modelNotSupported": "模型不支持，请在 Copilot 设置中启用该模型",
+    "messageError": "消息生成失败"
   },
   "notifications": {
     "settingsSaved": "设置已保存",

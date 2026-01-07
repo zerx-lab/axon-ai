@@ -3,6 +3,17 @@
  */
 
 import type { OpencodeClient as SDKClient } from "@opencode-ai/sdk/v2/client";
+import type { Event as SDKEvent } from "@opencode-ai/sdk/v2";
+
+/**
+ * SDK 事件类型 (re-export)
+ */
+export type OpencodeEvent = SDKEvent;
+
+/**
+ * 事件监听器类型
+ */
+export type EventListener = (event: OpencodeEvent) => void;
 
 /**
  * 服务连接模式

@@ -19,6 +19,8 @@ import {
   type OpencodeServiceState,
   type OpencodeClient,
   type ServiceMode,
+  type EventListener,
+  type SSEHealthStatus,
 } from "@/services/opencode";
 
 interface OpencodeContextValue {
@@ -29,6 +31,9 @@ interface OpencodeContextValue {
   isInitializing: boolean;
   error: string | null;
   
+  // SSE 健康状态
+  sseHealth: SSEHealthStatus;
+  
   // 操作
   connect: () => Promise<void>;
   disconnect: () => void;
@@ -37,6 +42,12 @@ interface OpencodeContextValue {
   stopService: () => Promise<void>;
   restartService: () => Promise<void>;
   retry: () => Promise<void>;
+  
+  // SSE 事件订阅
+  onEvent: (listener: EventListener) => () => void;
+  
+  // SSE 重连（用于手动恢复连接）
+  reconnectSSE: () => Promise<void>;
 }
 
 const OpencodeContext = createContext<OpencodeContextValue | null>(null);
@@ -219,12 +230,30 @@ export function OpencodeProvider({
     }
   }, [service]);
 
+  // SSE 事件订阅
+  const onEvent = useCallback((listener: EventListener) => {
+    return service.onEvent(listener);
+  }, [service]);
+  
+  // SSE 重连
+  const reconnectSSE = useCallback(async () => {
+    try {
+      await service.reconnectSSE();
+    } catch (e) {
+      console.error("[OpencodeProvider] SSE reconnect failed:", e);
+    }
+  }, [service]);
+  
+  // 获取 SSE 健康状态
+  const sseHealth = service.getSSEHealthStatus();
+
   const value: OpencodeContextValue = {
     state,
     client: service.getClient(),
     isConnected: state.connectionState.status === "connected",
     isInitializing,
     error,
+    sseHealth,
     connect,
     disconnect,
     setMode,
@@ -232,6 +261,8 @@ export function OpencodeProvider({
     stopService,
     restartService,
     retry,
+    onEvent,
+    reconnectSSE,
   };
 
   return (

@@ -104,7 +104,7 @@ export function ChatInput({
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground text-center">
-        Press Enter to send, Shift + Enter for new line
+        {t("chat.inputHint")}
       </p>
     </div>
   );

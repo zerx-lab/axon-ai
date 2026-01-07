@@ -16,6 +16,7 @@
 - **Frontend**: React 19 + TypeScript 5 + Vite 7
 - **Backend**: Rust + Tauri 2
 - **Package Manager**: Bun
+- **opencode**: 项目根目录下存在opencode源码,可用于功能调研与对接参考
 
 The backend handles async detection/download of opencode binary on startup and invokes `opencode serve` for AI operations.
 

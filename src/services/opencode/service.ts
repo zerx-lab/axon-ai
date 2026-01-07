@@ -3,6 +3,12 @@
  * 
  * 管理 OpenCode 客户端连接和状态
  * 支持本地模式和远程模式的切换
+ * 支持 SSE 事件订阅，实现流式对话
+ * 
+ * SSE 优化：
+ * - 心跳检测：处理 server.heartbeat 事件
+ * - 指数退避重连：连接失败时使用指数退避策略
+ * - 连接健康监测：监控 SSE 连接状态
  */
 
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client";
@@ -15,6 +21,8 @@ import {
   type ConnectionState,
   type BackendServiceStatus,
   type ServiceMode,
+  type OpencodeEvent,
+  type EventListener,
   DEFAULT_CONFIG,
   getEndpointUrl,
 } from "./types";
@@ -22,7 +30,28 @@ import {
 // Tauri 事件名称
 const EVENT_SERVICE_STATUS = "service:status";
 
+// SSE 重连配置
+const SSE_RECONNECT_CONFIG = {
+  baseDelay: 1000,      // 初始重连延迟 1秒
+  maxDelay: 30000,      // 最大重连延迟 30秒
+  maxRetries: 10,       // 最大重试次数
+  backoffMultiplier: 2, // 退避倍数
+};
+
+// 心跳超时配置（服务器每30秒发送心跳）
+const HEARTBEAT_TIMEOUT = 45000; // 45秒无心跳视为连接断开
+
 type StateListener = (state: OpencodeServiceState) => void;
+
+/**
+ * SSE 连接健康状态
+ */
+export interface SSEHealthStatus {
+  isConnected: boolean;
+  lastHeartbeat: number | null;
+  reconnectAttempts: number;
+  lastError: string | null;
+}
 
 /**
  * OpenCode 服务管理类
@@ -32,6 +61,8 @@ type StateListener = (state: OpencodeServiceState) => void;
  * 2. 监听 Rust 后端的服务状态变化
  * 3. 处理本地/远程模式切换
  * 4. 提供统一的状态接口
+ * 5. 管理 SSE 事件流，支持流式对话
+ * 6. SSE 连接健康监测和自动重连
  */
 export class OpencodeService {
   private client: OpencodeClient | null = null;
@@ -42,6 +73,18 @@ export class OpencodeService {
   private listeners: Set<StateListener> = new Set();
   private unlistenBackend: UnlistenFn | null = null;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  
+  // SSE 事件相关
+  private eventListeners: Set<EventListener> = new Set();
+  private eventAbortController: AbortController | null = null;
+  private eventStreamActive = false;
+  
+  // SSE 健康监测相关
+  private sseReconnectAttempts = 0;
+  private sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private lastHeartbeatTime: number | null = null;
+  private heartbeatCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private lastSSEError: string | null = null;
 
   constructor(config: Partial<OpencodeServiceConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -156,6 +199,9 @@ export class OpencodeService {
         
         // 启动健康检查
         this.startHealthCheck();
+        
+        // 启动 SSE 事件流
+        this.startEventStream();
       } else {
         throw new Error("Server health check failed");
       }
@@ -172,9 +218,267 @@ export class OpencodeService {
    */
   disconnect(): void {
     this.stopHealthCheck();
+    this.stopEventStream();
     this.client = null;
     this.endpoint = null;
     this.setConnectionState({ status: "disconnected" });
+  }
+
+  // ============== SSE 事件订阅 ==============
+
+  /**
+   * 启动 SSE 事件流
+   * 订阅服务器事件，用于流式对话
+   * 包含心跳检测和自动重连机制
+   */
+  async startEventStream(): Promise<void> {
+    if (this.eventStreamActive || !this.client) {
+      return;
+    }
+
+    console.log("[OpencodeService] Starting SSE event stream...");
+    this.eventAbortController = new AbortController();
+    this.eventStreamActive = true;
+    this.lastSSEError = null;
+
+    try {
+      const response = await this.client.event.subscribe();
+      
+      if (!response.stream) {
+        console.warn("[OpencodeService] SSE stream not available");
+        this.eventStreamActive = false;
+        this.scheduleReconnect();
+        return;
+      }
+
+      // 重置重连计数器（连接成功）
+      this.sseReconnectAttempts = 0;
+      
+      // 启动心跳检测
+      this.startHeartbeatCheck();
+
+      // 在后台处理事件流
+      this.processEventStream(response.stream);
+      console.log("[OpencodeService] SSE event stream started successfully");
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      console.error("[OpencodeService] Failed to start SSE event stream:", errorMessage);
+      this.lastSSEError = errorMessage;
+      this.eventStreamActive = false;
+      this.scheduleReconnect();
+    }
+  }
+
+  /**
+   * 处理 SSE 事件流
+   * 优化：增加心跳处理，使用批量事件处理减少重渲染
+   */
+  private async processEventStream(
+    stream: AsyncIterable<OpencodeEvent>
+  ): Promise<void> {
+    try {
+      for await (const event of stream) {
+        // 检查是否已停止
+        if (!this.eventStreamActive) {
+          break;
+        }
+
+        // 处理心跳事件（服务器可能发送此类型，但 SDK 类型定义可能不包含）
+        // 使用类型断言处理未知事件类型
+        const eventType = event.type as string;
+        if (eventType === "server.heartbeat") {
+          this.lastHeartbeatTime = Date.now();
+          // 心跳事件不需要通知业务监听器
+          continue;
+        }
+
+        // 更新心跳时间（任何事件都表示连接活跃）
+        this.lastHeartbeatTime = Date.now();
+
+        // 通知所有监听器
+        this.notifyEventListeners(event);
+      }
+      
+      // 流正常结束，可能是服务器主动关闭
+      if (this.eventStreamActive) {
+        console.log("[OpencodeService] SSE stream ended normally, scheduling reconnect...");
+        this.eventStreamActive = false;
+        this.scheduleReconnect();
+      }
+    } catch (e) {
+      if (this.eventStreamActive) {
+        const errorMessage = e instanceof Error ? e.message : "Unknown error";
+        console.error("[OpencodeService] SSE stream error:", errorMessage);
+        this.lastSSEError = errorMessage;
+        this.eventStreamActive = false;
+        this.scheduleReconnect();
+      }
+    }
+  }
+  
+  /**
+   * 通知事件监听器（优化版本）
+   * 使用 queueMicrotask 批量处理，减少同步阻塞
+   */
+  private notifyEventListeners(event: OpencodeEvent): void {
+    // 使用 Set 转数组避免迭代中修改问题
+    const listeners = Array.from(this.eventListeners);
+    
+    for (const listener of listeners) {
+      // 使用 queueMicrotask 异步执行，避免单个监听器阻塞
+      queueMicrotask(() => {
+        try {
+          listener(event);
+        } catch (e) {
+          console.error("[OpencodeService] Event listener error:", e);
+        }
+      });
+    }
+  }
+
+  /**
+   * 调度 SSE 重连（指数退避策略）
+   */
+  private scheduleReconnect(): void {
+    // 清除现有的重连定时器
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
+    }
+
+    // 检查是否超过最大重试次数
+    if (this.sseReconnectAttempts >= SSE_RECONNECT_CONFIG.maxRetries) {
+      console.error("[OpencodeService] SSE max reconnect attempts reached, giving up");
+      this.lastSSEError = "Max reconnect attempts reached";
+      return;
+    }
+
+    // 计算退避延迟
+    const delay = Math.min(
+      SSE_RECONNECT_CONFIG.baseDelay * Math.pow(SSE_RECONNECT_CONFIG.backoffMultiplier, this.sseReconnectAttempts),
+      SSE_RECONNECT_CONFIG.maxDelay
+    );
+    
+    this.sseReconnectAttempts++;
+    
+    console.log(
+      `[OpencodeService] Scheduling SSE reconnect in ${delay}ms (attempt ${this.sseReconnectAttempts}/${SSE_RECONNECT_CONFIG.maxRetries})`
+    );
+
+    this.sseReconnectTimeout = setTimeout(() => {
+      if (this.connectionState.status === "connected") {
+        this.startEventStream();
+      }
+    }, delay);
+  }
+
+  /**
+   * 启动心跳检测
+   * 如果超过 HEARTBEAT_TIMEOUT 没有收到心跳，认为连接已断开
+   */
+  private startHeartbeatCheck(): void {
+    this.stopHeartbeatCheck();
+    
+    this.lastHeartbeatTime = Date.now();
+    
+    this.heartbeatCheckInterval = setInterval(() => {
+      if (!this.eventStreamActive || !this.lastHeartbeatTime) {
+        return;
+      }
+      
+      const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeatTime;
+      
+      if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT) {
+        console.warn(
+          `[OpencodeService] SSE heartbeat timeout (${timeSinceLastHeartbeat}ms since last heartbeat)`
+        );
+        
+        // 强制重连
+        this.eventStreamActive = false;
+        this.lastSSEError = "Heartbeat timeout";
+        this.scheduleReconnect();
+      }
+    }, 10000); // 每10秒检查一次
+  }
+
+  /**
+   * 停止心跳检测
+   */
+  private stopHeartbeatCheck(): void {
+    if (this.heartbeatCheckInterval) {
+      clearInterval(this.heartbeatCheckInterval);
+      this.heartbeatCheckInterval = null;
+    }
+  }
+
+  /**
+   * 停止 SSE 事件流
+   */
+  stopEventStream(): void {
+    if (!this.eventStreamActive && !this.sseReconnectTimeout) {
+      return;
+    }
+
+    console.log("[OpencodeService] Stopping SSE event stream...");
+    this.eventStreamActive = false;
+    
+    // 停止心跳检测
+    this.stopHeartbeatCheck();
+    
+    // 取消重连定时器
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
+    }
+    
+    // 取消正在进行的请求
+    this.eventAbortController?.abort();
+    this.eventAbortController = null;
+    
+    // 重置状态
+    this.sseReconnectAttempts = 0;
+    this.lastHeartbeatTime = null;
+  }
+
+  /**
+   * 注册 SSE 事件监听器
+   * @returns 取消订阅函数
+   */
+  onEvent(listener: EventListener): () => void {
+    this.eventListeners.add(listener);
+    return () => {
+      this.eventListeners.delete(listener);
+    };
+  }
+
+  /**
+   * 获取 SSE 事件流状态
+   */
+  isEventStreamActive(): boolean {
+    return this.eventStreamActive;
+  }
+  
+  /**
+   * 获取 SSE 健康状态
+   */
+  getSSEHealthStatus(): SSEHealthStatus {
+    return {
+      isConnected: this.eventStreamActive,
+      lastHeartbeat: this.lastHeartbeatTime,
+      reconnectAttempts: this.sseReconnectAttempts,
+      lastError: this.lastSSEError,
+    };
+  }
+  
+  /**
+   * 手动触发 SSE 重连
+   * 用于用户主动触发或错误恢复
+   */
+  async reconnectSSE(): Promise<void> {
+    console.log("[OpencodeService] Manual SSE reconnect triggered");
+    this.stopEventStream();
+    this.sseReconnectAttempts = 0; // 重置重试计数
+    await this.startEventStream();
   }
 
   /**
@@ -243,6 +547,7 @@ export class OpencodeService {
     this.disconnect();
     this.unlistenBackend?.();
     this.listeners.clear();
+    this.eventListeners.clear();
   }
 
   // ============== 后端服务控制 ==============

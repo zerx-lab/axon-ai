@@ -35,7 +35,8 @@
     "older": "Older",
     "noChats": "No chats yet",
     "deleteChat": "Delete chat",
-    "renameChat": "Rename chat"
+    "renameChat": "Rename chat",
+    "refresh": "Refresh session list"
   },
   "chat": {
     "inputPlaceholder": "Type a message...",
@@ -46,7 +47,21 @@
     "copied": "Copied",
     "thinking": "Thinking...",
     "welcome": "Hello! I'm Axon AI assistant. How can I help you today?",
-    "errorMessage": "Sorry, an error occurred. Please try again."
+    "errorMessage": "Sorry, an error occurred. Please try again.",
+    "emptyState": {
+      "title": "Start a conversation",
+      "description": "Send a message to begin chatting with Axon AI assistant."
+    },
+    "inputHint": "Press Enter to send, Shift + Enter for new line",
+    "user": "You",
+    "assistant": "Axon",
+    "selectModel": "Select Model",
+    "noModels": "No models available",
+    "loadingModels": "Loading models...",
+    "modelRequired": "Please select a model first",
+    "connecting": "Connecting to service...",
+    "disconnected": "Service not connected",
+    "emptyResponse": "(Empty response)"
   },
   "settings": {
     "title": "Settings",
@@ -131,7 +146,18 @@
     "serviceUnavailable": "Service unavailable",
     "invalidUrl": "Invalid URL",
     "networkError": "Network error",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "sendMessageFailed": "Failed to send message",
+    "sendMessageFailedWithDetail": "Failed to send message: {{detail}}",
+    "sessionError": "Session error",
+    "sessionErrorWithDetail": "Session error: {{detail}}",
+    "serviceNotConnected": "Service not connected or no active session",
+    "modelRequired": "Please select a model first",
+    "createSessionFailed": "Failed to create session",
+    "loadSessionsFailed": "Failed to load sessions",
+    "deleteSessionFailed": "Failed to delete session",
+    "modelNotSupported": "Model not supported, please enable it in your Copilot settings",
+    "messageError": "Message generation failed"
   },
   "notifications": {
     "settingsSaved": "Settings saved",

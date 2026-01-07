@@ -19,11 +19,13 @@
  * - OpenCode SDK Client: 实际的 API 客户端
  */
 
-export { OpencodeService, getOpencodeService } from "./service";
+export { OpencodeService, getOpencodeService, type SSEHealthStatus } from "./service";
 export type { 
   ConnectionState, 
   ServiceMode, 
   OpencodeServiceConfig,
   OpencodeServiceState,
   OpencodeClient,
+  OpencodeEvent,
+  EventListener,
 } from "./types";
