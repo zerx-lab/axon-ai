@@ -2,10 +2,10 @@
  * 设置页面组件
  * 包含服务设置、AI 渠道商设置、语言设置、外观设置等
  * 采用左侧导航 + 右侧内容的双栏布局
+ * Tab 状态通过 URL search params 记录，支持刷新保持状态
  */
 
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Server, Globe, Palette, Info, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,7 @@ import { ProviderSettings } from "./ProviderSettings";
 import { LanguageSettings } from "./LanguageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { AboutSettings } from "./AboutSettings";
-
-type SettingsTab = "service" | "provider" | "language" | "appearance" | "about";
+import type { SettingsTab } from "@/routes/settings";
 
 interface NavItem {
   id: SettingsTab;
@@ -28,10 +27,21 @@ interface NavItem {
 export function SettingsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("service");
+  // 从 URL search params 获取当前 tab，默认为 "service"
+  const { tab } = useSearch({ from: "/settings" });
+  const activeTab: SettingsTab = tab ?? "service";
 
   const handleBack = () => {
     navigate({ to: "/" });
+  };
+
+  // 切换 tab 时更新 URL search params
+  const handleTabChange = (tabId: SettingsTab) => {
+    navigate({
+      to: "/settings",
+      search: { tab: tabId },
+      replace: true, // 使用 replace 避免产生过多历史记录
+    });
   };
 
   const navItems: NavItem[] = [
@@ -85,7 +95,7 @@ export function SettingsPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => handleTabChange(item.id)}
                     className={cn(
                       "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",

@@ -71,7 +71,7 @@
       "localDescription": "Use local OpenCode service, suitable for offline use",
       "remote": "Remote Service",
       "remoteDescription": "Connect to remote OpenCode server",
-      "remoteUrl": "Remote Service URL",
+      "remoteUrl": "Remote Service URL:",
       "remoteUrlPlaceholder": "Enter remote service URL",
       "remoteUrlHint": "e.g., http://localhost:8080",
       "status": "Connection Status",

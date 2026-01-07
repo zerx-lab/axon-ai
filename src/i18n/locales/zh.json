@@ -71,7 +71,7 @@
       "localDescription": "使用本地 OpenCode 服务，适合离线使用",
       "remote": "远程服务",
       "remoteDescription": "连接到远程 OpenCode 服务器",
-      "remoteUrl": "远程服务地址",
+      "remoteUrl": "远程服务地址:",
       "remoteUrlPlaceholder": "请输入远程服务 URL",
       "remoteUrlHint": "例如: http://localhost:8080",
       "status": "连接状态",

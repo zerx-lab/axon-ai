@@ -3,7 +3,7 @@
  * 用于配置 AI 服务提供商和 API Key
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -17,6 +17,7 @@ import {
   Search,
   Copy,
   Globe,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,12 +101,28 @@ const initialOAuthDialogState: OAuthDialogState = {
 
 export function ProviderSettings() {
   const { t } = useTranslation();
-  const { client, isConnected } = useOpencode();
+  const { client, isConnected, state, connect } = useOpencode();
+  
+  // 从全局状态获取连接状态和后端状态
+  const connectionStatus = state.connectionState.status;
+  const backendStatus = state.backendStatus.type;
+  
+  // 判断是否正在加载中（包括后端初始化、下载、启动、连接中）
+  const isInitializing = backendStatus === "uninitialized" || 
+                         backendStatus === "downloading" || 
+                         backendStatus === "starting" ||
+                         connectionStatus === "connecting";
+  
+  // 判断是否有错误（后端错误或连接错误，但排除初始化中的状态）
+  const hasError = (connectionStatus === "error" || backendStatus === "error") && !isInitializing;
+  const errorMessage = connectionStatus === "error" 
+    ? state.connectionState.message 
+    : (backendStatus === "error" ? (state.backendStatus as { message: string }).message : null);
   
   const [providers, setProviders] = useState<Provider[]>([]);
   const [connectedProviders, setConnectedProviders] = useState<Set<string>>(new Set());
   const [authMethods, setAuthMethods] = useState<Record<string, ProviderAuthMethod[]>>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
@@ -113,9 +130,6 @@ export function ProviderSettings() {
   
   // OAuth 对话框状态
   const [oauthDialog, setOAuthDialog] = useState<OAuthDialogState>(initialOAuthDialogState);
-  
-  // auto 模式轮询定时器
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 从 instructions 中提取验证码
   const extractDeviceCode = (instructions: string): string | null => {
@@ -141,21 +155,6 @@ export function ProviderSettings() {
     }
   };
 
-  // 停止轮询
-  const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  }, []);
-
-  // 组件卸载时清理轮询
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, [stopPolling]);
-
   // 过滤后的 Provider 列表
   const filteredProviders = useMemo(() => {
     if (!searchQuery.trim()) return providers;
@@ -172,7 +171,7 @@ export function ProviderSettings() {
   const loadProviders = useCallback(async () => {
     if (!client || !isConnected) return;
     
-    setIsLoading(true);
+    setIsLoadingProviders(true);
     try {
       const providerResult = await client.provider.list();
       if (providerResult.data) {
@@ -192,42 +191,13 @@ export function ProviderSettings() {
       console.error("加载 Provider 失败:", error);
       toast.error(t("errors.unknownError"));
     } finally {
-      setIsLoading(false);
+      setIsLoadingProviders(false);
     }
   }, [client, isConnected, t]);
 
   useEffect(() => {
     loadProviders();
   }, [loadProviders]);
-
-  // 开始轮询检查授权状态（auto 模式）
-  const startPollingAuthStatus = useCallback((providerId: string, providerName: string) => {
-    // 清除之前的轮询
-    stopPolling();
-    
-    // 每 2 秒检查一次
-    pollIntervalRef.current = setInterval(async () => {
-      if (!client) return;
-      
-      try {
-        const result = await client.provider.list();
-        if (result.data) {
-          const data = result.data as unknown as { connected: string[] };
-          const isNowConnected = (data.connected || []).includes(providerId);
-          
-          if (isNowConnected) {
-            // 授权成功
-            stopPolling();
-            toast.success(`${providerName} 授权成功`);
-            setOAuthDialog(initialOAuthDialogState);
-            loadProviders();
-          }
-        }
-      } catch (error) {
-        console.error("检查连接状态失败:", error);
-      }
-    }, 2000);
-  }, [client, stopPolling, loadProviders]);
 
   // 保存 API Key
   const handleSaveApiKey = async (providerId: string) => {
@@ -305,10 +275,12 @@ export function ProviderSettings() {
           isSubmitting: false,
         });
         
-        // auto 模式自动打开浏览器并开始轮询
+        // auto 模式：自动打开浏览器并调用 callback（后端阻塞等待授权完成）
         if (authorization.method === "auto") {
           await openUrl(authorization.url);
-          startPollingAuthStatus(providerId, providerName);
+          // 设置提交状态并调用回调（后端会阻塞直到用户完成授权）
+          setOAuthDialog(prev => ({ ...prev, isSubmitting: true }));
+          handleAutoOAuthCallback(providerId, providerName, methodIndex);
         }
       }
     } catch (error) {
@@ -319,7 +291,7 @@ export function ProviderSettings() {
     }
   };
 
-  // 处理 OAuth 回调 - 提交授权码
+  // 处理 OAuth 回调 - 提交授权码 (code 模式)
   const handleOAuthCallback = async () => {
     if (!client || !oauthDialog.authCode.trim()) return;
     
@@ -344,6 +316,35 @@ export function ProviderSettings() {
       await loadProviders();
     } catch (error) {
       console.error("OAuth 回调失败:", error);
+      toast.error(t("errors.unknownError"));
+      setOAuthDialog((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  // 处理 auto 模式 OAuth 回调 - 后端阻塞等待用户完成授权
+  const handleAutoOAuthCallback = async (providerId: string, providerName: string, methodIndex: number) => {
+    if (!client) return;
+    
+    try {
+      // 调用 callback 时不传 code 参数，后端会阻塞等待用户在浏览器中完成授权
+      const result = await client.provider.oauth.callback({
+        providerID: providerId,
+        method: methodIndex,
+      });
+      
+      if (result.error) {
+        console.error("OAuth 授权失败:", result.error);
+        toast.error(`授权失败: ${JSON.stringify(result.error)}`);
+        setOAuthDialog((prev) => ({ ...prev, isSubmitting: false }));
+        return;
+      }
+      
+      // 授权成功
+      toast.success(`${providerName} 授权成功`);
+      setOAuthDialog(initialOAuthDialogState);
+      await loadProviders();
+    } catch (error) {
+      console.error("OAuth 授权失败:", error);
       toast.error(t("errors.unknownError"));
       setOAuthDialog((prev) => ({ ...prev, isSubmitting: false }));
     }
@@ -377,7 +378,6 @@ export function ProviderSettings() {
   // 关闭 OAuth 对话框
   const handleCloseOAuthDialog = () => {
     if (oauthDialog.isSubmitting) return;
-    stopPolling();
     setOAuthDialog(initialOAuthDialogState);
   };
 
@@ -387,26 +387,71 @@ export function ProviderSettings() {
     setExpandedProvider(expandedProvider === providerId ? null : providerId);
   };
 
-  if (!isConnected) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            配置 AI 模型服务提供商的 API Key
-          </p>
+  // 渲染连接状态 UI（初始化中或连接失败）
+  const renderConnectionStatus = () => {
+    // 正在初始化/连接中（显示 loading）
+    if (isInitializing) {
+      // 根据不同阶段显示不同的提示文字
+      let loadingMessage = "正在连接到 OpenCode 服务...";
+      if (backendStatus === "downloading") {
+        loadingMessage = "正在下载 OpenCode...";
+      } else if (backendStatus === "starting") {
+        loadingMessage = "正在启动 OpenCode 服务...";
+      } else if (backendStatus === "uninitialized") {
+        loadingMessage = "正在初始化...";
+      }
+      
+      return (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              配置 AI 模型服务提供商的 API Key
+            </p>
+          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="mt-3 text-sm text-muted-foreground">{loadingMessage}</p>
+            </CardContent>
+          </Card>
         </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            <p className="text-sm text-muted-foreground">请先连接到 OpenCode 服务</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={loadProviders}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              重试
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+      );
+    }
+
+    // 连接失败或有错误
+    if (hasError || !isConnected) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">AI 服务提供商</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              配置 AI 模型服务提供商的 API Key
+            </p>
+          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+              <p className="mt-3 text-sm text-muted-foreground">
+                {errorMessage || "无法连接到 OpenCode 服务"}
+              </p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                重试连接
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // 如果未连接，显示连接状态 UI
+  const connectionStatusUI = renderConnectionStatus();
+  if (connectionStatusUI) {
+    return connectionStatusUI;
   }
 
   return (
@@ -419,8 +464,8 @@ export function ProviderSettings() {
             配置 AI 模型服务提供商的 API Key
           </p>
         </div>
-        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isLoading}>
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isLoadingProviders}>
+          <RefreshCw className={cn("h-4 w-4", isLoadingProviders && "animate-spin")} />
         </Button>
       </div>
 
@@ -437,7 +482,7 @@ export function ProviderSettings() {
 
       {/* Provider 列表 */}
       <div className="space-y-2">
-        {isLoading && providers.length === 0 ? (
+        {isLoadingProviders && providers.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
