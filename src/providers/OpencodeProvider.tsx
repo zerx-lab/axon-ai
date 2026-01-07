@@ -1,0 +1,253 @@
+/**
+ * OpenCode Service Provider
+ * 
+ * 在应用启动时自动初始化和启动 OpenCode 服务
+ * 提供全局的服务状态上下文
+ */
+
+import { 
+  createContext, 
+  useContext, 
+  useEffect, 
+  useState, 
+  useCallback,
+  type ReactNode 
+} from "react";
+import { 
+  OpencodeService, 
+  getOpencodeService,
+  type OpencodeServiceState,
+  type OpencodeClient,
+  type ServiceMode,
+} from "@/services/opencode";
+
+interface OpencodeContextValue {
+  // 状态
+  state: OpencodeServiceState;
+  client: OpencodeClient | null;
+  isConnected: boolean;
+  isInitializing: boolean;
+  error: string | null;
+  
+  // 操作
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  setMode: (mode: ServiceMode) => Promise<void>;
+  startService: () => Promise<void>;
+  stopService: () => Promise<void>;
+  restartService: () => Promise<void>;
+  retry: () => Promise<void>;
+}
+
+const OpencodeContext = createContext<OpencodeContextValue | null>(null);
+
+interface OpencodeProviderProps {
+  children: ReactNode;
+  autoStart?: boolean;
+}
+
+/**
+ * OpenCode 服务 Provider
+ * 
+ * 功能：
+ * 1. 应用启动时自动初始化服务
+ * 2. 如果配置了 autoStart，自动启动 opencode serve
+ * 3. 服务启动后自动连接
+ * 4. 提供全局状态和操作方法
+ */
+export function OpencodeProvider({ 
+  children, 
+  autoStart = true 
+}: OpencodeProviderProps) {
+  const [service] = useState<OpencodeService>(() => getOpencodeService());
+  const [state, setState] = useState<OpencodeServiceState>(service.getState());
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 初始化服务
+  useEffect(() => {
+    let mounted = true;
+
+    const initService = async () => {
+      try {
+        console.log("[OpencodeProvider] Starting initialization...");
+        setIsInitializing(true);
+        setError(null);
+
+        // 订阅状态变化
+        const unsubscribe = service.subscribe((newState) => {
+          if (mounted) {
+            console.log("[OpencodeProvider] State updated:", {
+              backendStatus: newState.backendStatus.type,
+              connectionStatus: newState.connectionState.status,
+            });
+            setState(newState);
+            
+            // 更新错误状态
+            if (newState.connectionState.status === "error") {
+              setError(newState.connectionState.message);
+            } else if (newState.backendStatus.type === "error") {
+              const errorState = newState.backendStatus as { type: "error"; message: string };
+              setError(errorState.message);
+            }
+          }
+        });
+
+        // 初始化服务（监听 Tauri 事件等）
+        await service.initialize();
+
+        // 检查后端状态，如果需要则启动服务
+        const currentState = service.getState();
+        console.log("[OpencodeProvider] Current state after init:", {
+          backendStatus: currentState.backendStatus.type,
+          mode: currentState.config.mode.type,
+          autoStart,
+        });
+        
+        if (autoStart && currentState.config.mode.type === "local") {
+          // 本地模式：检查是否需要启动服务
+          if (currentState.backendStatus.type === "ready") {
+            console.log("[OpencodeProvider] Starting opencode service...");
+            await service.startBackend();
+          } else if (currentState.backendStatus.type === "running") {
+            // 服务已在运行，直接连接
+            console.log("[OpencodeProvider] Service already running, connecting...");
+            await service.connect();
+          } else {
+            console.log("[OpencodeProvider] Backend status is:", currentState.backendStatus.type, "- waiting for status change");
+          }
+        } else if (currentState.config.mode.type === "remote") {
+          // 远程模式：直接尝试连接
+          console.log("[OpencodeProvider] Remote mode, connecting...");
+          await service.connect();
+        }
+
+        if (mounted) {
+          setIsInitializing(false);
+        }
+
+        return () => {
+          mounted = false;
+          unsubscribe();
+        };
+      } catch (e) {
+        console.error("[OpencodeProvider] Failed to initialize:", e);
+        if (mounted) {
+          setError(e instanceof Error ? e.message : "初始化失败");
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    initService();
+
+    return () => {
+      mounted = false;
+    };
+  }, [service, autoStart]);
+
+  // 连接
+  const connect = useCallback(async () => {
+    setError(null);
+    try {
+      await service.connect();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "连接失败");
+    }
+  }, [service]);
+
+  // 断开
+  const disconnect = useCallback(() => {
+    service.disconnect();
+  }, [service]);
+
+  // 设置模式
+  const setMode = useCallback(async (mode: ServiceMode) => {
+    setError(null);
+    try {
+      await service.setMode(mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "模式切换失败");
+    }
+  }, [service]);
+
+  // 启动服务
+  const startService = useCallback(async () => {
+    setError(null);
+    try {
+      await service.startBackend();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "启动服务失败");
+    }
+  }, [service]);
+
+  // 停止服务
+  const stopService = useCallback(async () => {
+    setError(null);
+    try {
+      await service.stopBackend();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "停止服务失败");
+    }
+  }, [service]);
+
+  // 重启服务
+  const restartService = useCallback(async () => {
+    setError(null);
+    try {
+      await service.restartBackend();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "重启服务失败");
+    }
+  }, [service]);
+
+  // 重试（重新初始化和启动）
+  const retry = useCallback(async () => {
+    setError(null);
+    setIsInitializing(true);
+    try {
+      // 先停止现有服务
+      await service.stopBackend().catch(() => {});
+      // 重新初始化
+      await service.initializeBackend();
+      // 启动服务
+      await service.startBackend();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "重试失败");
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [service]);
+
+  const value: OpencodeContextValue = {
+    state,
+    client: service.getClient(),
+    isConnected: state.connectionState.status === "connected",
+    isInitializing,
+    error,
+    connect,
+    disconnect,
+    setMode,
+    startService,
+    stopService,
+    restartService,
+    retry,
+  };
+
+  return (
+    <OpencodeContext.Provider value={value}>
+      {children}
+    </OpencodeContext.Provider>
+  );
+}
+
+/**
+ * 使用 OpenCode 上下文的 Hook
+ */
+export function useOpencodeContext(): OpencodeContextValue {
+  const context = useContext(OpencodeContext);
+  if (!context) {
+    throw new Error("useOpencodeContext must be used within OpencodeProvider");
+  }
+  return context;
+}

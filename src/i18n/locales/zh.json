@@ -1,0 +1,144 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "add": "添加",
+    "close": "关闭",
+    "loading": "加载中...",
+    "success": "成功",
+    "error": "错误",
+    "warning": "警告",
+    "info": "提示"
+  },
+  "app": {
+    "name": "Axon",
+    "description": "AI 智能助手客户端"
+  },
+  "titlebar": {
+    "settings": "设置",
+    "theme": {
+      "light": "浅色模式",
+      "dark": "深色模式",
+      "system": "跟随系统"
+    }
+  },
+  "sidebar": {
+    "newChat": "新对话",
+    "searchPlaceholder": "搜索对话...",
+    "today": "今天",
+    "yesterday": "昨天",
+    "previous7Days": "最近 7 天",
+    "previous30Days": "最近 30 天",
+    "older": "更早",
+    "noChats": "暂无对话",
+    "deleteChat": "删除对话",
+    "renameChat": "重命名对话"
+  },
+  "chat": {
+    "inputPlaceholder": "输入消息...",
+    "send": "发送",
+    "stop": "停止",
+    "regenerate": "重新生成",
+    "copy": "复制",
+    "copied": "已复制",
+    "thinking": "思考中...",
+    "welcome": "你好！我是 Axon AI 助手，有什么可以帮助你的吗？",
+    "errorMessage": "抱歉，发生了错误，请重试。"
+  },
+  "settings": {
+    "title": "设置",
+    "general": "通用",
+    "service": "服务",
+    "provider": "AI 服务商",
+    "appearance": "外观",
+    "language": "语言",
+    "about": "关于",
+    "languageSettings": {
+      "title": "语言设置",
+      "description": "选择应用程序显示语言",
+      "chinese": "中文",
+      "english": "English"
+    },
+    "serviceSettings": {
+      "title": "服务设置",
+      "description": "配置 AI 服务连接方式",
+      "mode": "服务模式",
+      "modeDescription": "选择使用本地服务还是远程服务",
+      "local": "本地服务",
+      "localDescription": "使用本地 OpenCode 服务，适合离线使用",
+      "remote": "远程服务",
+      "remoteDescription": "连接到远程 OpenCode 服务器",
+      "remoteUrl": "远程服务地址",
+      "remoteUrlPlaceholder": "请输入远程服务 URL",
+      "remoteUrlHint": "例如: http://localhost:8080",
+      "status": "连接状态",
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "connecting": "连接中...",
+      "testConnection": "测试连接",
+      "reconnect": "重新连接",
+      "startService": "启动服务",
+      "stopService": "停止服务",
+      "restartService": "重启服务"
+    },
+    "appearanceSettings": {
+      "title": "外观设置",
+      "description": "自定义应用程序外观",
+      "theme": "主题",
+      "themeDescription": "选择应用程序主题"
+    },
+    "aboutSettings": {
+      "title": "关于",
+      "version": "版本",
+      "description": "Axon 是一个现代化的 AI 桌面客户端，基于 OpenCode 构建。",
+      "github": "GitHub",
+      "documentation": "文档",
+      "license": "许可证"
+    },
+    "providerSettings": {
+      "title": "AI 服务提供商",
+      "description": "配置 AI 模型服务提供商的 API Key",
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "envVar": "环境变量",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "输入 API Key",
+      "apiKeyConfigured": "已配置 (输入新值以更新)",
+      "save": "保存",
+      "authorize": "开始授权",
+      "reauthorize": "重新授权",
+      "models": "可用模型",
+      "moreModels": "更多",
+      "envVarHint": "也可通过环境变量配置",
+      "howToGetApiKey": "如何获取 API Key?",
+      "howToGetApiKeyDesc": "访问对应服务商的官网，注册账号后在设置或 API 页面获取 API Key。部分服务商支持 OAuth 授权，可直接点击授权按钮完成配置。",
+      "refresh": "刷新",
+      "noProviders": "暂无可用的 AI 服务提供商",
+      "connectFirst": "请先连接到 OpenCode 服务"
+    }
+  },
+  "status": {
+    "online": "在线",
+    "offline": "离线",
+    "connecting": "连接中",
+    "error": "错误"
+  },
+  "errors": {
+    "connectionFailed": "连接失败",
+    "serviceUnavailable": "服务不可用",
+    "invalidUrl": "无效的 URL",
+    "networkError": "网络错误",
+    "unknownError": "未知错误"
+  },
+  "notifications": {
+    "settingsSaved": "设置已保存",
+    "connectionSuccess": "连接成功",
+    "connectionFailed": "连接失败",
+    "serviceStarted": "服务已启动",
+    "serviceStopped": "服务已停止",
+    "languageChanged": "语言已切换"
+  }
+}

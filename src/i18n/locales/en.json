@@ -1,0 +1,144 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "loading": "Loading...",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info"
+  },
+  "app": {
+    "name": "Axon",
+    "description": "AI Assistant Desktop Client"
+  },
+  "titlebar": {
+    "settings": "Settings",
+    "theme": {
+      "light": "Light Mode",
+      "dark": "Dark Mode",
+      "system": "System"
+    }
+  },
+  "sidebar": {
+    "newChat": "New Chat",
+    "searchPlaceholder": "Search chats...",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "previous7Days": "Previous 7 Days",
+    "previous30Days": "Previous 30 Days",
+    "older": "Older",
+    "noChats": "No chats yet",
+    "deleteChat": "Delete chat",
+    "renameChat": "Rename chat"
+  },
+  "chat": {
+    "inputPlaceholder": "Type a message...",
+    "send": "Send",
+    "stop": "Stop",
+    "regenerate": "Regenerate",
+    "copy": "Copy",
+    "copied": "Copied",
+    "thinking": "Thinking...",
+    "welcome": "Hello! I'm Axon AI assistant. How can I help you today?",
+    "errorMessage": "Sorry, an error occurred. Please try again."
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "service": "Service",
+    "provider": "AI Providers",
+    "appearance": "Appearance",
+    "language": "Language",
+    "about": "About",
+    "languageSettings": {
+      "title": "Language Settings",
+      "description": "Select application display language",
+      "chinese": "Chinese",
+      "english": "English"
+    },
+    "serviceSettings": {
+      "title": "Service Settings",
+      "description": "Configure AI service connection",
+      "mode": "Service Mode",
+      "modeDescription": "Choose between local or remote service",
+      "local": "Local Service",
+      "localDescription": "Use local OpenCode service, suitable for offline use",
+      "remote": "Remote Service",
+      "remoteDescription": "Connect to remote OpenCode server",
+      "remoteUrl": "Remote Service URL",
+      "remoteUrlPlaceholder": "Enter remote service URL",
+      "remoteUrlHint": "e.g., http://localhost:8080",
+      "status": "Connection Status",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "connecting": "Connecting...",
+      "testConnection": "Test Connection",
+      "reconnect": "Reconnect",
+      "startService": "Start Service",
+      "stopService": "Stop Service",
+      "restartService": "Restart Service"
+    },
+    "appearanceSettings": {
+      "title": "Appearance Settings",
+      "description": "Customize application appearance",
+      "theme": "Theme",
+      "themeDescription": "Select application theme"
+    },
+    "aboutSettings": {
+      "title": "About",
+      "version": "Version",
+      "description": "Axon is a modern AI desktop client built on OpenCode.",
+      "github": "GitHub",
+      "documentation": "Documentation",
+      "license": "License"
+    },
+    "providerSettings": {
+      "title": "AI Providers",
+      "description": "Configure AI model provider API keys",
+      "configured": "Configured",
+      "notConfigured": "Not Configured",
+      "envVar": "Environment Variable",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter API Key",
+      "apiKeyConfigured": "Configured (enter new value to update)",
+      "save": "Save",
+      "authorize": "Authorize",
+      "reauthorize": "Re-authorize",
+      "models": "Available Models",
+      "moreModels": "more",
+      "envVarHint": "Can also be configured via environment variables",
+      "howToGetApiKey": "How to get API Key?",
+      "howToGetApiKeyDesc": "Visit the provider's website, create an account, and get your API key from settings or API page. Some providers support OAuth authorization.",
+      "refresh": "Refresh",
+      "noProviders": "No AI providers available",
+      "connectFirst": "Please connect to OpenCode service first"
+    }
+  },
+  "status": {
+    "online": "Online",
+    "offline": "Offline",
+    "connecting": "Connecting",
+    "error": "Error"
+  },
+  "errors": {
+    "connectionFailed": "Connection failed",
+    "serviceUnavailable": "Service unavailable",
+    "invalidUrl": "Invalid URL",
+    "networkError": "Network error",
+    "unknownError": "Unknown error"
+  },
+  "notifications": {
+    "settingsSaved": "Settings saved",
+    "connectionSuccess": "Connection successful",
+    "connectionFailed": "Connection failed",
+    "serviceStarted": "Service started",
+    "serviceStopped": "Service stopped",
+    "languageChanged": "Language changed"
+  }
+}

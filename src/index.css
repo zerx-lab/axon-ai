@@ -1,0 +1,272 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Zed-style Design System
+ * - No gradients
+ * - Small border radius (2px)
+ * - Flat, minimal design
+ * - High contrast, clear hierarchy
+ */
+
+@theme inline {
+  /* Zed uses very small radius - 2px base */
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
+  --radius-4xl: 8px;
+
+  /* Color mappings */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Surface layers - Zed style */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+
+  /* Chart colors */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+/*
+ * Light theme - Zed One Light inspired
+ * Clean, minimal, paper-like
+ */
+:root {
+  --radius: 2px;
+
+  /* Base colors - warm gray tone */
+  --background: #fafafa;
+  --foreground: #1f2328;
+
+  /* Card - slightly elevated */
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+
+  /* Popover/dropdown */
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+
+  /* Primary - Zed blue */
+  --primary: #0969da;
+  --primary-foreground: #ffffff;
+
+  /* Secondary - subtle gray */
+  --secondary: #f0f0f0;
+  --secondary-foreground: #1f2328;
+
+  /* Muted - for disabled/secondary text */
+  --muted: #f6f6f6;
+  --muted-foreground: #656d76;
+
+  /* Accent - hover states */
+  --accent: #eaeef2;
+  --accent-foreground: #1f2328;
+
+  /* Destructive - error/delete */
+  --destructive: #cf222e;
+  --destructive-foreground: #ffffff;
+
+  /* Borders - subtle */
+  --border: #d8dee4;
+  --input: #d8dee4;
+  --ring: #0969da;
+
+  /* Surface layers */
+  --surface-0: #fafafa;
+  --surface-1: #ffffff;
+  --surface-2: #f6f6f6;
+
+  /* Sidebar */
+  --sidebar: #f6f6f6;
+  --sidebar-foreground: #1f2328;
+  --sidebar-primary: #0969da;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaeef2;
+  --sidebar-accent-foreground: #1f2328;
+  --sidebar-border: #d8dee4;
+  --sidebar-ring: #0969da;
+
+  /* Chart colors */
+  --chart-1: #0969da;
+  --chart-2: #1a7f37;
+  --chart-3: #9a6700;
+  --chart-4: #8250df;
+  --chart-5: #bf3989;
+}
+
+/*
+ * Dark theme - Zed One Dark inspired
+ * Deep, rich, easy on eyes
+ */
+.dark {
+  --radius: 2px;
+
+  /* Base - deep charcoal */
+  --background: #1e1e1e;
+  --foreground: #e6e6e6;
+
+  /* Card - slightly lighter */
+  --card: #252526;
+  --card-foreground: #e6e6e6;
+
+  /* Popover */
+  --popover: #2d2d30;
+  --popover-foreground: #e6e6e6;
+
+  /* Primary - brighter blue for dark mode */
+  --primary: #58a6ff;
+  --primary-foreground: #0d1117;
+
+  /* Secondary */
+  --secondary: #2d2d30;
+  --secondary-foreground: #e6e6e6;
+
+  /* Muted */
+  --muted: #2d2d30;
+  --muted-foreground: #8b949e;
+
+  /* Accent - subtle highlight */
+  --accent: #3c3c3c;
+  --accent-foreground: #e6e6e6;
+
+  /* Destructive */
+  --destructive: #f85149;
+  --destructive-foreground: #ffffff;
+
+  /* Borders - subtle in dark mode */
+  --border: #3c3c3c;
+  --input: #3c3c3c;
+  --ring: #58a6ff;
+
+  /* Surface layers */
+  --surface-0: #1e1e1e;
+  --surface-1: #252526;
+  --surface-2: #2d2d30;
+
+  /* Sidebar - darker than main content */
+  --sidebar: #181818;
+  --sidebar-foreground: #e6e6e6;
+  --sidebar-primary: #58a6ff;
+  --sidebar-primary-foreground: #0d1117;
+  --sidebar-accent: #2d2d30;
+  --sidebar-accent-foreground: #e6e6e6;
+  --sidebar-border: #3c3c3c;
+  --sidebar-ring: #58a6ff;
+
+  /* Chart colors - vibrant for dark mode */
+  --chart-1: #58a6ff;
+  --chart-2: #3fb950;
+  --chart-3: #d29922;
+  --chart-4: #a371f7;
+  --chart-5: #db61a2;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Zed-style focus ring - subtle and precise */
+  *:focus-visible {
+    @apply outline-none ring-1 ring-ring ring-offset-1 ring-offset-background;
+  }
+
+  /* Disable default browser focus styles */
+  :focus {
+    outline: none;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar - Zed style */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    opacity: 0.3;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    opacity: 0.5;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #5a5a5a;
+  }
+}
+
+/* Tauri window drag region */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* Prevent text selection in drag regions */
+[data-tauri-drag-region] * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Interactive elements should not be draggable */
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] [role="button"] {
+  -webkit-app-region: no-drag;
+}
