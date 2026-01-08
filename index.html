@@ -6,45 +6,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axon</title>
     
-    <!-- 首屏关键样式 - 仅用于防止白屏闪烁 -->
+    <!-- 首屏关键样式 - 防止白屏闪烁 -->
     <style>
-      /* 防止白屏闪烁的最小样式 */
-      html, body, #root { height: 100%; }
-      body { margin: 0; }
-      /* 暗色主题背景 */
-      .dark body, body.dark { background-color: #111113; }
+      /* 基础样式 */
+      html, body, #root { height: 100%; margin: 0; }
+      
+      /* 默认亮色主题背景 */
+      body { background-color: #f8f9fa; color: #171717; }
+      
+      /* 暗色主题背景 - 通过 class 或系统偏好 */
+      .dark, .dark body { background-color: #111113; color: #ededed; }
       @media (prefers-color-scheme: dark) {
-        body:not(.light) { background-color: #111113; }
+        body:not(.light) { background-color: #111113; color: #ededed; }
       }
-      /* 加载动画 */
-      .app-loading {
+      
+      /* 加载动画容器 */
+      #app-loading {
+        position: fixed;
+        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 100%;
-        width: 100%;
+        background-color: #f8f9fa;
+        z-index: 9999;
+        transition: opacity 200ms ease-out;
       }
+      
+      /* 暗色模式下的加载背景 */
+      .dark #app-loading { background-color: #111113; }
+      @media (prefers-color-scheme: dark) {
+        html:not(.light) #app-loading { background-color: #111113; }
+      }
+      
+      /* 淡出动画 */
+      #app-loading.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      /* 加载旋转动画 */
       .app-loading-spinner {
-        width: 32px;
-        height: 32px;
+        width: 28px;
+        height: 28px;
         border: 2px solid #888;
         border-top-color: transparent;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
       }
+      
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
     </style>
+    
+    <!-- 主题检测脚本 - 在渲染前同步设置主题 class -->
+    <script>
+      (function() {
+        // 从 localStorage 读取主题设置
+        const stored = localStorage.getItem('axon-theme');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
 
   <body>
-    <div id="root">
-      <!-- 首屏加载占位符 -->
-      <div class="app-loading">
-        <div class="app-loading-spinner"></div>
-      </div>
+    <!-- 首屏加载占位符 -->
+    <div id="app-loading">
+      <div class="app-loading-spinner"></div>
     </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -34,3 +34,16 @@ zip = "7.0.0"
 tauri-plugin-dialog = "2.4.2"
 similar = { version = "2.7.0", features = ["unicode"] }
 
+# Release 构建优化 - 减小体积并提升启动速度
+[profile.release]
+# 启用链接时优化
+lto = true
+# 单代码生成单元，优化更彻底
+codegen-units = 1
+# 优化大小同时保持性能
+opt-level = "s"
+# 移除 panic 展开信息
+panic = "abort"
+# 剥离调试符号
+strip = true
+

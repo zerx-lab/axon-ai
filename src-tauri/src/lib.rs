@@ -11,6 +11,7 @@ mod utils;
 use commands::*;
 use state::AppState;
 use tauri::Manager;
+use tauri::window::Color;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -20,6 +21,24 @@ fn init_logging() {
         .with(fmt::layer())
         .with(EnvFilter::from_default_env().add_directive("axon_desktop=debug".parse().unwrap()))
         .init();
+}
+
+/// 获取 WebView2 优化参数（仅 Windows）
+/// 这些参数可以加速 WebView2 启动
+#[cfg(target_os = "windows")]
+fn get_webview_args() -> &'static str {
+    // 禁用不必要的功能以加速启动
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+     --no-first-run \
+     --disable-background-networking \
+     --disable-component-update \
+     --disable-sync \
+     --disable-translate"
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_webview_args() -> &'static str {
+    ""
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -63,6 +82,29 @@ pub fn run() {
         .setup(|app| {
             let setup_start = std::time::Instant::now();
             let handle = app.handle().clone();
+
+            // 0. 创建优化的主窗口（使用 additional_browser_args 加速 WebView）
+            let webview_args = get_webview_args();
+            info!("创建主窗口，WebView 参数: {}", webview_args);
+            
+            // 窗口背景色 - 与 index.html 的暗色主题一致
+            // 使用 RGBA 格式: (R, G, B, A)，颜色值 #111113
+            let bg_color = Color(0x11, 0x11, 0x13, 0xFF);
+            
+            let _main_window = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("Axon")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(800.0, 600.0)
+            .decorations(false)
+            .transparent(false)
+            .center()
+            .background_color(bg_color)
+            .additional_browser_args(webview_args)
+            .build()?;
 
             // 1. 首先初始化应用数据目录（其他操作依赖此路径）
             //    使用 Tauri API 获取正确的应用目录，与 identifier 一致

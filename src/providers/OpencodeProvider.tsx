@@ -11,6 +11,7 @@ import {
   useEffect, 
   useState, 
   useCallback,
+  useRef,
   type ReactNode 
 } from "react";
 import { 
@@ -22,6 +23,7 @@ import {
   type EventListener,
   type SSEHealthStatus,
 } from "@/services/opencode";
+import { hideAppLoading } from "@/main";
 
 interface OpencodeContextValue {
   // 状态
@@ -74,6 +76,9 @@ export function OpencodeProvider({
   const [state, setState] = useState<OpencodeServiceState>(service.getState());
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 用于确保 loading 只隐藏一次
+  const loadingHiddenRef = useRef(false);
 
   // 初始化服务
   useEffect(() => {
@@ -135,6 +140,12 @@ export function OpencodeProvider({
 
         if (mounted) {
           setIsInitializing(false);
+          
+          // 初始化完成后隐藏 loading 动画
+          if (!loadingHiddenRef.current) {
+            loadingHiddenRef.current = true;
+            hideAppLoading();
+          }
         }
 
         return () => {
@@ -146,6 +157,12 @@ export function OpencodeProvider({
         if (mounted) {
           setError(e instanceof Error ? e.message : "初始化失败");
           setIsInitializing(false);
+          
+          // 即使初始化失败也要隐藏 loading，让用户看到错误信息
+          if (!loadingHiddenRef.current) {
+            loadingHiddenRef.current = true;
+            hideAppLoading();
+          }
         }
       }
     };

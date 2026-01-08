@@ -347,6 +347,20 @@
     "connecting": "Connecting",
     "error": "Error"
   },
+  "statusBar": {
+    "mcpServers": "MCP Servers",
+    "noServers": "No MCP servers",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "restartAll": "Restart All",
+    "stopAll": "Stop All",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "failed": "Connection failed",
+    "needsAuth": "Needs authorization",
+    "needsRegistration": "Needs registration",
+    "unknown": "Unknown status"
+  },
   "errors": {
     "connectionFailed": "Connection failed",
     "serviceUnavailable": "Service unavailable",

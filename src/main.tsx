@@ -5,6 +5,7 @@
  * 1. 使用 startTransition 降低初始化阻塞
  * 2. i18n 按需加载非默认语言
  * 3. QueryClient 使用更激进的缓存策略
+ * 4. Loading 动画在服务初始化完成后才移除
  */
 
 import { startTransition, StrictMode } from "react";
@@ -14,6 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OpencodeProvider } from "@/providers";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ProjectProvider } from "@/providers/ProjectProvider";
+import { AppLoader } from "@/components/AppLoader";
 import { Toaster } from "@/components/ui/sonner";
 import { router } from "./router";
 
@@ -37,14 +39,24 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * 移除首屏加载动画（带淡出效果）
+ * 由 OpencodeProvider 在初始化完成后调用
+ */
+export function hideAppLoading(): void {
+  const loadingElement = document.getElementById("app-loading");
+  if (loadingElement) {
+    // 添加淡出动画
+    loadingElement.classList.add("fade-out");
+    // 动画结束后移除元素
+    setTimeout(() => {
+      loadingElement.remove();
+    }, 200);
+  }
+}
+
 // 获取 root 元素
 const rootElement = document.getElementById("root") as HTMLElement;
-
-// 移除首屏加载动画
-const loadingElement = rootElement.querySelector(".app-loading");
-if (loadingElement) {
-  loadingElement.remove();
-}
 
 // 使用 startTransition 渲染应用，降低首屏阻塞
 // 注意：ChatProvider 必须在 OpencodeProvider 内部，因为 useChat 依赖 useOpencodeContext
@@ -56,12 +68,14 @@ startTransition(() => {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <OpencodeProvider autoStart={true}>
-          <ProjectProvider>
-            <ChatProvider>
-              <RouterProvider router={router} />
-              <Toaster position="bottom-right" richColors closeButton />
-            </ChatProvider>
-          </ProjectProvider>
+          <AppLoader>
+            <ProjectProvider>
+              <ChatProvider>
+                <RouterProvider router={router} />
+                <Toaster position="bottom-right" richColors closeButton />
+              </ChatProvider>
+            </ProjectProvider>
+          </AppLoader>
         </OpencodeProvider>
       </QueryClientProvider>
     </StrictMode>

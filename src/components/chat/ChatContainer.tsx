@@ -59,9 +59,13 @@ export function ChatContainer({
   const isEmptyState = messages.length === 0;
   
   // 是否应该自动滚动（用户未手动向上滚动时为 true）
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const shouldAutoScrollRef = useRef(true);
   // 是否显示"滚动到底部"按钮
   const [showScrollButton, setShowScrollButton] = useState(false);
+  // 追踪上一次消息数量，用于检测新消息
+  const prevMessageCountRef = useRef(messages.length);
+  // 标记是否是程序触发的滚动（非用户手动滚动）
+  const isProgrammaticScrollRef = useRef(false);
 
   // 检查是否滚动到底部附近（允许 50px 的误差）
   const isNearBottom = useCallback((element: HTMLElement) => {
@@ -73,15 +77,21 @@ export function ChatContainer({
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     
+    // 如果是程序触发的滚动，忽略此次事件
+    if (isProgrammaticScrollRef.current) {
+      isProgrammaticScrollRef.current = false;
+      return;
+    }
+    
     const nearBottom = isNearBottom(scrollRef.current);
     
     // 如果用户滚动到底部附近，恢复自动滚动
     if (nearBottom) {
-      setShouldAutoScroll(true);
+      shouldAutoScrollRef.current = true;
       setShowScrollButton(false);
     } else {
       // 用户向上滚动，禁用自动滚动
-      setShouldAutoScroll(false);
+      shouldAutoScrollRef.current = false;
       setShowScrollButton(true);
     }
   }, [isNearBottom]);
@@ -89,21 +99,31 @@ export function ChatContainer({
   // 滚动到底部
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
+      isProgrammaticScrollRef.current = true;
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
         behavior: "smooth",
       });
-      setShouldAutoScroll(true);
+      shouldAutoScrollRef.current = true;
       setShowScrollButton(false);
     }
   }, []);
 
   // 当有新消息时，仅在 shouldAutoScroll 为 true 时自动滚动到底部
+  // 只有消息数量增加时才触发滚动，避免消息内容更新时强制滚动
   useEffect(() => {
-    if (scrollRef.current && shouldAutoScroll) {
+    const currentCount = messages.length;
+    const prevCount = prevMessageCountRef.current;
+    
+    // 更新消息数量引用
+    prevMessageCountRef.current = currentCount;
+    
+    // 只有消息数量增加且允许自动滚动时才执行
+    if (scrollRef.current && shouldAutoScrollRef.current && currentCount > prevCount) {
+      isProgrammaticScrollRef.current = true;
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, shouldAutoScroll]);
+  }, [messages.length]);
 
   // 处理快捷提示选择
   const handleQuickPromptSelect = (prompt: string) => {

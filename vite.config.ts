@@ -180,9 +180,10 @@ export default defineConfig(async (): Promise<UserConfig> => ({
     warmup: {
       clientFiles: [
         "./src/main.tsx",
-        "./src/App.tsx",
         "./src/index.css",
-        "./src/router.ts",
+        "./src/router.tsx",
+        "./src/routes/__root.tsx",
+        "./src/routes/index.tsx",
       ],
     },
   },

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
 import { WorkspaceSidebar } from "@/components/sidebar";
 import { ActivityBar } from "@/components/activitybar";
+import { StatusBar } from "@/components/statusbar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useActivityBar } from "@/stores/activityBar";
@@ -128,81 +129,87 @@ function HomePage() {
   }, [currentProject, createNewSession]);
 
   return (
-    <div className="flex flex-1 h-full overflow-hidden">
-      {/* 活动栏 - 左侧位置 */}
-      {activityBarPosition === "left" && <ActivityBar />}
+    <div className="flex flex-1 flex-col h-full overflow-hidden">
+      {/* 主体区域（活动栏 + 内容） */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* 活动栏 - 左侧位置 */}
+        {activityBarPosition === "left" && <ActivityBar />}
 
-      {/* 主内容区域 */}
-      <div className="flex flex-1 h-full overflow-hidden">
-        <ResizablePanelGroup orientation="horizontal" className="flex-1">
-          {/* 侧边栏面板 - 仅在 sidebarVisible 时显示 */}
-          {sidebarVisible && (
-            <>
-              <ResizablePanel
-                id="sidebar"
-                defaultSize={initialSidebarSize}
-                minSize={SIDEBAR_CONFIG.minSize}
-                maxSize={SIDEBAR_CONFIG.maxSize}
-              >
-                <WorkspaceSidebar
-                  currentProject={currentProject}
-                  sessions={currentProjectSessions}
+        {/* 主内容区域 */}
+        <div className="flex flex-1 h-full overflow-hidden">
+          <ResizablePanelGroup orientation="horizontal" className="flex-1">
+            {/* 侧边栏面板 - 仅在 sidebarVisible 时显示 */}
+            {sidebarVisible && (
+              <>
+                <ResizablePanel
+                  id="sidebar"
+                  defaultSize={initialSidebarSize}
+                  minSize={SIDEBAR_CONFIG.minSize}
+                  maxSize={SIDEBAR_CONFIG.maxSize}
+                >
+                  <WorkspaceSidebar
+                    currentProject={currentProject}
+                    sessions={currentProjectSessions}
+                    activeSessionId={activeSession?.id ?? null}
+                    onSelectSession={selectSession}
+                    onNewSession={handleNewSession}
+                    onDeleteSession={deleteSession}
+                    onRefresh={handleRefreshSessions}
+                    isRefreshing={isRefreshing}
+                  />
+                </ResizablePanel>
+
+                {/* 拖拽手柄 */}
+                <ResizableHandle withHandle />
+              </>
+            )}
+
+            {/* 主聊天区域面板 */}
+            <ResizablePanel id="main" minSize={sidebarVisible ? "50%" : "100%"}>
+              <div className="flex flex-1 h-full flex-col overflow-hidden">
+                {/* 错误提示 */}
+                {error && (
+                  <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span className="flex-1">{error}</span>
+                    <button
+                      onClick={clearError}
+                      className="text-xs underline hover:no-underline"
+                    >
+                      {t("common.close")}
+                    </button>
+                  </div>
+                )}
+
+                {/* 聊天容器 */}
+                <ChatContainer
+                  messages={messages}
+                  onSend={sendMessage}
+                  onStop={stopGeneration}
+                  isLoading={isLoading}
+                  providers={providers}
+                  selectedModel={selectedModel}
+                  onSelectModel={selectModel}
+                  isLoadingModels={isLoadingModels}
+                  currentVariants={currentVariants}
+                  selectedVariant={selectedVariant}
+                  onSelectVariant={selectVariant}
+                  onCycleVariant={cycleVariant}
+                  sessions={sessions}
                   activeSessionId={activeSession?.id ?? null}
                   onSelectSession={selectSession}
-                  onNewSession={handleNewSession}
-                  onDeleteSession={deleteSession}
-                  onRefresh={handleRefreshSessions}
-                  isRefreshing={isRefreshing}
                 />
-              </ResizablePanel>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
 
-              {/* 拖拽手柄 */}
-              <ResizableHandle withHandle />
-            </>
-          )}
-
-          {/* 主聊天区域面板 */}
-          <ResizablePanel id="main" minSize={sidebarVisible ? "50%" : "100%"}>
-            <div className="flex flex-1 h-full flex-col overflow-hidden">
-              {/* 错误提示 */}
-              {error && (
-                <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">{error}</span>
-                  <button
-                    onClick={clearError}
-                    className="text-xs underline hover:no-underline"
-                  >
-                    {t("common.close")}
-                  </button>
-                </div>
-              )}
-
-              {/* 聊天容器 */}
-              <ChatContainer
-                messages={messages}
-                onSend={sendMessage}
-                onStop={stopGeneration}
-                isLoading={isLoading}
-                providers={providers}
-                selectedModel={selectedModel}
-                onSelectModel={selectModel}
-                isLoadingModels={isLoadingModels}
-                currentVariants={currentVariants}
-                selectedVariant={selectedVariant}
-                onSelectVariant={selectVariant}
-                onCycleVariant={cycleVariant}
-                sessions={sessions}
-                activeSessionId={activeSession?.id ?? null}
-                onSelectSession={selectSession}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        {/* 活动栏 - 右侧位置 */}
+        {activityBarPosition === "right" && <ActivityBar />}
       </div>
 
-      {/* 活动栏 - 右侧位置 */}
-      {activityBarPosition === "right" && <ActivityBar />}
+      {/* 底部状态栏 */}
+      <StatusBar />
     </div>
   );
 }

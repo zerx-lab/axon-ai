@@ -245,9 +245,17 @@ export function TodoListCompact({ sessionId, className }: TodoListCompactProps) 
     () => todos.filter((t) => t.status === "completed").length,
     [todos]
   );
+  const pendingCount = useMemo(
+    () => todos.filter((t) => t.status === "pending").length,
+    [todos]
+  );
 
   // 没有任务时不渲染
   if (todos.length === 0) return null;
+  
+  // 所有任务已完成（没有进行中和待处理的任务）时不渲染
+  const isAllCompleted = inProgressTodos.length === 0 && pendingCount === 0;
+  if (isAllCompleted) return null;
 
   const currentTask = inProgressTodos[0];
   const progressPercent = Math.round((completedCount / todos.length) * 100);

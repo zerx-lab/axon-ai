@@ -347,6 +347,20 @@
     "connecting": "连接中",
     "error": "错误"
   },
+  "statusBar": {
+    "mcpServers": "MCP 服务器",
+    "noServers": "暂无 MCP 服务器",
+    "connect": "连接",
+    "disconnect": "断开",
+    "restartAll": "重启全部",
+    "stopAll": "停止全部",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "failed": "连接失败",
+    "needsAuth": "需要授权",
+    "needsRegistration": "需要注册",
+    "unknown": "未知状态"
+  },
   "errors": {
     "connectionFailed": "连接失败",
     "serviceUnavailable": "服务不可用",

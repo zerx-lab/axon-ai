@@ -5,7 +5,7 @@
  * 性能优化：SessionSearchDialog 懒加载
  */
 
-import { useState, useRef, useCallback, lazy, Suspense, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -158,11 +158,20 @@ export function ChatInputCard({
 
   // 聚焦输入框
   const focusInput = useCallback(() => {
-    // 使用 requestAnimationFrame 确保在 DOM 更新后聚焦
+    // 使用双重 requestAnimationFrame 确保在 React 状态更新和 DOM 渲染完成后聚焦
+    // 单次 rAF 可能在 React 批量更新完成前执行，导致聚焦失败
     requestAnimationFrame(() => {
-      textareaRef.current?.focus();
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     });
   }, []);
+
+  // 组件挂载时自动聚焦输入框
+  // 这解决了从空状态切换到会话状态时（发送第一条消息）输入框失焦的问题
+  useEffect(() => {
+    focusInput();
+  }, [focusInput]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();

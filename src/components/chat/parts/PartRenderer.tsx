@@ -172,16 +172,40 @@ interface ToolPartViewProps {
 
 function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
   const { state } = part;
+  // 默认收起状态（已完成的工具）
+  const [expanded, setExpanded] = useState(state.status !== "completed");
   
   // 根据状态选择图标
   const StatusIcon = getStatusIcon(state.status);
   const ToolIcon = getToolIcon(part.tool);
   
+  // 判断是否可收起（只有已完成和错误状态才可收起）
+  const canCollapse = state.status === "completed" || state.status === "error";
+  
   return (
     <div className="rounded-md border border-border bg-card my-2">
-      {/* 工具标题栏 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
-        <ToolIcon className="h-4 w-4 text-muted-foreground" />
+      {/* 工具标题栏 - 可点击切换展开/收起 */}
+      <button
+        onClick={() => canCollapse && setExpanded(!expanded)}
+        disabled={!canCollapse}
+        className={cn(
+          "flex w-full items-center gap-2 px-3 py-2 bg-muted/30 text-left transition-colors",
+          canCollapse && "hover:bg-muted/50 cursor-pointer",
+          !canCollapse && "cursor-default",
+          expanded && "border-b border-border"
+        )}
+      >
+        {/* 展开/收起指示器 */}
+        {canCollapse ? (
+          expanded ? (
+            <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+          )
+        ) : (
+          <div className="w-3" /> // 占位保持对齐
+        )}
+        <ToolIcon className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-medium">{getToolDisplayName(part.tool)}</span>
         <div className="ml-auto flex items-center gap-2">
           <StatusIcon
@@ -194,23 +218,25 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
             )}
           />
         </div>
-      </div>
+      </button>
       
-      {/* 工具内容 */}
-      <div className="p-3">
-        {state.status === "completed" && (
-          <ToolCompletedContent tool={part.tool} state={state} messageInfo={messageInfo} />
-        )}
-        {state.status === "error" && (
-          <ToolErrorContent state={state} />
-        )}
-        {state.status === "running" && (
-          <ToolRunningContent tool={part.tool} state={state} />
-        )}
-        {state.status === "pending" && (
-          <div className="text-sm text-muted-foreground">等待执行...</div>
-        )}
-      </div>
+      {/* 工具内容 - 根据展开状态显示 */}
+      {expanded && (
+        <div className="p-3">
+          {state.status === "completed" && (
+            <ToolCompletedContent tool={part.tool} state={state} messageInfo={messageInfo} />
+          )}
+          {state.status === "error" && (
+            <ToolErrorContent state={state} />
+          )}
+          {state.status === "running" && (
+            <ToolRunningContent tool={part.tool} state={state} />
+          )}
+          {state.status === "pending" && (
+            <div className="text-sm text-muted-foreground">等待执行...</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
