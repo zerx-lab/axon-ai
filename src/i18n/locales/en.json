@@ -30,6 +30,9 @@
   "sidebar": {
     "newChat": "New Chat",
     "openProject": "Open Project",
+    "closeProject": "Close Project",
+    "projects": "Projects",
+    "noProjects": "No projects",
     "searchPlaceholder": "Search chats...",
     "today": "Today",
     "yesterday": "Yesterday",

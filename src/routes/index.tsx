@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
-import { ChatSidebar } from "@/components/sidebar";
+import { ProjectSidebar } from "@/components/sidebar";
 import { useChat } from "@/providers/ChatProvider";
+import { useProjectContext } from "@/providers/ProjectProvider";
 import { useWorkspace } from "@/stores/workspace";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Wifi, WifiOff } from "lucide-react";
@@ -65,6 +66,7 @@ function HomePage() {
     return saved ?? SIDEBAR_CONFIG.defaultSize;
   });
   
+  // 聊天状态
   const {
     sessions,
     activeSession,
@@ -89,8 +91,21 @@ function HomePage() {
     refreshSessions,
   } = useChat();
   
+  // 项目状态
+  const {
+    openProject,
+    closeProject,
+    toggleProjectExpanded,
+    getProjectsWithSessions,
+  } = useProjectContext();
+  
   // 工作区管理
   const { openDirectoryPicker } = useWorkspace();
+
+  // 计算项目和会话列表
+  const projectsWithSessions = useMemo(() => {
+    return getProjectsWithSessions(sessions);
+  }, [getProjectsWithSessions, sessions]);
 
   // 处理刷新会话列表
   const handleRefreshSessions = useCallback(async () => {
@@ -102,14 +117,52 @@ function HomePage() {
     }
   }, [refreshSessions]);
   
-  // 处理打开项目 - 选择目录并创建新会话
+  // 处理打开项目 - 选择目录并添加到项目列表
   const handleOpenProject = useCallback(async () => {
     const directory = await openDirectoryPicker();
     if (directory) {
+      // 添加项目到列表
+      openProject(directory);
       // 使用选择的目录创建新会话
       await createNewSession(directory);
     }
-  }, [openDirectoryPicker, createNewSession]);
+  }, [openDirectoryPicker, openProject, createNewSession]);
+  
+  // 处理在指定项目下新建会话
+  const handleNewSessionInProject = useCallback(async (directory: string) => {
+    await createNewSession(directory);
+  }, [createNewSession]);
+
+  // 处理关闭项目 - 同时删除该项目下的所有会话
+  const handleCloseProject = useCallback(async (projectId: string) => {
+    // 先找到该项目下的所有会话
+    const projectData = projectsWithSessions.find(
+      (p) => p.project.id === projectId
+    );
+    
+    if (!projectData) {
+      console.warn("[HomePage] 关闭项目时未找到项目数据:", projectId);
+      return;
+    }
+    
+    // 关闭项目
+    const result = closeProject(projectId);
+    if (!result.success) {
+      return;
+    }
+    
+    // 删除该项目下的所有会话
+    const sessionsToDelete = projectData.sessions;
+    console.log(`[HomePage] 关闭项目 ${result.project?.name}，删除 ${sessionsToDelete.length} 个会话`);
+    
+    for (const session of sessionsToDelete) {
+      try {
+        await deleteSession(session.id);
+      } catch (e) {
+        console.error("[HomePage] 删除会话失败:", session.id, e);
+      }
+    }
+  }, [projectsWithSessions, closeProject, deleteSession]);
 
   // 切换侧边栏折叠状态
   const handleToggleCollapse = useCallback(() => {
@@ -153,13 +206,15 @@ function HomePage() {
         collapsedSize={SIDEBAR_CONFIG.collapsedSize}
         onResize={handlePanelResize}
       >
-        <ChatSidebar
-          sessions={sessions}
+        <ProjectSidebar
+          projectsWithSessions={projectsWithSessions}
           activeSessionId={activeSession?.id ?? null}
           onSelectSession={selectSession}
-          onNewSession={createNewSession}
+          onNewSession={handleNewSessionInProject}
           onDeleteSession={deleteSession}
           onOpenProject={handleOpenProject}
+          onCloseProject={handleCloseProject}
+          onToggleProjectExpanded={toggleProjectExpanded}
           onRefresh={handleRefreshSessions}
           isRefreshing={isRefreshing}
           collapsed={sidebarCollapsed}

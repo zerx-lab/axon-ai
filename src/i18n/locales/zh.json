@@ -30,6 +30,9 @@
   "sidebar": {
     "newChat": "新对话",
     "openProject": "打开项目",
+    "closeProject": "关闭项目",
+    "projects": "项目",
+    "noProjects": "暂无项目",
     "searchPlaceholder": "搜索对话...",
     "today": "今天",
     "yesterday": "昨天",
