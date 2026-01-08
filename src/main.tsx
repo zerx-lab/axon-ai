@@ -6,12 +6,14 @@
  * 2. i18n 按需加载非默认语言
  * 3. QueryClient 使用更激进的缓存策略
  * 4. Loading 动画在服务初始化完成后才移除
+ * 5. 窗口延迟显示：WebView 加载完成后再显示窗口，避免白屏闪烁
  */
 
 import { startTransition, StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { OpencodeProvider } from "@/providers";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ProjectProvider } from "@/providers/ProjectProvider";
@@ -63,6 +65,20 @@ const rootElement = document.getElementById("root") as HTMLElement;
 // ProjectProvider 需要在 ChatProvider 之前，以便项目状态可以被聊天状态使用
 const root = ReactDOM.createRoot(rootElement);
 
+/**
+ * 通知 Tauri 后端应用已准备就绪
+ * 后端收到此事件后会显示窗口
+ */
+async function notifyAppReady(): Promise<void> {
+  try {
+    const window = getCurrentWindow();
+    await window.emit("app-ready");
+    console.log("[main] 已发送 app-ready 事件");
+  } catch (error) {
+    console.error("[main] 发送 app-ready 事件失败:", error);
+  }
+}
+
 startTransition(() => {
   root.render(
     <StrictMode>
@@ -80,4 +96,10 @@ startTransition(() => {
       </QueryClientProvider>
     </StrictMode>
   );
+
+  // React 渲染完成后，通知后端显示窗口
+  // 使用 requestAnimationFrame 确保 DOM 已经更新
+  requestAnimationFrame(() => {
+    notifyAppReady();
+  });
 });

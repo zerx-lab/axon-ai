@@ -10,6 +10,7 @@ mod utils;
 
 use commands::*;
 use state::AppState;
+use tauri::Listener;
 use tauri::Manager;
 use tauri::window::Color;
 use tracing::info;
@@ -87,11 +88,13 @@ pub fn run() {
             let webview_args = get_webview_args();
             info!("创建主窗口，WebView 参数: {}", webview_args);
             
-            // 窗口背景色 - 与 index.html 的暗色主题一致
-            // 使用 RGBA 格式: (R, G, B, A)，颜色值 #111113
-            let bg_color = Color(0x11, 0x11, 0x13, 0xFF);
+            // 窗口背景色 - 与 index.html 的亮色主题一致
+            // 使用 RGBA 格式: (R, G, B, A)，颜色值 #f8f9fa
+            let bg_color = Color(0xf8, 0xf9, 0xfa, 0xFF);
             
-            let _main_window = tauri::WebviewWindowBuilder::new(
+            // 创建窗口时先隐藏，等 WebView 加载完成后再显示
+            // 这样可以避免用户看到白屏闪烁
+            let main_window = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
@@ -102,9 +105,36 @@ pub fn run() {
             .decorations(false)
             .transparent(false)
             .center()
+            .visible(false) // 初始隐藏窗口
             .background_color(bg_color)
             .additional_browser_args(webview_args)
             .build()?;
+
+            // 监听前端发送的 "app-ready" 事件，收到后显示窗口
+            let window_for_event = main_window.clone();
+            main_window.listen("app-ready", move |_| {
+                info!("收到前端 app-ready 事件，显示窗口");
+                if let Err(e) = window_for_event.show() {
+                    tracing::error!("显示窗口失败: {}", e);
+                }
+                // 确保窗口获得焦点
+                let _ = window_for_event.set_focus();
+            });
+
+            // 设置超时保护：如果 3 秒内前端没有发送 ready 事件，强制显示窗口
+            // 避免因前端错误导致窗口永远不显示
+            let window_for_timeout = main_window.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                // 检查窗口是否仍然隐藏
+                if let Ok(visible) = window_for_timeout.is_visible() {
+                    if !visible {
+                        info!("超时保护：强制显示窗口");
+                        let _ = window_for_timeout.show();
+                        let _ = window_for_timeout.set_focus();
+                    }
+                }
+            });
 
             // 1. 首先初始化应用数据目录（其他操作依赖此路径）
             //    使用 Tauri API 获取正确的应用目录，与 identifier 一致

@@ -83,6 +83,13 @@ export function OpencodeProvider({
   // 初始化服务
   useEffect(() => {
     let mounted = true;
+    
+    // 立即隐藏首屏 loading，让用户直接看到主界面
+    // 下载/启动等状态在右上角 ServiceStatus 组件中展示
+    if (!loadingHiddenRef.current) {
+      loadingHiddenRef.current = true;
+      hideAppLoading();
+    }
 
     const initService = async () => {
       try {
@@ -140,12 +147,6 @@ export function OpencodeProvider({
 
         if (mounted) {
           setIsInitializing(false);
-          
-          // 初始化完成后隐藏 loading 动画
-          if (!loadingHiddenRef.current) {
-            loadingHiddenRef.current = true;
-            hideAppLoading();
-          }
         }
 
         return () => {
@@ -157,12 +158,6 @@ export function OpencodeProvider({
         if (mounted) {
           setError(e instanceof Error ? e.message : "初始化失败");
           setIsInitializing(false);
-          
-          // 即使初始化失败也要隐藏 loading，让用户看到错误信息
-          if (!loadingHiddenRef.current) {
-            loadingHiddenRef.current = true;
-            hideAppLoading();
-          }
         }
       }
     };

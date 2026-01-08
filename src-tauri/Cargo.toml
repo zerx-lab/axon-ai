@@ -34,6 +34,17 @@ zip = "7.0.0"
 tauri-plugin-dialog = "2.4.2"
 similar = { version = "2.7.0", features = ["unicode"] }
 
+# Dev 构建优化 - 加快编译速度
+[profile.dev]
+# 启用增量编译
+incremental = true
+# 减少优化级别以加快编译
+opt-level = 0
+
+# 对依赖使用优化（运行更快，首次编译稍慢但会被缓存）
+[profile.dev.package."*"]
+opt-level = 2
+
 # Release 构建优化 - 减小体积并提升启动速度
 [profile.release]
 # 启用链接时优化
@@ -46,4 +57,9 @@ opt-level = "s"
 panic = "abort"
 # 剥离调试符号
 strip = true
+
+# Release 增量编译（可选，release 默认关闭）
+# 如果需要频繁 release 构建可以启用
+# [profile.release]
+# incremental = true
 

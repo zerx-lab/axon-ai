@@ -1,0 +1,34 @@
+# Cargo 构建缓存配置
+# 加速重复构建，避免每次都等很久
+
+[build]
+# 启用增量编译（默认已启用，这里显式声明）
+incremental = true
+
+# 指定目标目录（可选，使用默认即可）
+# target-dir = "target"
+
+[profile.dev]
+# 开发模式：优先编译速度
+incremental = true
+# 减少优化以加快编译
+opt-level = 0
+# 开发时保留 debug 信息
+debug = true
+
+[profile.dev.package."*"]
+# 对依赖包使用优化，运行更快但首次编译稍慢
+opt-level = 2
+
+[net]
+# 使用 git CLI 而非内置 git（某些情况下更快）
+git-fetch-with-cli = true
+
+[registries.crates-io]
+# 使用稀疏索引（Cargo 1.68+ 默认启用，加速依赖解析）
+protocol = "sparse"
+
+# Windows 特定优化
+[target.x86_64-pc-windows-msvc]
+# 使用更快的链接器（如果安装了 lld）
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
