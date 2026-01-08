@@ -27,6 +27,21 @@
       "system": "跟随系统"
     }
   },
+  "projectPicker": {
+    "searchPlaceholder": "搜索项目或输入路径...",
+    "noResults": "未找到匹配的项目",
+    "actions": "操作",
+    "openFolder": "打开文件夹...",
+    "openFolderDesc": "浏览并选择一个项目文件夹",
+    "recentProjects": "最近项目",
+    "searchResults": "搜索结果",
+    "current": "当前",
+    "navigate": "导航",
+    "select": "选择",
+    "close": "关闭",
+    "projectsCount": "个项目",
+    "clickToSwitch": "点击切换项目"
+  },
   "sidebar": {
     "newChat": "新对话",
     "openProject": "打开项目",

@@ -197,3 +197,41 @@ const result = await invoke("command_name", { param: value });
 - opencode binary download/management on startup
 - `opencode serve` process management
 - State synchronization between frontend and Rust backend
+
+---
+
+## UI 组件设计规范
+
+### Dialog 对话框规范
+
+**所有 Dialog 组件必须遵循以下规范**（已在 `src/components/ui/dialog.tsx` 中统一配置）：
+
+1. **位置**：
+   - 水平居中：`left-[50%] translate-x-[-50%]`
+   - 垂直位置：距离顶部 15%（`top-[15%]`），**不要垂直居中**
+
+2. **动画效果**：
+   - 打开动画：从上向下滑入（`slide-in-from-top-4`）+ 淡入
+   - 关闭动画：向上滑出（`slide-out-to-top-4`）+ 淡出
+   - **不使用缩放动画**（zoom-in/zoom-out）
+
+3. **样式特征**：
+   - Zed 风格小圆角：`rounded-lg`（对应 `--radius-lg: 3px`）
+   - 精致阴影：`shadow-lg` 或 `shadow-2xl`
+   - 边框：`border border-border/60`
+
+4. **使用方式**：
+```tsx
+// 正确用法 - 直接使用 DialogContent，无需额外类名
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent className="w-[500px]">
+    {/* 内容 */}
+  </DialogContent>
+</Dialog>
+```
+
+5. **禁止**：
+   - ❌ 不要添加自定义动画覆盖默认行为
+   - ❌ 不要使用 `top-[50%] translate-y-[-50%]` 垂直居中
+   - ❌ 不要使用 `zoom-in-95` / `zoom-out-95` 缩放动画
+

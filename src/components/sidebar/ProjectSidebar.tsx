@@ -10,7 +10,6 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -27,7 +26,6 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  FolderOpen,
   Folder,
   X,
 } from "lucide-react";
@@ -48,8 +46,6 @@ interface ProjectSidebarProps {
   onNewSession: (directory: string) => void;
   /** 删除会话 */
   onDeleteSession: (sessionId: string) => void;
-  /** 打开项目（选择目录） */
-  onOpenProject?: () => void;
   /** 关闭项目（从列表移除） */
   onCloseProject?: (projectId: string) => void;
   /** 切换项目展开/折叠 */
@@ -72,7 +68,6 @@ export function ProjectSidebar({
   onSelectSession,
   onNewSession,
   onDeleteSession,
-  onOpenProject,
   onCloseProject,
   onToggleProjectExpanded,
   onRefresh,
@@ -114,18 +109,6 @@ export function ProjectSidebar({
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             </Button>
           )}
-          {/* 打开项目按钮 */}
-          {onOpenProject && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 hidden @[100px]:flex"
-              onClick={onOpenProject}
-              title={t("sidebar.openProject")}
-            >
-              <FolderOpen className="h-4 w-4" />
-            </Button>
-          )}
           {/* 折叠/展开切换按钮 */}
           <Button
             variant="ghost"
@@ -144,18 +127,6 @@ export function ProjectSidebar({
 
       {/* 折叠视图 */}
       <div className="flex flex-col items-center gap-2 py-3 @[100px]:hidden">
-        {onOpenProject && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onOpenProject}
-            title={t("sidebar.openProject")}
-          >
-            <FolderOpen className="h-4 w-4" />
-          </Button>
-        )}
-        <Separator className="w-6" />
         {/* 折叠状态下显示项目图标 */}
         {projectsWithSessions.slice(0, 5).map(({ project }) => (
           <Button

@@ -27,6 +27,21 @@
       "system": "System"
     }
   },
+  "projectPicker": {
+    "searchPlaceholder": "Search projects or enter path...",
+    "noResults": "No matching projects found",
+    "actions": "Actions",
+    "openFolder": "Open Folder...",
+    "openFolderDesc": "Browse and select a project folder",
+    "recentProjects": "Recent Projects",
+    "searchResults": "Search Results",
+    "current": "Current",
+    "navigate": "Navigate",
+    "select": "Select",
+    "close": "Close",
+    "projectsCount": "projects",
+    "clickToSwitch": "Click to switch project"
+  },
   "sidebar": {
     "newChat": "New Chat",
     "openProject": "Open Project",

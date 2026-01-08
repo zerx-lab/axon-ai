@@ -4,7 +4,6 @@ import { ChatContainer } from "@/components/chat";
 import { ProjectSidebar } from "@/components/sidebar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
-import { useWorkspace } from "@/stores/workspace";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Wifi, WifiOff } from "lucide-react";
 import {
@@ -93,15 +92,11 @@ function HomePage() {
   
   // 项目状态
   const {
-    openProject,
     closeProject,
     toggleProjectExpanded,
     getProjectsWithSessions,
   } = useProjectContext();
   
-  // 工作区管理
-  const { openDirectoryPicker } = useWorkspace();
-
   // 计算项目和会话列表
   const projectsWithSessions = useMemo(() => {
     return getProjectsWithSessions(sessions);
@@ -116,17 +111,6 @@ function HomePage() {
       setIsRefreshing(false);
     }
   }, [refreshSessions]);
-  
-  // 处理打开项目 - 选择目录并添加到项目列表
-  const handleOpenProject = useCallback(async () => {
-    const directory = await openDirectoryPicker();
-    if (directory) {
-      // 添加项目到列表
-      openProject(directory);
-      // 使用选择的目录创建新会话
-      await createNewSession(directory);
-    }
-  }, [openDirectoryPicker, openProject, createNewSession]);
   
   // 处理在指定项目下新建会话
   const handleNewSessionInProject = useCallback(async (directory: string) => {
@@ -212,7 +196,6 @@ function HomePage() {
           onSelectSession={selectSession}
           onNewSession={handleNewSessionInProject}
           onDeleteSession={deleteSession}
-          onOpenProject={handleOpenProject}
           onCloseProject={handleCloseProject}
           onToggleProjectExpanded={toggleProjectExpanded}
           onRefresh={handleRefreshSessions}

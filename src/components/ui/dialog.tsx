@@ -29,6 +29,14 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/**
+ * DialogContent - 对话框内容组件
+ *
+ * 设计规范：
+ * - 位置：距离顶部 15% 位置，水平居中
+ * - 动画：从上向下滑入（slide-in-from-top），关闭时向上滑出
+ * - 不使用缩放动画，保持简洁的滑动效果
+ */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -38,13 +46,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%]",
+        // 位置：水平居中，距离顶部 15%
+        "fixed left-[50%] top-[15%] z-50 grid w-full max-w-lg translate-x-[-50%]",
         "gap-4 border bg-background p-6 shadow-lg duration-200",
+        // 动画：淡入淡出 + 从顶部滑入滑出
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
-        "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "data-[state=closed]:slide-out-to-top-4 data-[state=open]:slide-in-from-top-4",
         "sm:rounded-lg",
         className
       )}
