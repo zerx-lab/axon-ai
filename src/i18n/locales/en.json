@@ -83,9 +83,49 @@
     "modelRequired": "Please select a model first",
     "searchModel": "Search models...",
     "noModelFound": "No matching model found",
+    "thinkingEffort": "Thinking Effort",
+    "variant": {
+      "default": "Default",
+      "defaultDesc": "Use model default settings",
+      "none": "None",
+      "noneDesc": "Disable reasoning, fast response",
+      "minimal": "Minimal",
+      "minimalDesc": "Minimal reasoning depth",
+      "low": "Low",
+      "lowDesc": "Less reasoning thinking",
+      "medium": "Medium",
+      "mediumDesc": "Balance reasoning and speed",
+      "high": "High",
+      "highDesc": "Deep reasoning thinking",
+      "xhigh": "X-High",
+      "xhighDesc": "Extra deep reasoning",
+      "max": "Max",
+      "maxDesc": "Maximum reasoning depth"
+    },
+    "thinkingStatus": {
+      "gathering": "Gathering thoughts",
+      "thinking": "Thinking deeply",
+      "searching": "Searching codebase",
+      "reading": "Reading files",
+      "editing": "Making edits",
+      "running": "Running commands",
+      "delegating": "Delegating work",
+      "planning": "Planning steps",
+      "fetching": "Fetching web",
+      "considering": "Considering"
+    },
     "connecting": "Connecting to service...",
     "disconnected": "Service not connected",
-    "emptyResponse": "(Empty response)"
+    "emptyResponse": "(Empty response)",
+    "sessionSearch": {
+      "title": "Search Sessions",
+      "placeholder": "Search sessions...",
+      "noResults": "No matching sessions found",
+      "navigate": "Navigate",
+      "select": "Select",
+      "close": "Close",
+      "sessions": "sessions"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -259,7 +299,8 @@
       "retry": "Retry Connection",
       "editDialogTitle": "Edit MCP Server",
       "editDialogDescription": "Modify MCP server configuration",
-      "editSuccess": "MCP server {{name}} updated"
+      "editSuccess": "MCP server {{name}} updated",
+      "refreshSuccess": "MCP server list refreshed"
     }
   },
   "status": {

@@ -31,7 +31,10 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import { SessionSearchDialog } from "./SessionSearchDialog";
+import { VariantSelector } from "./VariantSelector";
 import type { Provider } from "@/stores/chat";
+import type { Session } from "@/types/chat";
 
 interface ChatInputCardProps {
   onSend: (message: string) => void;
@@ -44,8 +47,17 @@ interface ChatInputCardProps {
   selectedModel?: { providerId: string; modelId: string } | null;
   onSelectModel?: (providerId: string, modelId: string) => void;
   isLoadingModels?: boolean;
+  // Variant（推理深度）相关
+  currentVariants?: string[];
+  selectedVariant?: string | undefined;
+  onSelectVariant?: (variant: string | undefined) => void;
+  onCycleVariant?: () => void;
   // 是否为空状态（新会话）
   isEmptyState?: boolean;
+  // 会话历史搜索相关
+  sessions?: Session[];
+  activeSessionId?: string | null;
+  onSelectSession?: (sessionId: string) => void;
 }
 
 /**
@@ -92,7 +104,14 @@ export function ChatInputCard({
   selectedModel,
   onSelectModel,
   isLoadingModels = false,
+  currentVariants = [],
+  selectedVariant,
+  onSelectVariant,
+  onCycleVariant,
   isEmptyState = false,
+  sessions = [],
+  activeSessionId = null,
+  onSelectSession,
 }: ChatInputCardProps) {
   const { t } = useTranslation();
   const inputPlaceholder =
@@ -102,6 +121,7 @@ export function ChatInputCard({
       : t("chat.inputPlaceholder"));
   const [value, setValue] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 创建模型过滤函数
@@ -224,8 +244,9 @@ export function ChatInputCard({
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            disabled={disabled}
+            disabled={disabled || sessions.length === 0}
             title={t("chat.history")}
+            onClick={() => setHistoryOpen(true)}
           >
             <Clock className="h-4 w-4" />
           </Button>
@@ -304,6 +325,18 @@ export function ChatInputCard({
             </Popover>
           )}
 
+          {/* Variant（推理深度）选择器 */}
+          {currentVariants.length > 0 && onSelectVariant && (
+            <VariantSelector
+              variants={currentVariants}
+              selectedVariant={selectedVariant}
+              onSelectVariant={onSelectVariant}
+              onCycleVariant={onCycleVariant}
+              disabled={disabled}
+              mode="dropdown"
+            />
+          )}
+
           {/* 加载模型状态 */}
           {isLoadingModels && (
             <div className="flex items-center gap-1.5 h-8 px-2.5 text-sm text-muted-foreground">
@@ -350,6 +383,17 @@ export function ChatInputCard({
           )}
         </div>
       </div>
+
+      {/* 会话搜索弹窗 */}
+      {onSelectSession && (
+        <SessionSearchDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={onSelectSession}
+        />
+      )}
     </div>
   );
 }

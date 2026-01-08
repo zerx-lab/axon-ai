@@ -17,13 +17,21 @@ export const MODEL_STORAGE_KEY = "axon-selected-model";
 /** localStorage 存储键名 - 活动会话 ID */
 export const ACTIVE_SESSION_STORAGE_KEY = "axon-active-session-id";
 
+/** localStorage 存储键名 - 模型 variant 选择 */
+export const VARIANT_STORAGE_KEY = "axon-model-variants";
+
 // ============== 类型定义 ==============
+
+/** 模型推理深度变体配置 */
+export type ModelVariants = Record<string, Record<string, unknown>>;
 
 /** 模型信息 */
 export interface Model {
   id: string;
   name: string;
   provider: string;
+  /** 可用的推理深度变体 (如 "low", "medium", "high", "max") */
+  variants?: ModelVariants;
 }
 
 /** Provider 信息 */
@@ -42,6 +50,9 @@ export interface SelectedModel {
   modelId: string;
 }
 
+/** 选中的 Variant (按模型存储) */
+export type SelectedVariants = Record<string, string | undefined>;
+
 /** Chat Hook 返回值 */
 export interface UseChatReturn {
   // 状态
@@ -58,6 +69,12 @@ export interface UseChatReturn {
   selectedModel: SelectedModel | null;
   isLoadingModels: boolean;
   
+  // Variant 相关
+  /** 当前模型可用的 variants 列表 */
+  currentVariants: string[];
+  /** 当前选中的 variant */
+  selectedVariant: string | undefined;
+  
   // 会话操作
   createNewSession: (directory?: string) => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
@@ -70,6 +87,12 @@ export interface UseChatReturn {
   // 模型操作
   selectModel: (providerId: string, modelId: string) => void;
   refreshProviders: () => Promise<void>;
+  
+  // Variant 操作
+  /** 设置当前模型的 variant */
+  selectVariant: (variant: string | undefined) => void;
+  /** 循环切换 variant */
+  cycleVariant: () => void;
   
   // 其他
   clearError: () => void;

@@ -20,6 +20,7 @@ import {
   ACTIVE_SESSION_STORAGE_KEY,
   type Provider,
   type SelectedModel,
+  type SelectedVariants,
 } from "./types";
 import { useSSEHandler } from "./sse";
 import {
@@ -29,7 +30,12 @@ import {
   useSelectSession,
   useDeleteSession,
 } from "./sessions";
-import { useRefreshProviders, useSelectModel } from "./providers";
+import { 
+  useRefreshProviders, 
+  useSelectModel, 
+  useVariantOperations,
+  loadSavedVariants,
+} from "./providers";
 import { useLoadMessages, useSendMessage, useStopGeneration } from "./messages";
 
 // 重新导出类型
@@ -81,6 +87,9 @@ export function useChat() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  
+  // Variant 状态（从 localStorage 恢复）
+  const [selectedVariants, setSelectedVariants] = useState<SelectedVariants>(() => loadSavedVariants());
   
   // ============== Refs ==============
   
@@ -175,6 +184,14 @@ export function useChat() {
   );
   
   const selectModel = useSelectModel(setSelectedModel);
+  
+  // Variant 操作
+  const variantOps = useVariantOperations(
+    providers,
+    selectedModel,
+    selectedVariants,
+    setSelectedVariants
+  );
 
   // ============== 消息发送/停止 Hooks ==============
   
@@ -185,6 +202,7 @@ export function useChat() {
     activeSession,
     sessions,
     selectedModel,
+    selectedVariant: variantOps.selectedVariant(),
     isLoading,
     setMessages,
     setSessions,
@@ -252,6 +270,10 @@ export function useChat() {
     selectedModel,
     isLoadingModels,
     
+    // Variant 相关
+    currentVariants: variantOps.currentVariants(),
+    selectedVariant: variantOps.selectedVariant(),
+    
     // 会话操作
     createNewSession,
     selectSession,
@@ -264,6 +286,10 @@ export function useChat() {
     // 模型操作
     selectModel,
     refreshProviders,
+    
+    // Variant 操作
+    selectVariant: variantOps.selectVariant,
+    cycleVariant: variantOps.cycleVariant,
     
     // 其他
     clearError,

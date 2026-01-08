@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { User, Bot, Loader2, AlertCircle } from "lucide-react";
 import { PartRenderer, MarkdownRenderer } from "./parts";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 import type { 
   Message, 
   Part,
@@ -159,6 +160,9 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
   const messageError = extractMessageError(messageInfo.error);
   const hasCompleted = messageInfo.time.completed !== undefined;
   
+  // 判断是否正在加载
+  const isLoading = !hasCompleted && !messageError;
+  
   // 过滤掉一些不需要显示的 part 类型
   const visibleParts = parts.filter((part) => {
     // 不显示快照和补丁等内部类型
@@ -196,12 +200,13 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
       );
     }
     
-    // 正在加载
+    // 正在加载 - 使用 ThinkingIndicator
     return (
-      <div className="text-sm text-muted-foreground flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span>{t("chat.thinking")}</span>
-      </div>
+      <ThinkingIndicator
+        parts={parts}
+        startTime={messageInfo.time.created}
+        isLoading={true}
+      />
     );
   }
 
@@ -215,6 +220,15 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
           isLast={index === visibleParts.length - 1}
         />
       ))}
+      {/* 如果正在生成且有内容，在底部显示 ThinkingIndicator */}
+      {isLoading && visibleParts.length > 0 && (
+        <ThinkingIndicator
+          parts={parts}
+          startTime={messageInfo.time.created}
+          isLoading={true}
+          className="mt-2"
+        />
+      )}
       {/* 如果有内容但也有错误，在底部显示错误 */}
       {messageError && (
         <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3 mt-2">

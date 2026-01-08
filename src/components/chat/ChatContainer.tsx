@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInputCard } from "./ChatInputCard";
 import { QuickPrompts } from "./QuickPrompts";
-import type { Message } from "@/types/chat";
+import type { Message, Session } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
 import { Sparkles } from "lucide-react";
 
@@ -23,6 +23,15 @@ interface ChatContainerProps {
   selectedModel?: { providerId: string; modelId: string } | null;
   onSelectModel?: (providerId: string, modelId: string) => void;
   isLoadingModels?: boolean;
+  // Variant（推理深度）相关
+  currentVariants?: string[];
+  selectedVariant?: string | undefined;
+  onSelectVariant?: (variant: string | undefined) => void;
+  onCycleVariant?: () => void;
+  // 会话历史搜索相关
+  sessions?: Session[];
+  activeSessionId?: string | null;
+  onSelectSession?: (sessionId: string) => void;
 }
 
 export function ChatContainer({
@@ -35,6 +44,13 @@ export function ChatContainer({
   selectedModel,
   onSelectModel,
   isLoadingModels = false,
+  currentVariants = [],
+  selectedVariant,
+  onSelectVariant,
+  onCycleVariant,
+  sessions = [],
+  activeSessionId = null,
+  onSelectSession,
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isEmptyState = messages.length === 0;
@@ -71,7 +87,14 @@ export function ChatContainer({
               selectedModel={selectedModel}
               onSelectModel={onSelectModel}
               isLoadingModels={isLoadingModels}
+              currentVariants={currentVariants}
+              selectedVariant={selectedVariant}
+              onSelectVariant={onSelectVariant}
+              onCycleVariant={onCycleVariant}
               isEmptyState={true}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelectSession={onSelectSession}
             />
           </div>
 
@@ -114,7 +137,14 @@ export function ChatContainer({
             selectedModel={selectedModel}
             onSelectModel={onSelectModel}
             isLoadingModels={isLoadingModels}
+            currentVariants={currentVariants}
+            selectedVariant={selectedVariant}
+            onSelectVariant={onSelectVariant}
+            onCycleVariant={onCycleVariant}
             isEmptyState={false}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={onSelectSession}
           />
         </div>
 

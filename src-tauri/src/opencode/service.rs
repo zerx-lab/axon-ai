@@ -7,9 +7,8 @@ use crate::opencode::downloader::OpencodeDownloader;
 use crate::opencode::types::{
     DownloadProgress, OpencodeError, ServiceConfig, ServiceMode, ServiceStatus,
 };
-use crate::utils::paths::{ensure_dir_exists, get_opencode_config_dir};
+use crate::utils::paths::{ensure_dir_exists, get_app_data_dir};
 use parking_lot::RwLock;
-use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -156,9 +155,20 @@ impl OpencodeService {
 
     /// 启动本地 opencode serve 进程
     ///
-    /// 通过设置环境变量实现配置隔离：
-    /// - OPENCODE_CONFIG_CONTENT: 传递 Axon 专用配置（JSON 格式）
-    /// - OPENCODE_CONFIG_DIR: 指向 Axon 专用配置目录
+    /// 通过设置 XDG 环境变量实现**完全配置隔离**：
+    /// - opencode 使用 xdg-basedir 库读取 XDG_CONFIG_HOME 等环境变量
+    /// - xdg-basedir 会自动在 XDG_CONFIG_HOME 下创建 /opencode 子目录
+    /// - 这样可以完全绕过用户的全局配置 ~/.config/opencode/
+    ///
+    /// 目录结构：
+    /// ```
+    /// <app_data_dir>/
+    /// ├── bin/                      # opencode 二进制
+    /// ├── opencode/                 # opencode 配置和数据（xdg-basedir 自动创建）
+    /// │   └── opencode.json         # 配置文件
+    /// └── cache/                    # 缓存目录
+    ///     └── opencode/             # opencode 缓存
+    /// ```
     async fn start_local_service(&self, port: u16) -> Result<(), OpencodeError> {
         let binary_path = self
             .downloader
@@ -168,33 +178,61 @@ impl OpencodeService {
         self.update_status(ServiceStatus::Starting);
         info!("启动 opencode serve，端口: {}", port);
 
-        // 构建 Axon 专用配置
-        let config_content = self.build_opencode_config(port);
-        let config_dir = self.get_axon_opencode_config_dir();
+        // 获取应用数据目录
+        let app_data_dir = get_app_data_dir().ok_or(OpencodeError::ConfigError(
+            "未初始化应用数据目录".to_string(),
+        ))?;
 
-        // 确保配置目录存在
-        if let Some(ref dir) = config_dir {
-            if let Err(e) = ensure_dir_exists(dir) {
-                warn!("创建 opencode 配置目录失败: {}", e);
-            }
+        // 缓存目录
+        let cache_dir = app_data_dir.join("cache");
+        if let Err(e) = ensure_dir_exists(&cache_dir) {
+            warn!("创建缓存目录失败: {}", e);
         }
 
-        debug!("OPENCODE_CONFIG_CONTENT: {}", config_content);
-        debug!("OPENCODE_CONFIG_DIR: {:?}", config_dir);
+        // opencode 会在 $XDG_CONFIG_HOME/opencode/ 下创建配置
+        // 设置 XDG_CONFIG_HOME 为 app_data_dir，opencode 自动创建 /opencode 子目录
+        let opencode_config_dir = app_data_dir.join("opencode");
+        if let Err(e) = ensure_dir_exists(&opencode_config_dir) {
+            warn!("创建 opencode 配置目录失败: {}", e);
+        }
+
+        // 只有在配置文件不存在时才创建默认配置
+        // 使用 opencode.json，与 Config.update API 写入的文件名一致
+        // opencode 加载顺序：config.json -> opencode.json -> opencode.jsonc
+        // 后加载的文件会覆盖前面的配置，所以使用 opencode.json 可以确保一致性
+        let config_file = opencode_config_dir.join("opencode.json");
+        if !config_file.exists() {
+            let config_json = self.build_opencode_config(port);
+            if let Err(e) = std::fs::write(&config_file, &config_json) {
+                warn!("写入 opencode 配置文件失败: {}", e);
+            } else {
+                info!("已创建默认 opencode 配置文件: {:?}", config_file);
+            }
+        } else {
+            debug!("opencode 配置文件已存在，跳过创建: {:?}", config_file);
+        }
+
+        info!("opencode 配置目录: {:?}", opencode_config_dir);
 
         let mut cmd = std::process::Command::new(&binary_path);
         cmd.args(["serve", "--port", &port.to_string()])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            // 注入配置环境变量，避免与全局 opencode 配置冲突
-            .env("OPENCODE_CONFIG_CONTENT", &config_content)
+            // 设置工作目录为 opencode 配置目录
+            // 这样：
+            // 1. opencode 不会向上查找到项目目录下的配置文件
+            // 2. Instance.directory = opencode_config_dir
+            // 3. Config.update 会写入到 opencode_config_dir/config.json
+            // 4. 与 Global.Path.config (XDG_CONFIG_HOME/opencode) 一致
+            .current_dir(&opencode_config_dir)
+            // 设置 XDG 环境变量实现配置隔离
+            // xdg-basedir 会自动在这些目录下创建 /opencode 子目录
+            .env("XDG_CONFIG_HOME", &app_data_dir)
+            .env("XDG_DATA_HOME", &app_data_dir)
+            .env("XDG_STATE_HOME", &app_data_dir)
+            .env("XDG_CACHE_HOME", &cache_dir)
             // 禁用自动更新（由 Axon 管理）
             .env("OPENCODE_DISABLE_AUTOUPDATE", "true");
-
-        // 设置独立的配置目录
-        if let Some(ref dir) = config_dir {
-            cmd.env("OPENCODE_CONFIG_DIR", dir);
-        }
 
         let child = cmd
             .spawn()
@@ -220,28 +258,40 @@ impl OpencodeService {
         }
     }
 
-    /// 构建 Axon 专用的 opencode 配置
+    /// 构建 Axon 专用的 opencode 配置文件内容
     ///
-    /// 返回 JSON 格式的配置字符串，通过 OPENCODE_CONFIG_CONTENT 环境变量传递
+    /// 由于我们通过 XDG_CONFIG_HOME 实现了完全隔离，
+    /// opencode 会在全新的配置目录中启动，不会加载任何全局配置。
+    /// 这里只需要配置 Axon 需要的基本设置即可。
     fn build_opencode_config(&self, port: u16) -> String {
         let config = serde_json::json!({
+            // JSON Schema（帮助编辑器提供自动补全）
+            "$schema": "https://opencode.ai/config.json",
+            
             // 服务器配置
             "server": {
                 "port": port,
                 "hostname": "127.0.0.1"
             },
+            
             // 禁用自动更新（由 Axon 管理二进制版本）
             "autoupdate": false,
+            
             // 禁用分享功能（桌面应用不需要）
-            "share": "disabled"
+            "share": "disabled",
+            
+            // 权限配置 - 桌面应用中可以更宽松
+            "permission": {
+                "edit": "allow",
+                "write": "allow",
+                "bash": "allow"
+            }
+            
+            // MCP 服务器配置 - 初始为空，用户可通过 Axon UI 添加
+            // "mcp": {}
         });
 
-        serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string())
-    }
-
-    /// 获取 Axon 专用的 opencode 配置目录
-    fn get_axon_opencode_config_dir(&self) -> Option<PathBuf> {
-        get_opencode_config_dir()
+        serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Verify remote server connection

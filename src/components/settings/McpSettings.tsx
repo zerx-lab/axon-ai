@@ -140,7 +140,7 @@ interface McpConfigCache {
 
 export function McpSettings() {
   const { t } = useTranslation();
-  const { client, isConnected, state, connect } = useOpencode();
+  const { client, isConnected, state, connect, restartBackend } = useOpencode();
 
   // 从全局状态获取连接状态和后端状态
   const connectionStatus = state.connectionState.status;
@@ -211,6 +211,46 @@ export function McpSettings() {
       setIsLoading(false);
     }
   }, [client, isConnected, t]);
+
+  // 刷新 MCP 服务器状态（重启 opencode 服务以清除缓存后重新加载）
+  const refreshMcpStatus = useCallback(async () => {
+    if (!client || !isConnected) return;
+
+    setIsLoading(true);
+    try {
+      // 重启 opencode 服务以清除所有缓存（包括 Config.global）
+      // 这是因为官方 opencode 二进制的 Instance.dispose() 不会重置 Config.global 缓存
+      await restartBackend();
+      
+      // 等待服务重启完成并重新连接
+      // restartBackend 内部会处理重连，这里等待一下确保服务稳定
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 然后重新加载状态
+      const [statusResult, configResult] = await Promise.all([
+        client.mcp.status(),
+        client.config.get(),
+      ]);
+      
+      if (statusResult.data) {
+        setMcpServers(statusResult.data as unknown as Record<string, McpStatus>);
+      }
+      
+      if (configResult.data) {
+        const config = configResult.data as unknown as { mcp?: Record<string, McpConfig> };
+        if (config.mcp) {
+          setMcpConfigs(config.mcp);
+        }
+      }
+      
+      toast.success(t("settings.mcpSettings.refreshSuccess"));
+    } catch (error) {
+      console.error("刷新 MCP 状态失败:", error);
+      toast.error(t("errors.unknownError"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client, isConnected, restartBackend, t]);
 
   useEffect(() => {
     loadMcpStatus();
@@ -316,13 +356,22 @@ export function McpSettings() {
         };
       }
 
-      await client.mcp.add({
-        name: addDialog.name.trim(),
-        config,
+      const mcpName = addDialog.name.trim();
+      
+      // 使用 config.update 持久化 MCP 配置到配置文件
+      // POST /mcp 只是运行时添加，重启后会丢失
+      await client.config.update({
+        config: {
+          mcp: {
+            [mcpName]: config,
+          },
+        },
       });
 
-      toast.success(t("settings.mcpSettings.addSuccess", { name: addDialog.name }));
+      toast.success(t("settings.mcpSettings.addSuccess", { name: mcpName }));
       setAddDialog(initialAddDialogState);
+      // 刷新 MCP 状态缓存（config.update 更新配置文件后，MCP.state 有缓存需要刷新）
+      await client.instance.dispose();
       await loadMcpStatus();
     } catch (error) {
       console.error("添加 MCP 服务器失败:", error);
@@ -435,14 +484,21 @@ export function McpSettings() {
         };
       }
 
-      // 使用 add 覆盖现有配置
-      await client.mcp.add({
-        name: editDialog.name.trim(),
-        config,
+      const mcpName = editDialog.name.trim();
+      
+      // 使用 config.update 持久化 MCP 配置到配置文件
+      await client.config.update({
+        config: {
+          mcp: {
+            [mcpName]: config,
+          },
+        },
       });
 
-      toast.success(t("settings.mcpSettings.editSuccess", { name: editDialog.name }));
+      toast.success(t("settings.mcpSettings.editSuccess", { name: mcpName }));
       setEditDialog(initialEditDialogState);
+      // 刷新 MCP 状态缓存（config.update 更新配置文件后，MCP.state 有缓存需要刷新）
+      await client.instance.dispose();
       await loadMcpStatus();
     } catch (error) {
       console.error("编辑 MCP 服务器失败:", error);
@@ -591,7 +647,7 @@ export function McpSettings() {
             <Plus className="mr-1.5 h-4 w-4" />
             {t("settings.mcpSettings.add")}
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={loadMcpStatus} disabled={isLoading}>
+          <Button variant="ghost" size="icon-sm" onClick={refreshMcpStatus} disabled={isLoading}>
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
         </div>

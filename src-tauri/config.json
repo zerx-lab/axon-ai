@@ -1,4 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "github-copilot/claude-opus-4.5"
+  "model": "github-copilot/claude-opus-4.5",
+  "mcp": {
+    "pdf-reader": {
+      "type": "local",
+      "command": [
+        "bunx",
+        "@sylphx/pdf-reader-mcp"
+      ],
+      "enabled": true,
+      "timeout": 5000
+    }
+  }
 }

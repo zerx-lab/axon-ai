@@ -8,7 +8,7 @@ use crate::utils::paths::{get_bin_dir, get_opencode_bin_path};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -147,7 +147,7 @@ impl OpencodeDownloader {
     async fn download_file(
         &self,
         url: &str,
-        dest: &PathBuf,
+        dest: &Path,
         progress_tx: Option<mpsc::Sender<DownloadProgress>>,
     ) -> Result<(), OpencodeError> {
         let response = self
@@ -186,7 +186,7 @@ impl OpencodeDownloader {
     }
 
     /// Extract binary from archive
-    fn extract_binary(&self, archive_path: &PathBuf, dest_dir: &PathBuf) -> Result<PathBuf, OpencodeError> {
+    fn extract_binary(&self, archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, OpencodeError> {
         let binary_name = get_binary_name();
         let binary_path = dest_dir.join(binary_name);
 
@@ -208,8 +208,8 @@ impl OpencodeDownloader {
     /// Extract from zip archive (Windows)
     fn extract_zip(
         &self,
-        archive_path: &PathBuf,
-        dest_dir: &PathBuf,
+        archive_path: &Path,
+        dest_dir: &Path,
         binary_name: &str,
     ) -> Result<(), OpencodeError> {
         let file = std::fs::File::open(archive_path)?;
@@ -241,8 +241,8 @@ impl OpencodeDownloader {
     #[cfg(not(windows))]
     fn extract_tar_gz(
         &self,
-        archive_path: &PathBuf,
-        dest_dir: &PathBuf,
+        archive_path: &Path,
+        dest_dir: &Path,
         binary_name: &str,
     ) -> Result<(), OpencodeError> {
         use std::process::Command;
@@ -283,8 +283,8 @@ impl OpencodeDownloader {
     #[cfg(windows)]
     fn extract_tar_gz(
         &self,
-        _archive_path: &PathBuf,
-        _dest_dir: &PathBuf,
+        _archive_path: &Path,
+        _dest_dir: &Path,
         _binary_name: &str,
     ) -> Result<(), OpencodeError> {
         // Windows uses zip, this should never be called

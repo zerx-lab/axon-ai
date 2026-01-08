@@ -75,12 +75,16 @@ function HomePage() {
     providers,
     selectedModel,
     isLoadingModels,
+    currentVariants,
+    selectedVariant,
     sendMessage,
     stopGeneration,
     createNewSession,
     selectSession,
     deleteSession,
     selectModel,
+    selectVariant,
+    cycleVariant,
     clearError,
     refreshSessions,
   } = useChat();
@@ -214,6 +218,13 @@ function HomePage() {
             selectedModel={selectedModel}
             onSelectModel={selectModel}
             isLoadingModels={isLoadingModels}
+            currentVariants={currentVariants}
+            selectedVariant={selectedVariant}
+            onSelectVariant={selectVariant}
+            onCycleVariant={cycleVariant}
+            sessions={sessions}
+            activeSessionId={activeSession?.id ?? null}
+            onSelectSession={selectSession}
           />
         </div>
       </ResizablePanel>

@@ -1,12 +1,19 @@
 /**
  * 聊天状态管理 - Provider/模型管理
  * 
- * 包含 Provider 列表获取、模型选择等功能
+ * 包含 Provider 列表获取、模型选择、Variant 管理等功能
  */
 
 import { useCallback } from "react";
 import type { OpencodeClient } from "@/services/opencode/types";
-import { MODEL_STORAGE_KEY, type Provider, type SelectedModel } from "./types";
+import { 
+  MODEL_STORAGE_KEY, 
+  VARIANT_STORAGE_KEY, 
+  type Provider, 
+  type SelectedModel, 
+  type SelectedVariants, 
+  type ModelVariants 
+} from "./types";
 
 // ============== 刷新 Providers ==============
 
@@ -37,7 +44,11 @@ export function useRefreshProviders(
         const all = providerData.all as Array<{
           id: string;
           name: string;
-          models: Record<string, { id: string; name: string }>;
+          models: Record<string, { 
+            id: string; 
+            name: string;
+            variants?: ModelVariants;
+          }>;
         }>;
         const connected = providerData.connected as string[];
         // default 是一个 map: { [agentName: string]: "provider/modelId" }
@@ -54,6 +65,8 @@ export function useRefreshProviders(
               id: modelId,
               name: model.name,
               provider: p.id,
+              // 解析模型的 variants 配置
+              variants: model.variants,
             })),
           }));
         
@@ -151,4 +164,125 @@ export function useSelectModel(
       console.error("保存模型选择失败:", e);
     }
   }, [setSelectedModel]);
+}
+
+// ============== Variant 管理 ==============
+
+/**
+ * 生成模型的唯一键
+ */
+export function getModelKey(providerId: string, modelId: string): string {
+  return `${providerId}/${modelId}`;
+}
+
+/**
+ * 从 localStorage 加载已保存的 variant 选择
+ */
+export function loadSavedVariants(): SelectedVariants {
+  try {
+    const saved = localStorage.getItem(VARIANT_STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved) as SelectedVariants;
+    }
+  } catch {
+    // 忽略读取错误
+  }
+  return {};
+}
+
+/**
+ * 保存 variant 选择到 localStorage
+ */
+export function saveVariants(variants: SelectedVariants): void {
+  try {
+    localStorage.setItem(VARIANT_STORAGE_KEY, JSON.stringify(variants));
+  } catch (e) {
+    console.error("保存 variant 选择失败:", e);
+  }
+}
+
+/**
+ * 使用 Variant 操作 Hook
+ */
+export function useVariantOperations(
+  providers: Provider[],
+  selectedModel: SelectedModel | null,
+  selectedVariants: SelectedVariants,
+  setSelectedVariants: React.Dispatch<React.SetStateAction<SelectedVariants>>
+) {
+  // 获取当前模型
+  const getCurrentModel = useCallback(() => {
+    if (!selectedModel) return null;
+    for (const provider of providers) {
+      if (provider.id === selectedModel.providerId) {
+        const model = provider.models.find((m) => m.id === selectedModel.modelId);
+        if (model) return model;
+      }
+    }
+    return null;
+  }, [providers, selectedModel]);
+
+  // 获取当前模型可用的 variants 列表
+  const currentVariants = useCallback((): string[] => {
+    const model = getCurrentModel();
+    if (!model?.variants) return [];
+    return Object.keys(model.variants);
+  }, [getCurrentModel]);
+
+  // 获取当前选中的 variant
+  const selectedVariant = useCallback((): string | undefined => {
+    if (!selectedModel) return undefined;
+    const key = getModelKey(selectedModel.providerId, selectedModel.modelId);
+    return selectedVariants[key];
+  }, [selectedModel, selectedVariants]);
+
+  // 设置当前模型的 variant
+  const selectVariant = useCallback((variant: string | undefined) => {
+    if (!selectedModel) return;
+    const key = getModelKey(selectedModel.providerId, selectedModel.modelId);
+    
+    setSelectedVariants((prev) => {
+      const updated = { ...prev };
+      if (variant === undefined) {
+        delete updated[key];
+      } else {
+        updated[key] = variant;
+      }
+      // 持久化保存
+      saveVariants(updated);
+      return updated;
+    });
+  }, [selectedModel, setSelectedVariants]);
+
+  // 循环切换 variant
+  const cycleVariant = useCallback(() => {
+    const variants = currentVariants();
+    if (variants.length === 0) return;
+
+    const current = selectedVariant();
+    
+    if (!current) {
+      // 没有选中任何 variant，选择第一个
+      selectVariant(variants[0]);
+      return;
+    }
+
+    const index = variants.indexOf(current);
+    if (index === -1 || index === variants.length - 1) {
+      // 找不到或已经是最后一个，重置为默认
+      selectVariant(undefined);
+      return;
+    }
+
+    // 选择下一个
+    selectVariant(variants[index + 1]);
+  }, [currentVariants, selectedVariant, selectVariant]);
+
+  return {
+    getCurrentModel,
+    currentVariants,
+    selectedVariant,
+    selectVariant,
+    cycleVariant,
+  };
 }

@@ -31,6 +31,8 @@ export interface MessageOperationsDeps {
   activeSession: Session | null;
   sessions: Session[];
   selectedModel: SelectedModel | null;
+  /** 当前选中的推理深度 variant */
+  selectedVariant: string | undefined;
   isLoading: boolean;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
@@ -86,6 +88,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     activeSession,
     sessions,
     selectedModel,
+    selectedVariant,
     isLoading,
     setMessages,
     setSessions,
@@ -125,8 +128,14 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     
     try {
       // 使用 session.promptAsync() 发送消息（异步，响应通过 SSE 事件流式返回）
-      // SDK v2 使用扁平化参数结构: { sessionID, directory, parts, model, ... }
-      const promptParams = {
+      // SDK v2 使用扁平化参数结构: { sessionID, directory, parts, model, variant, ... }
+      const promptParams: {
+        sessionID: string;
+        directory?: string;
+        parts: Array<{ type: "text"; text: string }>;
+        model: { providerID: string; modelID: string };
+        variant?: string;
+      } = {
         sessionID: activeSessionId,
         directory: activeSession?.directory,
         parts: [{ type: "text" as const, text: content }],
@@ -136,10 +145,16 @@ export function useSendMessage(deps: MessageOperationsDeps) {
         },
       };
       
+      // 添加推理深度 variant（如果选择了）
+      if (selectedVariant) {
+        promptParams.variant = selectedVariant;
+      }
+      
       // 调试日志：打印发送的参数
       console.log("[sendMessage] 发送参数:", JSON.stringify(promptParams, null, 2));
       console.log("[sendMessage] activeSession:", activeSession);
       console.log("[sendMessage] selectedModel:", selectedModel);
+      console.log("[sendMessage] selectedVariant:", selectedVariant);
       
       const response = await client.session.promptAsync(promptParams);
       
@@ -218,7 +233,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
       isGeneratingRef.current = false;
     }
     // 注意：不在 finally 中关闭 isLoading，由 SSE 事件控制
-  }, [client, activeSessionId, selectedModel, isLoading, activeSession, sessions, t, setMessages, setSessions, setIsLoading, setError, isGeneratingRef]);
+  }, [client, activeSessionId, selectedModel, selectedVariant, isLoading, activeSession, sessions, t, setMessages, setSessions, setIsLoading, setError, isGeneratingRef]);
 }
 
 // ============== 停止生成 ==============

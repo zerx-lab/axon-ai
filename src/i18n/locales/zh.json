@@ -83,9 +83,49 @@
     "modelRequired": "请先选择模型",
     "searchModel": "搜索模型...",
     "noModelFound": "未找到匹配的模型",
+    "thinkingEffort": "推理深度",
+    "variant": {
+      "default": "默认",
+      "defaultDesc": "使用模型默认设置",
+      "none": "无推理",
+      "noneDesc": "禁用推理，快速响应",
+      "minimal": "极简",
+      "minimalDesc": "最小推理深度",
+      "low": "低",
+      "lowDesc": "较少的推理思考",
+      "medium": "中等",
+      "mediumDesc": "平衡推理与速度",
+      "high": "高",
+      "highDesc": "深度推理思考",
+      "xhigh": "超高",
+      "xhighDesc": "超深度推理",
+      "max": "最大",
+      "maxDesc": "最大化推理深度"
+    },
+    "thinkingStatus": {
+      "gathering": "收集思路",
+      "thinking": "深度思考",
+      "searching": "搜索代码库",
+      "reading": "读取文件",
+      "editing": "编辑文件",
+      "running": "运行命令",
+      "delegating": "委派任务",
+      "planning": "规划步骤",
+      "fetching": "获取网页",
+      "considering": "思考中"
+    },
     "connecting": "正在连接服务...",
     "disconnected": "服务未连接",
-    "emptyResponse": "（空响应）"
+    "emptyResponse": "（空响应）",
+    "sessionSearch": {
+      "title": "搜索会话",
+      "placeholder": "搜索会话...",
+      "noResults": "未找到匹配的会话",
+      "navigate": "导航",
+      "select": "选择",
+      "close": "关闭",
+      "sessions": "个会话"
+    }
   },
   "settings": {
     "title": "设置",
@@ -259,7 +299,8 @@
       "retry": "重试连接",
       "editDialogTitle": "编辑 MCP 服务器",
       "editDialogDescription": "修改 MCP 服务器配置",
-      "editSuccess": "MCP 服务器 {{name}} 已更新"
+      "editSuccess": "MCP 服务器 {{name}} 已更新",
+      "refreshSuccess": "MCP 服务器列表已刷新"
     }
   },
   "status": {

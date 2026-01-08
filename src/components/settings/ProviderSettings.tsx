@@ -218,6 +218,8 @@ export function ProviderSettings() {
       
       toast.success(t("notifications.settingsSaved"));
       setApiKeys((prev) => ({ ...prev, [providerId]: "" }));
+      // 刷新 Provider 状态缓存（API Key 保存后 auth.json 已更新，但 Provider.state 有缓存）
+      await client.instance.dispose();
       await loadProviders();
     } catch (error) {
       console.error("保存 API Key 失败:", error);
@@ -313,6 +315,9 @@ export function ProviderSettings() {
       
       toast.success(t("settings.providerSettings.authSuccess", { name: oauthDialog.providerName }));
       setOAuthDialog(initialOAuthDialogState);
+      // 刷新 Provider 状态缓存（OAuth 成功后 auth.json 已更新，但 Provider.state 有缓存）
+      // 参考 OpenCode TUI 的做法：通过 instance.dispose 销毁实例来刷新状态
+      await client.instance.dispose();
       await loadProviders();
     } catch (error) {
       console.error("OAuth 回调失败:", error);
@@ -342,6 +347,8 @@ export function ProviderSettings() {
       // 授权成功
       toast.success(t("settings.providerSettings.authSuccess", { name: providerName }));
       setOAuthDialog(initialOAuthDialogState);
+      // 刷新 Provider 状态缓存（OAuth 成功后 auth.json 已更新，但 Provider.state 有缓存）
+      await client.instance.dispose();
       await loadProviders();
     } catch (error) {
       console.error("OAuth 授权失败:", error);

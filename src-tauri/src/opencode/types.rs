@@ -18,11 +18,6 @@ pub enum OpencodeError {
     #[error("Failed to start service: {0}")]
     ServiceStartError(String),
 
-    // TODO: Will be used when implementing service health checks
-    #[allow(dead_code)]
-    #[error("Service is not running")]
-    ServiceNotRunning,
-
     #[error("Failed to connect to service: {0}")]
     ConnectionError(String),
 
@@ -37,26 +32,22 @@ pub enum OpencodeError {
 }
 
 /// Service connection mode
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ServiceMode {
     /// Local opencode binary (auto-download if needed)
+    #[default]
     Local,
     /// Remote opencode server
     Remote { url: String },
 }
 
-impl Default for ServiceMode {
-    fn default() -> Self {
-        Self::Local
-    }
-}
-
 /// Current status of the opencode service
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ServiceStatus {
     /// Service is not initialized
+    #[default]
     Uninitialized,
     /// Downloading binary
     Downloading { progress: f32 },
@@ -70,12 +61,6 @@ pub enum ServiceStatus {
     Stopped,
     /// Error state
     Error { message: String },
-}
-
-impl Default for ServiceStatus {
-    fn default() -> Self {
-        Self::Uninitialized
-    }
 }
 
 /// Download progress information

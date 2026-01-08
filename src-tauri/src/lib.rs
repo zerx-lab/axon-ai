@@ -61,7 +61,7 @@ pub fn run() {
             // 1. 首先初始化应用数据目录（其他操作依赖此路径）
             //    使用 Tauri API 获取正确的应用目录，与 identifier 一致
             utils::paths::init_app_data_dir(&handle)
-                .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+                .map_err(|e| Box::new(std::io::Error::other(e)))?;
 
             // 2. 设置 app_handle 用于事件发送（必须在异步操作之前）
             {

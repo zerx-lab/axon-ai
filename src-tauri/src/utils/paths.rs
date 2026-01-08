@@ -2,7 +2,7 @@
 //!
 //! 使用 Tauri API 获取应用数据目录，确保路径与 tauri.conf.json 中的 identifier 一致
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Manager};
 use tracing::{debug, info};
@@ -58,29 +58,8 @@ pub fn get_opencode_bin_path() -> Option<PathBuf> {
     })
 }
 
-/// 获取 opencode 专用配置目录
-/// 用于存储 Axon 管理的 opencode 配置，与全局 opencode 配置隔离
-/// 路径: <app_data_dir>/opencode
-pub fn get_opencode_config_dir() -> Option<PathBuf> {
-    get_app_data_dir().map(|p| p.join("opencode"))
-}
-
-/// 获取配置目录
-/// 路径: <app_data_dir>/config
-#[allow(dead_code)]
-pub fn get_config_dir() -> Option<PathBuf> {
-    get_app_data_dir().map(|p| p.join("config"))
-}
-
-/// 获取日志目录
-/// 路径: <app_data_dir>/logs
-#[allow(dead_code)]
-pub fn get_logs_dir() -> Option<PathBuf> {
-    get_app_data_dir().map(|p| p.join("logs"))
-}
-
 /// 确保目录存在
-pub fn ensure_dir_exists(path: &PathBuf) -> Result<(), std::io::Error> {
+pub fn ensure_dir_exists(path: &Path) -> Result<(), std::io::Error> {
     if !path.exists() {
         debug!("创建目录: {:?}", path);
         std::fs::create_dir_all(path)?;
