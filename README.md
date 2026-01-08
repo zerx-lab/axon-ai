@@ -5,7 +5,7 @@
 <h1 align="center">Axon</h1>
 
 <p align="center">
-  基于 OpenCode 的跨平台 AI 编程客户端
+  跨平台 AI 编程助手
 </p>
 
 <p align="center">
@@ -20,21 +20,40 @@
 
 ## 简介
 
-Axon 是 [OpenCode](https://github.com/opencode-ai/opencode) 的桌面客户端，使用 Tauri 2 + React 19 构建。
+Axon 是一个桌面端 AI 编程助手，使用 Tauri 2 + React 19 构建，支持 Windows、macOS、Linux。
 
-相比命令行工具，Axon 提供了可视化的会话管理、代码预览、Diff 对比等功能，适合需要图形界面的开发场景。
+通过对话的方式完成代码编写、文件编辑、命令执行等开发任务。
 
 ---
 
 ## 功能
 
-- **会话管理** - 多会话切换，历史记录持久化
-- **代码预览** - 文件浏览，语法高亮
-- **Diff 可视化** - unified/split 视图，Rust 后端计算
-- **任务追踪** - 实时显示 AI 执行的操作步骤
-- **权限确认** - 文件写入、命令执行等操作需用户确认
-- **主题切换** - 深色/浅色主题，跟随系统
-- **多语言** - 中文/英文界面
+### AI 能力
+
+- **代码生成** - 根据描述生成代码，支持多种编程语言
+- **代码编辑** - 修改现有代码，自动生成 Diff
+- **代码解释** - 分析代码逻辑，回答技术问题
+- **命令执行** - 运行 shell 命令，查看输出结果
+- **文件操作** - 读取、创建、修改项目文件
+- **上下文理解** - 自动读取相关文件，理解项目结构
+
+### 模型支持
+
+- Claude (Anthropic)
+- GPT-4 / GPT-4o (OpenAI)
+- Gemini (Google)
+- 本地模型 (Ollama)
+
+### 客户端功能
+
+- **会话管理** - 多会话并行，历史记录持久化
+- **代码预览** - 文件浏览器，语法高亮
+- **Diff 可视化** - unified/split 视图，查看代码变更
+- **任务追踪** - 实时显示执行步骤和进度
+- **权限确认** - 敏感操作（写文件、执行命令）需用户确认
+- **布局记忆** - 自动保存窗口布局和打开的文件
+- **主题** - 深色/浅色，跟随系统
+- **多语言** - 中文/英文
 
 ---
 
@@ -49,20 +68,18 @@ Axon 是 [OpenCode](https://github.com/opencode-ai/opencode) 的桌面客户端�
 │  │  React 19      │  │  │  Tauri 2 (Rust)            │  │
 │  │  TanStack      │◄─┼─►│  - 窗口管理                │  │
 │  │  Zustand       │  │  │  - 文件系统                │  │
-│  │  TailwindCSS   │  │  │  - Diff 计算 (similar)     │  │
+│  │  TailwindCSS   │  │  │  - Diff 计算               │  │
 │  └────────────────┘  │  │  - 进程管理                │  │
 │          │           │  └────────────────────────────┘  │
-│          │           │               │                  │
-│          └───────────┼───── SSE ─────┘                  │
-│                      │                                  │
-│              ┌───────┴───────┐                          │
-│              │  OpenCode     │                          │
-│              │  (子进程)      │                          │
-│              └───────────────┘                          │
+│          │ SSE       │               │                  │
+│          ▼           │               ▼                  │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │                   AI Service                        │ │
+│  └────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 前端
+### 前端依赖
 
 | 依赖 | 用途 |
 |------|------|
@@ -72,9 +89,8 @@ Axon 是 [OpenCode](https://github.com/opencode-ai/opencode) 的桌面客户端�
 | Zustand | 状态管理 |
 | TailwindCSS 4 | 样式 |
 | Radix UI | 无障碍组件 |
-| @opencode-ai/sdk | OpenCode API 客户端 |
 
-### 后端
+### 后端依赖
 
 | 依赖 | 用途 |
 |------|------|
@@ -98,13 +114,12 @@ axon/
 │   │   ├── sidebar/             # 侧边栏
 │   │   └── ui/                  # 基础组件
 │   ├── providers/               # Context Providers
-│   ├── services/opencode/       # OpenCode 服务封装
+│   ├── services/                # API 服务封装
 │   ├── stores/                  # Zustand Stores
 │   └── routes/                  # 页面
 ├── src-tauri/                   # Rust 后端
 │   └── src/
 │       ├── commands/            # Tauri Commands
-│       ├── opencode/            # OpenCode 进程管理
 │       └── utils/               # 工具函数
 └── public/                      # 静态资源
 ```
@@ -119,7 +134,7 @@ axon/
 - Rust 1.70+
 - 系统依赖见 [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/)
 
-### 安装与构建
+### 构建
 
 ```bash
 # 安装依赖
@@ -128,32 +143,20 @@ bun install
 # 构建前端
 bun run build
 
-# 构建完整应用
+# 构建应用
 bun run tauri build
 ```
 
-### Rust 开发
+### Rust
 
 ```bash
 cd src-tauri
 
 cargo check      # 类型检查
-cargo test       # 运行测试
+cargo test       # 测试
 cargo fmt        # 格式化
 cargo clippy     # Lint
 ```
-
----
-
-## OpenCode 集成
-
-Axon 通过 `@opencode-ai/sdk` 与 OpenCode 服务通信：
-
-1. 应用启动时自动下载 OpenCode 二进制文件（如不存在）
-2. 启动 `opencode serve` 子进程
-3. 前端通过 HTTP + SSE 与服务交互
-
-支持的模型取决于 OpenCode 配置（Claude、GPT-4、Gemini、Ollama 等）。
 
 ---
 
@@ -165,10 +168,3 @@ Axon 通过 `@opencode-ai/sdk` 与 OpenCode 服务通信：
 - 需要署名
 - 禁止商业使用
 - 修改后需使用相同许可证
-
----
-
-## 相关项目
-
-- [OpenCode](https://github.com/opencode-ai/opencode) - AI 编程 CLI
-- [Tauri](https://tauri.app) - 桌面应用框架
