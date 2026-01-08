@@ -68,6 +68,13 @@ export interface CollapsiblePanelProps {
   contentClassName?: string;
   /** 是否显示项目数量徽章 */
   count?: number;
+  /** 
+   * 面板的 flex 占比
+   * - 0: 不占空间（折叠状态）
+   * - 1: 均匀分配空间
+   * - 其他值: 相对占比
+   */
+  flexGrow?: number;
 }
 
 // ============== 主组件 ==============
@@ -81,6 +88,7 @@ export function CollapsiblePanel({
   contextMenuActions,
   contentClassName,
   count,
+  flexGrow = 0,
 }: CollapsiblePanelProps) {
   // 面板头部内容
   const panelHeader = (
@@ -145,7 +153,16 @@ export function CollapsiblePanel({
   );
 
   return (
-    <Collapsible open={isOpen} onOpenChange={onToggle} className="flex flex-col min-h-0">
+    <Collapsible 
+      open={isOpen} 
+      onOpenChange={onToggle} 
+      className="flex flex-col min-h-0"
+      style={{ 
+        flexGrow: isOpen ? flexGrow : 0,
+        flexShrink: isOpen ? 1 : 0,
+        flexBasis: 'auto',
+      }}
+    >
       {/* 带右键菜单的头部 */}
       {contextMenuActions && contextMenuActions.length > 0 ? (
         <ContextMenu>

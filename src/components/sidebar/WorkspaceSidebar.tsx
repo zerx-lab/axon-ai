@@ -119,6 +119,34 @@ export function WorkspaceSidebar({
     setExplorerKey((k) => k + 1);
   }, [onRefresh]);
 
+  // 计算面板 flexGrow 值
+  // VS Code 风格：第一个展开的面板获得最大空间，其他展开的面板均分剩余空间
+  const panelFlexGrow = useMemo(() => {
+    const openPanels: (keyof typeof DEFAULT_PANEL_STATE)[] = [];
+    if (panelState.sessions) openPanels.push("sessions");
+    if (panelState.explorer) openPanels.push("explorer");
+    
+    // 如果没有展开的面板，都返回 0
+    if (openPanels.length === 0) {
+      return { sessions: 0, explorer: 0 };
+    }
+    
+    // 如果只有一个展开的面板，它获得全部空间
+    if (openPanels.length === 1) {
+      return {
+        sessions: panelState.sessions ? 1 : 0,
+        explorer: panelState.explorer ? 1 : 0,
+      };
+    }
+    
+    // 多个面板展开时：第一个展开的面板获得更多空间（比例 3），其余的均分（比例 1）
+    const result = { sessions: 0, explorer: 0 };
+    openPanels.forEach((panel, index) => {
+      result[panel] = index === 0 ? 3 : 1;
+    });
+    return result;
+  }, [panelState]);
+
   // 按更新时间排序的会话列表
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -176,6 +204,7 @@ export function WorkspaceSidebar({
           onToggle={() => togglePanel("sessions")}
           count={sessions.length}
           actions={sessionPanelActions}
+          flexGrow={panelFlexGrow.sessions}
         >
           <div className="flex flex-col">
             {sortedSessions.length === 0 ? (
@@ -202,6 +231,7 @@ export function WorkspaceSidebar({
           title={t("sidebar.explorer", "资源管理器")}
           isOpen={panelState.explorer}
           onToggle={() => togglePanel("explorer")}
+          flexGrow={panelFlexGrow.explorer}
         >
           {currentProject ? (
             <FileExplorer

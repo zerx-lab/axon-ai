@@ -234,6 +234,16 @@ impl OpencodeService {
             // 禁用自动更新（由 Axon 管理）
             .env("OPENCODE_DISABLE_AUTOUPDATE", "true");
 
+        // Windows 平台：设置 CREATE_NO_WINDOW 标志，避免弹出 CMD 控制台窗口
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            // CREATE_NO_WINDOW = 0x08000000
+            // 参考：https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
         let child = cmd
             .spawn()
             .map_err(|e| OpencodeError::ServiceStartError(e.to_string()))?;
