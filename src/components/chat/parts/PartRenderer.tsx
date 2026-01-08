@@ -24,6 +24,8 @@ import {
   CheckCircle2,
   Loader2,
   Clock,
+  Columns2,
+  Rows2,
 } from "lucide-react";
 import type {
   Part,
@@ -39,6 +41,7 @@ import type {
 } from "@/types/chat";
 import { getToolDisplayName } from "@/types/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { DiffViewer, DiffStatsDisplay } from "@/components/diff";
 
 // ============== Part 渲染器 ==============
 
@@ -277,6 +280,58 @@ function BashToolContent({ state }: { state: ToolStateCompleted }) {
   );
 }
 
+// 文件差异数据结构（与 opencode 一致）
+interface FileDiffData {
+  file: string;
+  before: string;
+  after: string;
+  additions: number;
+  deletions: number;
+}
+
+// multiedit 工具的单个 edit 结果
+interface EditResultMetadata {
+  diff?: string;
+  filediff?: FileDiffData;
+  diagnostics?: Record<string, unknown>;
+}
+
+// multiedit 工具的 metadata 结构
+interface MultiEditMetadata {
+  results: EditResultMetadata[];
+}
+
+// 从 multiedit 结果中提取合并的差异数据
+function extractMultiEditDiff(metadata: MultiEditMetadata): FileDiffData | null {
+  const results = metadata.results;
+  if (!results || results.length === 0) return null;
+  
+  // 获取第一个有效的 filediff（作为 before 来源）
+  const firstResult = results[0];
+  // 获取最后一个有效的 filediff（作为 after 来源）
+  const lastResult = results[results.length - 1];
+  
+  if (!firstResult?.filediff || !lastResult?.filediff) return null;
+  
+  // 累加所有的 additions 和 deletions
+  let totalAdditions = 0;
+  let totalDeletions = 0;
+  for (const result of results) {
+    if (result.filediff) {
+      totalAdditions += result.filediff.additions;
+      totalDeletions += result.filediff.deletions;
+    }
+  }
+  
+  return {
+    file: firstResult.filediff.file,
+    before: firstResult.filediff.before,
+    after: lastResult.filediff.after,
+    additions: totalAdditions,
+    deletions: totalDeletions,
+  };
+}
+
 // 文件工具内容
 function FileToolContent({ 
   tool, 
@@ -288,6 +343,7 @@ function FileToolContent({
   messageInfo: AssistantMessageInfo;
 }) {
   const [showContent, setShowContent] = useState(false);
+  const [diffMode, setDiffMode] = useState<"split" | "unified">("split");
   const filePath = state.input.filePath as string;
   const cwd = messageInfo.path?.cwd || "";
   
@@ -296,6 +352,22 @@ function FileToolContent({
     ? filePath.slice(cwd.length + 1) 
     : filePath;
   
+  // 获取 filediff 数据
+  // - edit 工具: 直接从 metadata.filediff 获取
+  // - multiedit 工具: 从 metadata.results 数组中提取合并的差异
+  const fileDiff = tool === "edit" 
+    ? (state.metadata?.filediff as FileDiffData | undefined)
+    : tool === "multiedit"
+    ? extractMultiEditDiff(state.metadata as unknown as MultiEditMetadata)
+    : undefined;
+  
+  // 判断是否有完整的差异数据
+  const hasFileDiff = (tool === "edit" || tool === "multiedit") && 
+    fileDiff && 
+    typeof fileDiff.before === "string" && 
+    typeof fileDiff.after === "string";
+  
+  // 对于非 edit/multiedit 工具，使用原来的内容
   const content = tool === "read" 
     ? (state.metadata?.preview as string || state.output)
     : tool === "write"
@@ -304,10 +376,63 @@ function FileToolContent({
   
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">{displayPath}</span>
+      {/* 文件路径和差异统计 */}
+      <div className="flex items-center gap-2 justify-between">
+        <span className="text-sm font-medium text-muted-foreground truncate">
+          {displayPath}
+        </span>
+        {hasFileDiff && (
+          <div className="flex items-center gap-2">
+            <DiffStatsDisplay 
+              additions={fileDiff.additions} 
+              deletions={fileDiff.deletions} 
+            />
+            {/* 视图模式切换 */}
+            <div className="flex items-center border border-border rounded-md overflow-hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 px-2 rounded-none text-xs",
+                  diffMode === "split" && "bg-accent"
+                )}
+                onClick={() => setDiffMode("split")}
+                title="分栏视图"
+              >
+                <Columns2 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 px-2 rounded-none text-xs",
+                  diffMode === "unified" && "bg-accent"
+                )}
+                onClick={() => setDiffMode("unified")}
+                title="统一视图"
+              >
+                <Rows2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-      {content && (
+      
+      {/* edit 工具使用 DiffViewer */}
+      {hasFileDiff && (
+        <DiffViewer
+          oldText={fileDiff.before}
+          newText={fileDiff.after}
+          fileName={displayPath}
+          mode={diffMode}
+          showHeader={false}
+          showLineNumbers={true}
+          contextLines={3}
+        />
+      )}
+      
+      {/* 其他工具使用原来的折叠输出 */}
+      {!hasFileDiff && content && (
         <CollapsibleOutput
           output={content}
           showOutput={showContent}

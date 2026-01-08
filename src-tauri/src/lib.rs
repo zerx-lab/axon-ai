@@ -53,6 +53,11 @@ pub fn run() {
             // 文件系统命令
             ensure_directory_exists,
             select_directory,
+            // Diff 计算命令
+            compute_diff,
+            compute_unified_diff,
+            compute_diff_stats,
+            texts_are_equal,
         ])
         .setup(|app| {
             let setup_start = std::time::Instant::now();
