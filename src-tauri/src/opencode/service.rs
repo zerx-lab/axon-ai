@@ -1,8 +1,15 @@
-//! OpenCode service management
+//! OpenCode 服务生命周期管理模块
+//!
+//! 负责 opencode 二进制的下载、启动、停止、重启等操作。
+//! 通过 Tauri 事件系统与前端通信，实时报告服务状态。
 
 use crate::opencode::downloader::OpencodeDownloader;
-use crate::opencode::types::{DownloadProgress, OpencodeError, ServiceConfig, ServiceMode, ServiceStatus};
+use crate::opencode::types::{
+    DownloadProgress, OpencodeError, ServiceConfig, ServiceMode, ServiceStatus,
+};
+use crate::utils::paths::{ensure_dir_exists, get_opencode_config_dir};
 use parking_lot::RwLock;
+use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -147,7 +154,11 @@ impl OpencodeService {
         Ok(())
     }
 
-    /// Start local opencode serve process
+    /// 启动本地 opencode serve 进程
+    ///
+    /// 通过设置环境变量实现配置隔离：
+    /// - OPENCODE_CONFIG_CONTENT: 传递 Axon 专用配置（JSON 格式）
+    /// - OPENCODE_CONFIG_DIR: 指向 Axon 专用配置目录
     async fn start_local_service(&self, port: u16) -> Result<(), OpencodeError> {
         let binary_path = self
             .downloader
@@ -155,33 +166,82 @@ impl OpencodeService {
             .ok_or(OpencodeError::BinaryNotFound)?;
 
         self.update_status(ServiceStatus::Starting);
-        info!("Starting opencode serve on port {}", port);
+        info!("启动 opencode serve，端口: {}", port);
 
-        let child = std::process::Command::new(&binary_path)
-            .args(["serve", "--port", &port.to_string()])
+        // 构建 Axon 专用配置
+        let config_content = self.build_opencode_config(port);
+        let config_dir = self.get_axon_opencode_config_dir();
+
+        // 确保配置目录存在
+        if let Some(ref dir) = config_dir {
+            if let Err(e) = ensure_dir_exists(dir) {
+                warn!("创建 opencode 配置目录失败: {}", e);
+            }
+        }
+
+        debug!("OPENCODE_CONFIG_CONTENT: {}", config_content);
+        debug!("OPENCODE_CONFIG_DIR: {:?}", config_dir);
+
+        let mut cmd = std::process::Command::new(&binary_path);
+        cmd.args(["serve", "--port", &port.to_string()])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
+            // 注入配置环境变量，避免与全局 opencode 配置冲突
+            .env("OPENCODE_CONFIG_CONTENT", &config_content)
+            // 禁用自动更新（由 Axon 管理）
+            .env("OPENCODE_DISABLE_AUTOUPDATE", "true");
+
+        // 设置独立的配置目录
+        if let Some(ref dir) = config_dir {
+            cmd.env("OPENCODE_CONFIG_DIR", dir);
+        }
+
+        let child = cmd
             .spawn()
             .map_err(|e| OpencodeError::ServiceStartError(e.to_string()))?;
 
         *self.process.write() = Some(child);
 
-        // Wait a bit for the service to start
+        // 等待服务启动
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        // Verify service is running
+        // 验证服务是否正在运行
         if self.is_process_running() {
             self.update_status(ServiceStatus::Running { port });
-            info!("OpenCode service started successfully on port {}", port);
+            info!("OpenCode 服务启动成功，端口: {}", port);
             Ok(())
         } else {
             self.update_status(ServiceStatus::Error {
-                message: "Service failed to start".to_string(),
+                message: "服务启动失败".to_string(),
             });
             Err(OpencodeError::ServiceStartError(
-                "Process exited immediately".to_string(),
+                "进程立即退出".to_string(),
             ))
         }
+    }
+
+    /// 构建 Axon 专用的 opencode 配置
+    ///
+    /// 返回 JSON 格式的配置字符串，通过 OPENCODE_CONFIG_CONTENT 环境变量传递
+    fn build_opencode_config(&self, port: u16) -> String {
+        let config = serde_json::json!({
+            // 服务器配置
+            "server": {
+                "port": port,
+                "hostname": "127.0.0.1"
+            },
+            // 禁用自动更新（由 Axon 管理二进制版本）
+            "autoupdate": false,
+            // 禁用分享功能（桌面应用不需要）
+            "share": "disabled"
+        });
+
+        serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// 获取 Axon 专用的 opencode 配置目录
+    fn get_axon_opencode_config_dir(&self) -> Option<PathBuf> {
+        get_opencode_config_dir()
     }
 
     /// Verify remote server connection

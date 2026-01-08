@@ -85,6 +85,7 @@ interface AddMcpDialogState {
   command: string;
   environment: string;
   url: string;
+  headers: string;
   enabled: boolean;
   timeout: string;
   isSubmitting: boolean;
@@ -97,6 +98,7 @@ const initialAddDialogState: AddMcpDialogState = {
   command: "",
   environment: "",
   url: "",
+  headers: "",
   enabled: true,
   timeout: "5000",
   isSubmitting: false,
@@ -111,6 +113,7 @@ interface EditMcpDialogState {
   command: string;
   environment: string;
   url: string;
+  headers: string;
   enabled: boolean;
   timeout: string;
   isSubmitting: boolean;
@@ -124,6 +127,7 @@ const initialEditDialogState: EditMcpDialogState = {
   command: "",
   environment: "",
   url: "",
+  headers: "",
   enabled: true,
   timeout: "5000",
   isSubmitting: false,
@@ -291,9 +295,22 @@ export function McpSettings() {
           return;
         }
 
+        // 解析请求头
+        let headers: Record<string, string> | undefined;
+        if (addDialog.headers.trim()) {
+          try {
+            headers = JSON.parse(addDialog.headers);
+          } catch {
+            toast.error(t("settings.mcpSettings.invalidHeadersFormat"));
+            setAddDialog((prev) => ({ ...prev, isSubmitting: false }));
+            return;
+          }
+        }
+
         config = {
           type: "remote",
           url: addDialog.url.trim(),
+          headers,
           enabled: addDialog.enabled,
           timeout: addDialog.timeout ? parseInt(addDialog.timeout) : undefined,
         };
@@ -332,6 +349,7 @@ export function McpSettings() {
         command: config.command.join(" "),
         environment: config.environment ? JSON.stringify(config.environment, null, 2) : "",
         url: "",
+        headers: "",
         enabled: config.enabled !== false,
         timeout: config.timeout?.toString() || "5000",
         isSubmitting: false,
@@ -345,6 +363,7 @@ export function McpSettings() {
         command: "",
         environment: "",
         url: config.url,
+        headers: config.headers ? JSON.stringify(config.headers, null, 2) : "",
         enabled: config.enabled !== false,
         timeout: config.timeout?.toString() || "5000",
         isSubmitting: false,
@@ -395,9 +414,22 @@ export function McpSettings() {
           return;
         }
 
+        // 解析请求头
+        let headers: Record<string, string> | undefined;
+        if (editDialog.headers.trim()) {
+          try {
+            headers = JSON.parse(editDialog.headers);
+          } catch {
+            toast.error(t("settings.mcpSettings.invalidHeadersFormat"));
+            setEditDialog((prev) => ({ ...prev, isSubmitting: false }));
+            return;
+          }
+        }
+
         config = {
           type: "remote",
           url: editDialog.url.trim(),
+          headers,
           enabled: editDialog.enabled,
           timeout: editDialog.timeout ? parseInt(editDialog.timeout) : undefined,
         };
@@ -807,14 +839,31 @@ export function McpSettings() {
 
             {/* 远程类型配置 */}
             {addDialog.type === "remote" && (
-              <div className="space-y-2">
-                <Label>{t("settings.mcpSettings.url")}</Label>
-                <Input
-                  placeholder={t("settings.mcpSettings.urlPlaceholder")}
-                  value={addDialog.url}
-                  onChange={(e) => setAddDialog((prev) => ({ ...prev, url: e.target.value }))}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>{t("settings.mcpSettings.url")}</Label>
+                  <Input
+                    placeholder={t("settings.mcpSettings.urlPlaceholder")}
+                    value={addDialog.url}
+                    onChange={(e) => setAddDialog((prev) => ({ ...prev, url: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("settings.mcpSettings.headers")}</Label>
+                  <Textarea
+                    placeholder={t("settings.mcpSettings.headersPlaceholder")}
+                    value={addDialog.headers}
+                    onChange={(e) =>
+                      setAddDialog((prev) => ({ ...prev, headers: e.target.value }))
+                    }
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.mcpSettings.headersHint")}
+                  </p>
+                </div>
+              </>
             )}
 
             {/* 超时设置 */}
@@ -950,14 +999,31 @@ export function McpSettings() {
 
             {/* 远程类型配置 */}
             {editDialog.type === "remote" && (
-              <div className="space-y-2">
-                <Label>{t("settings.mcpSettings.url")}</Label>
-                <Input
-                  placeholder={t("settings.mcpSettings.urlPlaceholder")}
-                  value={editDialog.url}
-                  onChange={(e) => setEditDialog((prev) => ({ ...prev, url: e.target.value }))}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>{t("settings.mcpSettings.url")}</Label>
+                  <Input
+                    placeholder={t("settings.mcpSettings.urlPlaceholder")}
+                    value={editDialog.url}
+                    onChange={(e) => setEditDialog((prev) => ({ ...prev, url: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("settings.mcpSettings.headers")}</Label>
+                  <Textarea
+                    placeholder={t("settings.mcpSettings.headersPlaceholder")}
+                    value={editDialog.headers}
+                    onChange={(e) =>
+                      setEditDialog((prev) => ({ ...prev, headers: e.target.value }))
+                    }
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.mcpSettings.headersHint")}
+                  </p>
+                </div>
+              </>
             )}
 
             {/* 超时设置 */}

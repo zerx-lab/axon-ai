@@ -32,12 +32,22 @@ function TooltipTrigger({
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 
+interface TooltipContentProps
+  extends React.ComponentProps<typeof TooltipPrimitive.Content> {
+  /** 是否隐藏箭头 */
+  hideArrow?: boolean
+  /** 自定义箭头类名 */
+  arrowClassName?: string
+}
+
 function TooltipContent({
   className,
   sideOffset = 0,
   children,
+  hideArrow = false,
+  arrowClassName,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+}: TooltipContentProps) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
@@ -50,7 +60,14 @@ function TooltipContent({
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+        {!hideArrow && (
+          <TooltipPrimitive.Arrow
+            className={cn(
+              "bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]",
+              arrowClassName
+            )}
+          />
+        )}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
