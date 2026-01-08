@@ -6,7 +6,7 @@
  * 中间区域为 VSCode 风格的项目选择器触发器
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, ChevronDown } from "lucide-react";
 import { WindowControls } from "./WindowControls";
@@ -47,6 +47,19 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
     setPickerOpen(true);
   }, []);
 
+  // 监听 Ctrl+O 快捷键打开项目选择器
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "o") {
+        e.preventDefault();
+        setPickerOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // 处理选择项目
   const handleSelectProject = useCallback(async (directory: string) => {
     // 添加项目到列表（如果还未添加）
@@ -67,16 +80,14 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
   return (
     <>
       <header className="flex h-9 shrink-0 select-none items-center border-b border-border bg-surface-1">
-        {/* 左侧 - 应用标题 */}
+        {/* 左侧 - 应用标题 + 项目选择器 */}
         <div
           data-tauri-drag-region
           className="flex h-full items-center gap-2 px-3"
         >
           <span className="text-sm font-medium text-foreground">{title}</span>
-        </div>
-
-        {/* 中间 - 项目选择器触发器 (VSCode 风格) */}
-        <div data-tauri-drag-region className="flex-1 h-full flex items-center justify-center">
+          
+          {/* 项目选择器触发器 (VSCode 风格) */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -101,12 +112,15 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
               <TooltipContent side="bottom" className="max-w-xs">
                 <p className="text-xs">{currentDirectory || t("titlebar.defaultWorkspace")}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {t("projectPicker.clickToSwitch", "点击切换项目")}
+                  {t("projectPicker.clickToSwitch", "点击切换项目")} (Ctrl+O)
                 </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
+
+        {/* 中间 - 拖拽区域 */}
+        <div data-tauri-drag-region className="flex-1 h-full" />
 
         {/* 右侧 - 控制按钮 */}
         <div className="flex h-full items-center">

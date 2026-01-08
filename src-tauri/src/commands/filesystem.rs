@@ -139,6 +139,53 @@ pub async fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
     Ok(entries)
 }
 
+/// 读取文件内容
+/// 返回文件的文本内容
+#[tauri::command]
+pub async fn read_file_content(path: String) -> Result<String, String> {
+    debug!("读取文件内容: {}", path);
+
+    let file_path = Path::new(&path);
+
+    if !file_path.exists() {
+        error!("文件不存在: {:?}", file_path);
+        return Err(format!("文件不存在: {}", path));
+    }
+
+    if !file_path.is_file() {
+        error!("路径不是文件: {:?}", file_path);
+        return Err(format!("路径不是文件: {}", path));
+    }
+
+    // 读取文件内容
+    match std::fs::read_to_string(file_path) {
+        Ok(content) => {
+            debug!("成功读取文件，大小: {} 字节", content.len());
+            Ok(content)
+        }
+        Err(e) => {
+            // 如果是编码错误，尝试读取为二进制并转换
+            if e.kind() == std::io::ErrorKind::InvalidData {
+                debug!("文件可能不是 UTF-8 编码，尝试读取二进制");
+                match std::fs::read(file_path) {
+                    Ok(bytes) => {
+                        // 尝试使用有损转换
+                        let content = String::from_utf8_lossy(&bytes).to_string();
+                        Ok(content)
+                    }
+                    Err(read_err) => {
+                        error!("读取文件失败: {:?}, 错误: {}", file_path, read_err);
+                        Err(format!("读取文件失败: {}", read_err))
+                    }
+                }
+            } else {
+                error!("读取文件失败: {:?}, 错误: {}", file_path, e);
+                Err(format!("读取文件失败: {}", e))
+            }
+        }
+    }
+}
+
 /// 打开目录选择对话框
 /// 返回用户选择的目录路径，如果用户取消则返回 None
 #[tauri::command]

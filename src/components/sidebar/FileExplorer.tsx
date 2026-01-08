@@ -58,8 +58,8 @@ interface FileExplorerProps {
   rootName?: string;
   /** 是否显示隐藏文件 */
   showHidden?: boolean;
-  /** 点击文件回调 */
-  onFileClick?: (path: string) => void;
+  /** 点击文件回调，参数为文件路径和文件名 */
+  onFileClick?: (path: string, name: string) => void;
   /** 类名 */
   className?: string;
 }
@@ -128,7 +128,7 @@ interface FileTreeItemProps {
   node: FileTreeNode;
   depth: number;
   onToggle: (path: string) => void;
-  onFileClick?: (path: string) => void;
+  onFileClick?: (path: string, name: string) => void;
 }
 
 function FileTreeItem({
@@ -144,7 +144,7 @@ function FileTreeItem({
     if (node.is_directory) {
       onToggle(node.path);
     } else {
-      onFileClick?.(node.path);
+      onFileClick?.(node.path, node.name);
     }
   }, [node, onToggle, onFileClick]);
 

@@ -333,6 +333,16 @@
   .dark .chat-scroll-area:hover::-webkit-scrollbar-thumb:hover {
     background: #666;
   }
+
+  /* 隐藏滚动条 */
+  .scrollbar-none {
+    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Opera */
+  }
 }
 
 /* Tauri window drag region */

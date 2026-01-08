@@ -74,11 +74,17 @@ pub fn run() {
             ensure_directory_exists,
             select_directory,
             read_directory,
+            read_file_content,
             // Diff 计算命令
             compute_diff,
             compute_unified_diff,
             compute_diff_stats,
             texts_are_equal,
+            // 工作区布局命令
+            save_workspace_layout,
+            load_workspace_layout,
+            delete_workspace_layout,
+            list_workspace_layouts,
         ])
         .setup(|app| {
             let setup_start = std::time::Instant::now();

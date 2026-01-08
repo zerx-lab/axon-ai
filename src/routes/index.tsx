@@ -1,12 +1,15 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
 import { WorkspaceSidebar } from "@/components/sidebar";
+import { FilePreviewPanel } from "@/components/editor";
 import { ActivityBar } from "@/components/activitybar";
 import { StatusBar } from "@/components/statusbar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useActivityBar } from "@/stores/activityBar";
+import { useEditor } from "@/stores/editor";
+import { useLayout } from "@/stores/layout";
 import { useTranslation } from "react-i18next";
 import { AlertCircle } from "lucide-react";
 import {
@@ -14,33 +17,27 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import type { PanelSize } from "react-resizable-panels";
 import { normalizeDirectory } from "@/types/project";
 
-// 侧边栏面板配置（使用像素值）
+// 侧边栏面板配置（像素值）
+// react-resizable-panels: 数字 = 像素，字符串如 "15%" = 百分比
 const SIDEBAR_CONFIG = {
-  defaultSize: 256,   // 默认宽度 256px
-  minSize: 180,       // 最小宽度 180px
-  maxSize: 400,       // 最大宽度 400px
+  defaultSize: 256, // 默认宽度 256px
+  minSize: 180, // 最小宽度 180px
+  maxSize: 400, // 最大宽度 400px
 };
 
-// localStorage 存储键名
-const SIDEBAR_STORAGE_KEY = "axon-sidebar-layout";
+// 编辑器面板配置（百分比字符串）
+const EDITOR_PANEL_CONFIG = {
+  defaultSize: "50%", // 默认占比 50%（均匀分割）
+  minSize: "20%", // 最小占比 20%
+};
 
-// 从 localStorage 读取保存的侧边栏大小
-function getSavedSidebarSize(): number | null {
-  try {
-    const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (typeof parsed.size === "number") {
-        return parsed.size;
-      }
-    }
-  } catch {
-    // 忽略解析错误
-  }
-  return null;
-}
+// 聊天面板配置（像素值）
+const CHAT_PANEL_CONFIG = {
+  minSize: 460, // 最小宽度 460px
+};
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -49,16 +46,38 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { t } = useTranslation();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // 活动栏状态
   const { position: activityBarPosition, sidebarVisible } = useActivityBar();
-  
-  // 从 localStorage 获取初始侧边栏大小
-  const [initialSidebarSize] = useState(() => {
-    const saved = getSavedSidebarSize();
-    return saved ?? SIDEBAR_CONFIG.defaultSize;
-  });
-  
+
+  // 编辑器状态
+  const {
+    isVisible: editorVisible,
+    openFile,
+    tabs,
+    activeTabPath,
+    restoreFromLayout,
+    getTabsForPersistence,
+  } = useEditor();
+
+  // 布局状态
+  const {
+    layout,
+    isInitialized: layoutInitialized,
+    loadLayout,
+    updateSidebarWidth,
+    updateEditorPanelRatio,
+    updateOpenedTabs,
+    updateActiveTabPath,
+    updateEditorVisible,
+  } = useLayout();
+
+  // 用于防抖保存的定时器
+  const sidebarSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const editorSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 聊天状态
   const {
     sessions,
@@ -82,13 +101,10 @@ function HomePage() {
     clearError,
     refreshSessions,
   } = useChat();
-  
+
   // 项目状态
-  const {
-    projects,
-    getProjectByDirectory,
-  } = useProjectContext();
-  
+  const { projects, getProjectByDirectory } = useProjectContext();
+
   // 获取当前项目 - 基于活动会话的目录
   const currentProject = useMemo(() => {
     if (!activeSession?.directory) {
@@ -99,11 +115,102 @@ function HomePage() {
     const project = getProjectByDirectory(activeSession.directory);
     return project || (projects.length > 0 ? projects[0] : null);
   }, [activeSession?.directory, getProjectByDirectory, projects]);
-  
+
+  // 加载项目布局
+  const lastLoadedProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      currentProject &&
+      currentProject.directory !== lastLoadedProjectRef.current
+    ) {
+      lastLoadedProjectRef.current = currentProject.directory;
+      loadLayout(currentProject.directory);
+    }
+  }, [currentProject, loadLayout]);
+
+  // 当布局加载完成后，恢复编辑器状态
+  // 使用项目目录作为 key，确保每个项目只恢复一次
+  const restoredProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 只有当布局初始化完成，且是新项目时才恢复
+    if (!layoutInitialized || !layout) return;
+
+    const projectDir = layout.project_directory;
+    if (restoredProjectRef.current === projectDir) {
+      // 已经恢复过这个项目了
+      return;
+    }
+
+    console.log("[HomePage] 恢复布局:", {
+      projectDir,
+      openedTabs: layout.opened_tabs?.length,
+      activeTabPath: layout.active_tab_path,
+      editorVisible: layout.editor_visible,
+    });
+
+    // 标记为已恢复
+    restoredProjectRef.current = projectDir;
+
+    // 恢复编辑器状态
+    if (layout.opened_tabs.length > 0 || layout.active_tab_path) {
+      restoreFromLayout(
+        layout.opened_tabs,
+        layout.active_tab_path,
+        layout.editor_visible,
+      );
+    }
+  }, [layoutInitialized, layout, restoreFromLayout]);
+
+  // 同步编辑器状态到布局（当标签页变化时）
+  const prevTabsRef = useRef<string>("");
+  useEffect(() => {
+    if (!layoutInitialized) return;
+
+    const tabsKey = tabs.map((t) => t.path).join("|");
+    if (tabsKey !== prevTabsRef.current) {
+      prevTabsRef.current = tabsKey;
+      updateOpenedTabs(getTabsForPersistence());
+    }
+  }, [tabs, layoutInitialized, updateOpenedTabs, getTabsForPersistence]);
+
+  // 同步活动标签页到布局
+  useEffect(() => {
+    if (layoutInitialized) {
+      updateActiveTabPath(activeTabPath);
+    }
+  }, [activeTabPath, layoutInitialized, updateActiveTabPath]);
+
+  // 同步编辑器可见性到布局
+  useEffect(() => {
+    if (layoutInitialized) {
+      updateEditorVisible(editorVisible);
+    }
+  }, [editorVisible, layoutInitialized, updateEditorVisible]);
+
+  // 从布局获取初始值
+  // 侧边栏使用像素值（数字会被解释为像素）
+  const initialSidebarSize =
+    layout?.sidebar_width ?? SIDEBAR_CONFIG.defaultSize;
+  // 编辑器使用百分比字符串
+  const initialEditorSize = layout?.editor_panel_ratio
+    ? `${layout.editor_panel_ratio}%`
+    : EDITOR_PANEL_CONFIG.defaultSize;
+
+  // 用于强制 ResizablePanelGroup 重新挂载的 key
+  // 只在以下情况触发重新挂载：
+  // 1. 布局首次加载完成
+  // 2. 项目变化
+  // 3. activityBarPosition 变化
+  // 不包含 updated_at，避免每次保存都触发刷新
+  const layoutKey = useMemo(() => {
+    if (!layoutInitialized) return "loading";
+    return `${activityBarPosition}-${layout?.project_directory || "default"}`;
+  }, [layoutInitialized, activityBarPosition, layout?.project_directory]);
+
   // 获取当前项目的会话列表
   const currentProjectSessions = useMemo(() => {
     if (!currentProject) return [];
-    
+
     const projectDir = normalizeDirectory(currentProject.directory);
     return sessions.filter((session) => {
       const sessionDir = normalizeDirectory(session.directory || "");
@@ -120,13 +227,55 @@ function HomePage() {
       setIsRefreshing(false);
     }
   }, [refreshSessions]);
-  
+
   // 处理新建会话（在当前项目下）
   const handleNewSession = useCallback(async () => {
     if (currentProject) {
       await createNewSession(currentProject.directory);
     }
   }, [currentProject, createNewSession]);
+
+  // 处理文件点击 - 打开文件预览
+  const handleFileClick = useCallback(
+    (path: string, name: string) => {
+      openFile(path, name);
+    },
+    [openFile],
+  );
+
+  // 处理侧边栏尺寸变化（使用 Panel 的 onResize 回调）
+  // 防抖 500ms 后保存，避免拖拽过程中频繁更新状态
+  const handleSidebarResize = useCallback(
+    (size: PanelSize) => {
+      // 清除之前的定时器
+      if (sidebarSaveTimerRef.current) {
+        clearTimeout(sidebarSaveTimerRef.current);
+      }
+      // 防抖保存
+      sidebarSaveTimerRef.current = setTimeout(() => {
+        updateSidebarWidth(size.inPixels);
+      }, 500);
+    },
+    [updateSidebarWidth],
+  );
+
+  // 处理编辑器面板尺寸变化
+  const handleEditorResize = useCallback(
+    (size: PanelSize) => {
+      // 清除之前的定时器
+      if (editorSaveTimerRef.current) {
+        clearTimeout(editorSaveTimerRef.current);
+      }
+      // 防抖保存
+      editorSaveTimerRef.current = setTimeout(() => {
+        updateEditorPanelRatio(size.asPercentage);
+      }, 500);
+    },
+    [updateEditorPanelRatio],
+  );
+
+  // 是否显示分屏（编辑器可见且有打开的文件）
+  const showSplitView = editorVisible && tabs.length > 0;
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden">
@@ -137,15 +286,20 @@ function HomePage() {
 
         {/* 主内容区域 */}
         <div className="flex flex-1 h-full overflow-hidden">
-          <ResizablePanelGroup orientation="horizontal" className="flex-1">
-            {/* 侧边栏面板 - 仅在 sidebarVisible 时显示 */}
-            {sidebarVisible && (
+          <ResizablePanelGroup
+            key={layoutKey}
+            orientation="horizontal"
+            className="flex-1"
+          >
+            {/* 活动栏在左侧时：侧边栏在左 */}
+            {activityBarPosition === "left" && sidebarVisible && (
               <>
                 <ResizablePanel
                   id="sidebar"
                   defaultSize={initialSidebarSize}
                   minSize={SIDEBAR_CONFIG.minSize}
                   maxSize={SIDEBAR_CONFIG.maxSize}
+                  onResize={handleSidebarResize}
                 >
                   <WorkspaceSidebar
                     currentProject={currentProject}
@@ -156,51 +310,139 @@ function HomePage() {
                     onDeleteSession={deleteSession}
                     onRefresh={handleRefreshSessions}
                     isRefreshing={isRefreshing}
+                    onFileClick={handleFileClick}
                   />
                 </ResizablePanel>
-
-                {/* 拖拽手柄 */}
                 <ResizableHandle withHandle />
               </>
             )}
 
-            {/* 主聊天区域面板 */}
+            {/* 主内容区域面板 - 包含聊天和/或编辑器 */}
             <ResizablePanel id="main" minSize={sidebarVisible ? "50%" : "100%"}>
-              <div className="flex flex-1 h-full flex-col overflow-hidden">
-                {/* 错误提示 */}
-                {error && (
-                  <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span className="flex-1">{error}</span>
-                    <button
-                      onClick={clearError}
-                      className="text-xs underline hover:no-underline"
-                    >
-                      {t("common.close")}
-                    </button>
-                  </div>
-                )}
+              {showSplitView ? (
+                // 分屏模式：编辑器 + 聊天（默认均匀分割 50%）
+                <ResizablePanelGroup
+                  key={`editor-${layoutKey}`}
+                  orientation="horizontal"
+                >
+                  {/* 编辑器面板 */}
+                  <ResizablePanel
+                    id="editor"
+                    defaultSize={initialEditorSize}
+                    minSize={EDITOR_PANEL_CONFIG.minSize}
+                    onResize={handleEditorResize}
+                  >
+                    <FilePreviewPanel />
+                  </ResizablePanel>
 
-                {/* 聊天容器 */}
-                <ChatContainer
-                  messages={messages}
-                  onSend={sendMessage}
-                  onStop={stopGeneration}
-                  isLoading={isLoading}
-                  providers={providers}
-                  selectedModel={selectedModel}
-                  onSelectModel={selectModel}
-                  isLoadingModels={isLoadingModels}
-                  currentVariants={currentVariants}
-                  selectedVariant={selectedVariant}
-                  onSelectVariant={selectVariant}
-                  onCycleVariant={cycleVariant}
-                  sessions={sessions}
-                  activeSessionId={activeSession?.id ?? null}
-                  onSelectSession={selectSession}
-                />
-              </div>
+                  {/* 拖拽手柄 */}
+                  <ResizableHandle withHandle />
+
+                  {/* 聊天面板 */}
+                  <ResizablePanel
+                    id="chat"
+                    minSize={`${CHAT_PANEL_CONFIG.minSize}px`}
+                  >
+                    <div className="flex flex-1 h-full flex-col overflow-hidden">
+                      {/* 错误提示 */}
+                      {error && (
+                        <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          <span className="flex-1">{error}</span>
+                          <button
+                            onClick={clearError}
+                            className="text-xs underline hover:no-underline"
+                          >
+                            {t("common.close")}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 聊天容器 */}
+                      <ChatContainer
+                        messages={messages}
+                        onSend={sendMessage}
+                        onStop={stopGeneration}
+                        isLoading={isLoading}
+                        providers={providers}
+                        selectedModel={selectedModel}
+                        onSelectModel={selectModel}
+                        isLoadingModels={isLoadingModels}
+                        currentVariants={currentVariants}
+                        selectedVariant={selectedVariant}
+                        onSelectVariant={selectVariant}
+                        onCycleVariant={cycleVariant}
+                        sessions={sessions}
+                        activeSessionId={activeSession?.id ?? null}
+                        onSelectSession={selectSession}
+                      />
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              ) : (
+                // 单面板模式：仅聊天
+                <div className="flex flex-1 h-full flex-col overflow-hidden">
+                  {/* 错误提示 */}
+                  {error && (
+                    <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{error}</span>
+                      <button
+                        onClick={clearError}
+                        className="text-xs underline hover:no-underline"
+                      >
+                        {t("common.close")}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 聊天容器 */}
+                  <ChatContainer
+                    messages={messages}
+                    onSend={sendMessage}
+                    onStop={stopGeneration}
+                    isLoading={isLoading}
+                    providers={providers}
+                    selectedModel={selectedModel}
+                    onSelectModel={selectModel}
+                    isLoadingModels={isLoadingModels}
+                    currentVariants={currentVariants}
+                    selectedVariant={selectedVariant}
+                    onSelectVariant={selectVariant}
+                    onCycleVariant={cycleVariant}
+                    sessions={sessions}
+                    activeSessionId={activeSession?.id ?? null}
+                    onSelectSession={selectSession}
+                  />
+                </div>
+              )}
             </ResizablePanel>
+
+            {/* 活动栏在右侧时：侧边栏在右 */}
+            {activityBarPosition === "right" && sidebarVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel
+                  id="sidebar"
+                  defaultSize={initialSidebarSize}
+                  minSize={SIDEBAR_CONFIG.minSize}
+                  maxSize={SIDEBAR_CONFIG.maxSize}
+                  onResize={handleSidebarResize}
+                >
+                  <WorkspaceSidebar
+                    currentProject={currentProject}
+                    sessions={currentProjectSessions}
+                    activeSessionId={activeSession?.id ?? null}
+                    onSelectSession={selectSession}
+                    onNewSession={handleNewSession}
+                    onDeleteSession={deleteSession}
+                    onRefresh={handleRefreshSessions}
+                    isRefreshing={isRefreshing}
+                    onFileClick={handleFileClick}
+                  />
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
         </div>
 
