@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer, ModelSelector } from "@/components/chat";
 import { ChatSidebar } from "@/components/sidebar";
-import { useChat } from "@/stores/chat";
+import { useChat } from "@/providers/ChatProvider";
+import { useWorkspace } from "@/stores/workspace";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Wifi, WifiOff } from "lucide-react";
 import {
@@ -84,6 +85,9 @@ function HomePage() {
     clearError,
     refreshSessions,
   } = useChat();
+  
+  // 工作区管理
+  const { openDirectoryPicker } = useWorkspace();
 
   // 处理刷新会话列表
   const handleRefreshSessions = useCallback(async () => {
@@ -94,6 +98,15 @@ function HomePage() {
       setIsRefreshing(false);
     }
   }, [refreshSessions]);
+  
+  // 处理打开项目 - 选择目录并创建新会话
+  const handleOpenProject = useCallback(async () => {
+    const directory = await openDirectoryPicker();
+    if (directory) {
+      // 使用选择的目录创建新会话
+      await createNewSession(directory);
+    }
+  }, [openDirectoryPicker, createNewSession]);
 
   // 切换侧边栏折叠状态
   const handleToggleCollapse = useCallback(() => {
@@ -143,6 +156,7 @@ function HomePage() {
           onSelectSession={selectSession}
           onNewSession={createNewSession}
           onDeleteSession={deleteSession}
+          onOpenProject={handleOpenProject}
           onRefresh={handleRefreshSessions}
           isRefreshing={isRefreshing}
           collapsed={sidebarCollapsed}

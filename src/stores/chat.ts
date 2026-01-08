@@ -72,7 +72,7 @@ export interface UseChatReturn {
   isLoadingModels: boolean;
   
   // 会话操作
-  createNewSession: () => Promise<void>;
+  createNewSession: (directory?: string) => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   
@@ -96,6 +96,8 @@ function mapApiSession(apiSession: ApiSession): Session {
   return {
     id: apiSession.id,
     title: apiSession.title || "新对话",
+    directory: apiSession.directory || "",
+    projectID: apiSession.projectID || "global",
     // API 返回的是毫秒时间戳
     createdAt: apiSession.time.created,
     updatedAt: apiSession.time.updated,
@@ -271,6 +273,7 @@ export function useChat(): UseChatReturn {
   
   // 当活动会话 ID 变化时，保存到 localStorage
   useEffect(() => {
+    console.log("[useChat] activeSessionId 变化:", activeSessionId);
     try {
       if (activeSessionId) {
         localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
@@ -305,6 +308,9 @@ export function useChat(): UseChatReturn {
   // 派生状态
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const models = providers.flatMap((p) => p.models);
+  
+  // 调试：追踪派生状态
+  console.log("[useChat] 派生状态计算 - activeSessionId:", activeSessionId, "sessions.length:", sessions.length, "activeSession:", activeSession?.id);
 
   // ============== 加载消息 ==============
   
@@ -347,12 +353,12 @@ export function useChat(): UseChatReturn {
   }, [client]);
   
   /** 加载会话消息 */
-  const loadMessages = useCallback(async (sessionId: string) => {
+  const loadMessages = useCallback(async (sessionId: string, directory?: string) => {
     if (!client) return;
     
     try {
-      // SDK 使用 session.messages() 方法，参数是 sessionID
-      const response = await client.session.messages({ sessionID: sessionId });
+      // SDK 使用 session.messages() 方法，参数是 sessionID 和可选的 directory
+      const response = await client.session.messages({ sessionID: sessionId, directory });
       if (response.data) {
         // response.data 是消息数组
         const messageList = response.data as Array<{
@@ -373,20 +379,34 @@ export function useChat(): UseChatReturn {
 
   // ============== 会话操作 ==============
 
-  /** 创建新会话 */
-  const createNewSession = useCallback(async () => {
+  /** 创建新会话
+   * @param directory 可选的工作目录，传递给 opencode API
+   */
+  const createNewSession = useCallback(async (directory?: string) => {
     if (!client) {
       setError(t("errors.serviceNotConnected"));
       return;
     }
     
+    // 确保 directory 是字符串类型（防止 React 事件对象被传入）
+    const validDirectory = typeof directory === "string" ? directory : undefined;
+    
     try {
-      const response = await client.session.create({});
+      // SDK v2 使用扁平化参数结构: { directory?, parentID?, title?, permission? }
+      console.log("[createNewSession] 调用 session.create, directory:", validDirectory);
+      const response = await client.session.create({ directory: validDirectory });
+      console.log("[createNewSession] API 响应:", JSON.stringify(response.data, null, 2));
       if (response.data) {
         const newSession = mapApiSession(response.data as ApiSession);
-        setSessions((prev) => [newSession, ...prev]);
+        console.log("[createNewSession] 映射后的会话:", newSession);
+        console.log("[createNewSession] 设置 activeSessionId 为:", newSession.id);
+        setSessions((prev) => {
+          console.log("[createNewSession] 添加会话到列表，当前列表长度:", prev.length);
+          return [newSession, ...prev];
+        });
         setActiveSessionId(newSession.id);
         setMessages([]);
+        console.log("[createNewSession] 完成，新会话 ID:", newSession.id);
       }
     } catch (e) {
       console.error("创建会话失败:", e);
@@ -416,17 +436,19 @@ export function useChat(): UseChatReturn {
           
           if (sessionExists) {
             // 会话存在，加载消息并检查状态（用于页面刷新恢复）
+            const sessionDir = mappedSessions.find((s) => s.id === activeSessionId)?.directory;
             await Promise.all([
-              loadMessages(activeSessionId),
+              loadMessages(activeSessionId, sessionDir),
               checkAndRestoreSessionStatus(activeSessionId),
             ]);
           } else if (mappedSessions.length > 0) {
             // 保存的会话不存在，回退到第一个会话
             console.log(`[useChat] 保存的会话 ${activeSessionId} 不存在，回退到第一个会话`);
             const firstSessionId = mappedSessions[0].id;
+            const firstSessionDir = mappedSessions[0].directory;
             setActiveSessionId(firstSessionId);
             await Promise.all([
-              loadMessages(firstSessionId),
+              loadMessages(firstSessionId, firstSessionDir),
               checkAndRestoreSessionStatus(firstSessionId),
             ]);
           } else {
@@ -437,9 +459,10 @@ export function useChat(): UseChatReturn {
         } else if (mappedSessions.length > 0) {
           // 没有活动会话但有会话列表，选择第一个
           const firstSessionId = mappedSessions[0].id;
+          const firstSessionDir = mappedSessions[0].directory;
           setActiveSessionId(firstSessionId);
           await Promise.all([
-            loadMessages(firstSessionId),
+            loadMessages(firstSessionId, firstSessionDir),
             checkAndRestoreSessionStatus(firstSessionId),
           ]);
         } else {
@@ -458,22 +481,28 @@ export function useChat(): UseChatReturn {
   const selectSession = useCallback(async (sessionId: string) => {
     if (sessionId === activeSessionId) return;
     
+    // 获取要选择的会话信息
+    const sessionToSelect = sessions.find((s) => s.id === sessionId);
+    
     setActiveSessionId(sessionId);
     
     // 并行加载消息和检查会话状态
     await Promise.all([
-      loadMessages(sessionId),
+      loadMessages(sessionId, sessionToSelect?.directory),
       checkAndRestoreSessionStatus(sessionId),
     ]);
-  }, [activeSessionId, loadMessages, checkAndRestoreSessionStatus]);
+  }, [activeSessionId, sessions, loadMessages, checkAndRestoreSessionStatus]);
 
   /** 删除会话 */
   const deleteSession = useCallback(async (sessionId: string) => {
     if (!client) return;
     
+    // 获取要删除的会话信息
+    const sessionToDelete = sessions.find((s) => s.id === sessionId);
+    
     try {
-      // SDK 使用 sessionID 作为参数名
-      await client.session.delete({ sessionID: sessionId });
+      // SDK v2 使用扁平化参数结构: { sessionID, directory? }
+      await client.session.delete({ sessionID: sessionId, directory: sessionToDelete?.directory });
       
       setSessions((prev) => {
         const filtered = prev.filter((s) => s.id !== sessionId);
@@ -482,7 +511,7 @@ export function useChat(): UseChatReturn {
         if (sessionId === activeSessionId) {
           if (filtered.length > 0) {
             setActiveSessionId(filtered[0].id);
-            loadMessages(filtered[0].id);
+            loadMessages(filtered[0].id, filtered[0].directory);
           } else {
             // 创建新会话
             createNewSession();
@@ -496,7 +525,7 @@ export function useChat(): UseChatReturn {
       const detail = e instanceof Error ? e.message : "";
       setError(detail ? t("errors.sendMessageFailedWithDetail", { detail }) : t("errors.deleteSessionFailed"));
     }
-  }, [client, activeSessionId, loadMessages, createNewSession, t]);
+  }, [client, sessions, activeSessionId, loadMessages, createNewSession, t]);
 
   // ============== 初始化 ==============
 
@@ -745,10 +774,20 @@ export function useChat(): UseChatReturn {
         case "session.updated": {
           // 会话更新（如标题变更）
           const { info } = event.properties;
+          const updatedSession = mapApiSession(info as ApiSession);
+          
           setSessions((prev) =>
-            prev.map((s) =>
-              s.id === info.id ? mapApiSession(info as ApiSession) : s
-            )
+            prev.map((s) => {
+              if (s.id !== info.id) return s;
+              
+              // 保留本地会话的 directory（如果已存在）
+              // 因为 SSE 事件可能返回服务端的工作目录，而不是创建时传入的目录
+              // 只有当本地没有 directory 时才使用 SSE 返回的值
+              return {
+                ...updatedSession,
+                directory: s.directory || updatedSession.directory,
+              };
+            })
           );
           break;
         }
@@ -865,15 +904,23 @@ export function useChat(): UseChatReturn {
     
     try {
       // 使用 session.promptAsync() 发送消息（异步，响应通过 SSE 事件流式返回）
-      // SDK 参数: sessionID, parts, model: { providerID, modelID }
-      const response = await client.session.promptAsync({
+      // SDK v2 使用扁平化参数结构: { sessionID, directory, parts, model, ... }
+      const promptParams = {
         sessionID: activeSessionId,
-        parts: [{ type: "text", text: content }],
+        directory: activeSession?.directory,
+        parts: [{ type: "text" as const, text: content }],
         model: {
           providerID: selectedModel.providerId,
           modelID: selectedModel.modelId,
         },
-      });
+      };
+      
+      // 调试日志：打印发送的参数
+      console.log("[sendMessage] 发送参数:", JSON.stringify(promptParams, null, 2));
+      console.log("[sendMessage] activeSession:", activeSession);
+      console.log("[sendMessage] selectedModel:", selectedModel);
+      
+      const response = await client.session.promptAsync(promptParams);
       
       // 检查 API 响应是否成功
       // SDK 返回结构可能是: { data, error, success } 或 { data: { error, success } }
@@ -921,6 +968,7 @@ export function useChat(): UseChatReturn {
         try {
           await client.session.update({
             sessionID: activeSessionId,
+            directory: currentSession.directory,
             title: newTitle,
           });
           setSessions((prev) =>
@@ -956,8 +1004,8 @@ export function useChat(): UseChatReturn {
     if (!client || !activeSessionId) return;
     
     try {
-      // SDK 使用 sessionID 参数
-      await client.session.abort({ sessionID: activeSessionId });
+      // SDK v2 使用扁平化参数结构: { sessionID, directory? }
+      await client.session.abort({ sessionID: activeSessionId, directory: activeSession?.directory });
     } catch (e) {
       console.error("停止生成失败:", e);
     } finally {
@@ -965,9 +1013,9 @@ export function useChat(): UseChatReturn {
       isGeneratingRef.current = false;
       
       // 刷新消息
-      await loadMessages(activeSessionId);
+      await loadMessages(activeSessionId, activeSession?.directory);
     }
-  }, [client, activeSessionId, loadMessages]);
+  }, [client, activeSessionId, activeSession, loadMessages]);
 
   // ============== 模型操作 ==============
 

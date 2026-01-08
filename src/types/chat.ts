@@ -274,6 +274,10 @@ export interface Message {
 export interface Session {
   id: string;
   title: string;
+  /** 会话工作目录 */
+  directory: string;
+  /** 项目 ID */
+  projectID: string;
   createdAt: number;
   updatedAt: number;
   parentId?: string;
@@ -296,12 +300,14 @@ export function generateId(): string {
 }
 
 /** 创建一个新的空会话 */
-export function createSession(title?: string): Session {
+export function createSession(title?: string, directory?: string, projectID?: string): Session {
   const id = generateId();
   const now = Date.now();
   return {
     id,
     title: title || "新对话",
+    directory: directory || "",
+    projectID: projectID || "global",
     createdAt: now,
     updatedAt: now,
   };

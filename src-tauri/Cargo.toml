@@ -31,4 +31,5 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 parking_lot = "0.12.5"
 zip = "7.0.0"
+tauri-plugin-dialog = "2.4.2"
 

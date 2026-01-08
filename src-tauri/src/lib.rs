@@ -30,6 +30,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // OpenCode service commands
@@ -48,6 +49,9 @@ pub fn run() {
             window_close,
             window_is_maximized,
             window_toggle_fullscreen,
+            // Filesystem commands
+            ensure_directory_exists,
+            select_directory,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

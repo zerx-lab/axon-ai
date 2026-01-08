@@ -228,7 +228,7 @@ export class OpencodeService {
 
   /**
    * 启动 SSE 事件流
-   * 订阅服务器事件，用于流式对话
+   * 使用 global.event() 订阅全局事件，接收所有目录的事件
    * 包含心跳检测和自动重连机制
    */
   async startEventStream(): Promise<void> {
@@ -236,13 +236,15 @@ export class OpencodeService {
       return;
     }
 
-    console.log("[OpencodeService] Starting SSE event stream...");
+    console.log("[OpencodeService] Starting SSE event stream (global.event)...");
     this.eventAbortController = new AbortController();
     this.eventStreamActive = true;
     this.lastSSEError = null;
 
     try {
-      const response = await this.client.event.subscribe();
+      // 使用 global.event() 订阅全局事件流（而不是 event.subscribe）
+      // 全局事件流会接收所有目录的事件，事件中包含 directory 字段
+      const response = await this.client.global.event();
       
       if (!response.stream) {
         console.warn("[OpencodeService] SSE stream not available");
@@ -258,7 +260,7 @@ export class OpencodeService {
       this.startHeartbeatCheck();
 
       // 在后台处理事件流
-      this.processEventStream(response.stream);
+      this.processGlobalEventStream(response.stream);
       console.log("[OpencodeService] SSE event stream started successfully");
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unknown error";
@@ -270,18 +272,28 @@ export class OpencodeService {
   }
 
   /**
-   * 处理 SSE 事件流
+   * 处理全局 SSE 事件流
+   * 全局事件格式: { directory: string, payload: Event }
    * 优化：增加心跳处理，使用批量事件处理减少重渲染
    */
-  private async processEventStream(
-    stream: AsyncIterable<OpencodeEvent>
+  private async processGlobalEventStream(
+    stream: AsyncIterable<{ directory?: string; payload: OpencodeEvent }>
   ): Promise<void> {
     try {
-      for await (const event of stream) {
+      for await (const globalEvent of stream) {
         // 检查是否已停止
         if (!this.eventStreamActive) {
           break;
         }
+
+        const { directory, payload: event } = globalEvent;
+        
+        // 调试日志：打印所有 SSE 事件
+        console.log("[OpencodeService] SSE global event received:", {
+          directory: directory ?? "global",
+          type: event.type,
+          event,
+        });
 
         // 处理心跳事件（服务器可能发送此类型，但 SDK 类型定义可能不包含）
         // 使用类型断言处理未知事件类型
@@ -295,7 +307,7 @@ export class OpencodeService {
         // 更新心跳时间（任何事件都表示连接活跃）
         this.lastHeartbeatTime = Date.now();
 
-        // 通知所有监听器
+        // 通知所有监听器（传递原始的 payload 事件）
         this.notifyEventListeners(event);
       }
       

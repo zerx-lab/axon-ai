@@ -19,6 +19,8 @@
   },
   "titlebar": {
     "settings": "设置",
+    "default": "默认",
+    "defaultWorkspace": "默认工作区",
     "theme": {
       "light": "浅色模式",
       "dark": "深色模式",
@@ -27,6 +29,7 @@
   },
   "sidebar": {
     "newChat": "新对话",
+    "openProject": "打开项目",
     "searchPlaceholder": "搜索对话...",
     "today": "今天",
     "yesterday": "昨天",
@@ -59,6 +62,8 @@
     "noModels": "暂无可用模型",
     "loadingModels": "加载模型中...",
     "modelRequired": "请先选择模型",
+    "searchModel": "搜索模型...",
+    "noModelFound": "未找到匹配的模型",
     "connecting": "正在连接服务...",
     "disconnected": "服务未连接",
     "emptyResponse": "（空响应）"

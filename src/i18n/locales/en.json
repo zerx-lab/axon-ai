@@ -19,6 +19,8 @@
   },
   "titlebar": {
     "settings": "Settings",
+    "default": "Default",
+    "defaultWorkspace": "Default Workspace",
     "theme": {
       "light": "Light Mode",
       "dark": "Dark Mode",
@@ -27,6 +29,7 @@
   },
   "sidebar": {
     "newChat": "New Chat",
+    "openProject": "Open Project",
     "searchPlaceholder": "Search chats...",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -59,6 +62,8 @@
     "noModels": "No models available",
     "loadingModels": "Loading models...",
     "modelRequired": "Please select a model first",
+    "searchModel": "Search models...",
+    "noModelFound": "No matching model found",
     "connecting": "Connecting to service...",
     "disconnected": "Service not connected",
     "emptyResponse": "(Empty response)"

@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  FolderOpen,
 } from "lucide-react";
 
 interface ChatSidebarProps {
@@ -23,6 +24,7 @@ interface ChatSidebarProps {
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
   onDeleteSession: (sessionId: string) => void;
+  onOpenProject?: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
   collapsed?: boolean;
@@ -35,6 +37,7 @@ export function ChatSidebar({
   onSelectSession,
   onNewSession,
   onDeleteSession,
+  onOpenProject,
   onRefresh,
   isRefreshing = false,
   collapsed = false,
@@ -77,6 +80,18 @@ export function ChatSidebar({
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             </Button>
           )}
+          {/* 打开项目按钮 */}
+          {onOpenProject && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hidden @[100px]:flex"
+              onClick={onOpenProject}
+              title={t("sidebar.openProject")}
+            >
+              <FolderOpen className="h-4 w-4" />
+            </Button>
+          )}
           {/* 展开时显示新建按钮 */}
           <Button
             variant="ghost"
@@ -114,6 +129,17 @@ export function ChatSidebar({
         >
           <Plus className="h-4 w-4" />
         </Button>
+        {onOpenProject && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onOpenProject}
+            title={t("sidebar.openProject")}
+          >
+            <FolderOpen className="h-4 w-4" />
+          </Button>
+        )}
         <Separator className="w-6" />
         {sessions.slice(0, 5).map((session) => (
           <Button
