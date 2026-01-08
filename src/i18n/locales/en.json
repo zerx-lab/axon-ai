@@ -27,6 +27,15 @@
       "system": "System"
     }
   },
+  "activityBar": {
+    "chat": "Chat",
+    "search": "Search",
+    "extensions": "Extensions",
+    "moveToLeft": "Move to Left",
+    "moveToRight": "Move to Right",
+    "hideSidebar": "Hide Sidebar",
+    "showSidebar": "Show Sidebar"
+  },
   "projectPicker": {
     "searchPlaceholder": "Search projects or enter path...",
     "noResults": "No matching projects found",

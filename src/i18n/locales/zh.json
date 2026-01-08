@@ -27,6 +27,15 @@
       "system": "跟随系统"
     }
   },
+  "activityBar": {
+    "chat": "会话",
+    "search": "搜索",
+    "extensions": "扩展",
+    "moveToLeft": "移动到左侧",
+    "moveToRight": "移动到右侧",
+    "hideSidebar": "隐藏侧边栏",
+    "showSidebar": "显示侧边栏"
+  },
   "projectPicker": {
     "searchPlaceholder": "搜索项目或输入路径...",
     "noResults": "未找到匹配的项目",

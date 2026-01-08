@@ -5,3 +5,4 @@
 export * from "./theme";
 export * from "./workspace";
 export * from "./chat";
+export * from "./activityBar";

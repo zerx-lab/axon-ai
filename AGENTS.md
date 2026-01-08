@@ -200,38 +200,124 @@ const result = await invoke("command_name", { param: value });
 
 ---
 
-## UI 组件设计规范
+## UI 设计系统
 
-### Dialog 对话框规范
+本项目采用 **Zed 风格极简主义设计**，所有 UI 组件必须遵循以下统一规范。
 
-**所有 Dialog 组件必须遵循以下规范**（已在 `src/components/ui/dialog.tsx` 中统一配置）：
+### 核心设计哲学
 
-1. **位置**：
-   - 水平居中：`left-[50%] translate-x-[-50%]`
-   - 垂直位置：距离顶部 15%（`top-[15%]`），**不要垂直居中**
+1. **极简主义 (Minimalism)**
+   - 只保留必要元素，去除视觉噪音
+   - 留白即设计，空间感优先
+   - 功能导向，形式服务于内容
 
-2. **动画效果**：
-   - 打开动画：从上向下滑入（`slide-in-from-top-4`）+ 淡入
-   - 关闭动画：向上滑出（`slide-out-to-top-4`）+ 淡出
-   - **不使用缩放动画**（zoom-in/zoom-out）
+2. **优雅克制 (Elegant Restraint)**
+   - 使用微妙的视觉反馈，不喧宾夺主
+   - 动画简短流畅（150-300ms），避免花哨效果
+   - 颜色使用克制，避免过度装饰
 
-3. **样式特征**：
-   - Zed 风格小圆角：`rounded-lg`（对应 `--radius-lg: 3px`）
-   - 精致阴影：`shadow-lg` 或 `shadow-2xl`
-   - 边框：`border border-border/60`
+3. **一致性 (Consistency)**
+   - 统一的圆角系统（2-4px 小圆角）
+   - 统一的间距节奏（4px 基准）
+   - 统一的交互反馈模式
 
-4. **使用方式**：
-```tsx
-// 正确用法 - 直接使用 DialogContent，无需额外类名
-<Dialog open={open} onOpenChange={setOpen}>
-  <DialogContent className="w-[500px]">
-    {/* 内容 */}
-  </DialogContent>
-</Dialog>
+### 视觉规范
+
+#### 圆角系统
+```css
+--radius-sm: 1px;
+--radius-md: 2px;   /* 默认 */
+--radius-lg: 3px;
+--radius-xl: 4px;
 ```
 
-5. **禁止**：
-   - ❌ 不要添加自定义动画覆盖默认行为
-   - ❌ 不要使用 `top-[50%] translate-y-[-50%]` 垂直居中
-   - ❌ 不要使用 `zoom-in-95` / `zoom-out-95` 缩放动画
+#### 颜色使用
+- **默认状态**: `text-muted-foreground/70` - 柔和不突兀
+- **悬浮状态**: `text-foreground` + `bg-accent` - 清晰反馈
+- **激活状态**: `text-foreground` + 主题色指示器
+- **边框透明度**: 使用 50-60% 透明度，更加细腻
+
+#### 图标规范
+- 尺寸统一：小图标 16px，标准图标 18px，大图标 20px
+- 默认使用 `muted-foreground` 颜色
+- 悬浮/激活时过渡到 `foreground`
+
+#### 动画规范
+- 过渡时长：150ms（快速）、200ms（标准）、300ms（强调）
+- 缓动函数：`ease-out` 为主
+- 禁止使用：缩放动画（zoom-in/zoom-out）、弹跳效果
+
+### 组件规范
+
+#### Activity Bar（活动栏）
+- 宽度：40px（紧凑）
+- 图标大小：18px
+- 激活指示器：2px 宽主题色竖线
+- 微交互：设置图标悬浮时 45° 旋转
+
+#### Dialog（对话框）
+- 位置：水平居中，垂直距顶部 15%（不垂直居中）
+- 动画：从上向下滑入 + 淡入，关闭时反向
+- 样式：`rounded-lg`、`shadow-lg`、`border border-border/60`
+- 禁止：缩放动画、垂直居中
+
+#### Sidebar（侧边栏）
+- 背景：`bg-sidebar`（略深于主背景）
+- 边框：`border-sidebar-border/50`
+- 滚动条：默认隐藏，悬浮显示，宽度 4-6px
+
+#### Button（按钮）
+- ghost 变体：无背景，悬浮时 `bg-accent`
+- 图标按钮：正方形，常用尺寸 28-36px
+- 焦点状态：1px ring，偏移 1px
+
+### 交互规范
+
+#### Tooltip
+- 延迟显示：300ms
+- 字体大小：`text-xs`
+- 位置：根据触发元素位置自动调整
+
+#### 右键菜单
+- 最小宽度：160px
+- 菜单项：`text-xs`，图标 14px
+
+#### 悬浮效果
+- 背景变化：`hover:bg-accent`
+- 颜色过渡：`transition-colors duration-150`
+- 避免多重效果叠加
+
+### 代码示例
+
+```tsx
+// ✅ 正确：极简按钮样式
+<button
+  className={cn(
+    "flex items-center justify-center",
+    "w-9 h-9",
+    "text-muted-foreground/70 hover:text-foreground",
+    "hover:bg-accent",
+    "transition-colors duration-150",
+    isActive && "text-foreground"
+  )}
+>
+  <Icon className="w-[18px] h-[18px]" />
+</button>
+
+// ❌ 错误：过度装饰
+<button
+  className="bg-gradient-to-r from-blue-500 to-purple-500 
+             rounded-xl shadow-2xl hover:scale-105 
+             transition-all duration-500"
+>
+```
+
+### 禁止事项
+
+- ❌ 渐变背景（gradients）
+- ❌ 大圆角（>8px）
+- ❌ 过长动画（>300ms）
+- ❌ 缩放/弹跳动画
+- ❌ 多重阴影叠加
+- ❌ 过度使用颜色
 

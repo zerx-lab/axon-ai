@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
 import { ProjectSidebar } from "@/components/sidebar";
+import { ActivityBar } from "@/components/activitybar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
+import { useActivityBar } from "@/stores/activityBar";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Wifi, WifiOff } from "lucide-react";
 import {
@@ -58,6 +60,9 @@ function HomePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
+  
+  // 活动栏状态
+  const { position: activityBarPosition, sidebarVisible } = useActivityBar();
   
   // 从 localStorage 获取初始侧边栏大小
   const [initialSidebarSize] = useState(() => {
@@ -178,94 +183,109 @@ function HomePage() {
   }, []);
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="flex-1">
-      {/* 侧边栏面板 */}
-      <ResizablePanel
-        id="sidebar"
-        panelRef={sidebarPanelRef}
-        defaultSize={initialSidebarSize}
-        minSize={SIDEBAR_CONFIG.minSize}
-        maxSize={SIDEBAR_CONFIG.maxSize}
-        collapsible={true}
-        collapsedSize={SIDEBAR_CONFIG.collapsedSize}
-        onResize={handlePanelResize}
-      >
-        <ProjectSidebar
-          projectsWithSessions={projectsWithSessions}
-          activeSessionId={activeSession?.id ?? null}
-          onSelectSession={selectSession}
-          onNewSession={handleNewSessionInProject}
-          onDeleteSession={deleteSession}
-          onCloseProject={handleCloseProject}
-          onToggleProjectExpanded={toggleProjectExpanded}
-          onRefresh={handleRefreshSessions}
-          isRefreshing={isRefreshing}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={handleToggleCollapse}
-        />
-      </ResizablePanel>
+    <div className="flex flex-1 h-full overflow-hidden">
+      {/* 活动栏 - 左侧位置 */}
+      {activityBarPosition === "left" && <ActivityBar />}
 
-      {/* 拖拽手柄 */}
-      <ResizableHandle withHandle />
-
-      {/* 主聊天区域面板 */}
-      <ResizablePanel id="main" minSize="50%">
-        <div className="flex flex-1 h-full flex-col overflow-hidden">
-          {/* 顶部工具栏 - 简化版本，只显示连接状态 */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-background/95 backdrop-blur">
-            {/* 连接状态指示器 */}
-            <div className="flex items-center gap-2">
-              {isConnected ? (
-                <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
-                  <Wifi className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t("settings.serviceSettings.connected")}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <WifiOff className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t("chat.connecting")}</span>
-                </div>
-              )}
-            </div>
-
-            {/* 占位符，保持布局平衡 */}
-            <div />
-          </div>
-
-          {/* 错误提示 */}
-          {error && (
-            <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{error}</span>
-              <button
-                onClick={clearError}
-                className="text-xs underline hover:no-underline"
+      {/* 主内容区域 */}
+      <div className="flex flex-1 h-full overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1">
+          {/* 侧边栏面板 - 仅在 sidebarVisible 时显示 */}
+          {sidebarVisible && (
+            <>
+              <ResizablePanel
+                id="sidebar"
+                panelRef={sidebarPanelRef}
+                defaultSize={initialSidebarSize}
+                minSize={SIDEBAR_CONFIG.minSize}
+                maxSize={SIDEBAR_CONFIG.maxSize}
+                collapsible={true}
+                collapsedSize={SIDEBAR_CONFIG.collapsedSize}
+                onResize={handlePanelResize}
               >
-                {t("common.close")}
-              </button>
-            </div>
+                <ProjectSidebar
+                  projectsWithSessions={projectsWithSessions}
+                  activeSessionId={activeSession?.id ?? null}
+                  onSelectSession={selectSession}
+                  onNewSession={handleNewSessionInProject}
+                  onDeleteSession={deleteSession}
+                  onCloseProject={handleCloseProject}
+                  onToggleProjectExpanded={toggleProjectExpanded}
+                  onRefresh={handleRefreshSessions}
+                  isRefreshing={isRefreshing}
+                  collapsed={sidebarCollapsed}
+                  onToggleCollapse={handleToggleCollapse}
+                />
+              </ResizablePanel>
+
+              {/* 拖拽手柄 */}
+              <ResizableHandle withHandle />
+            </>
           )}
 
-          {/* 聊天容器 */}
-          <ChatContainer
-            messages={messages}
-            onSend={sendMessage}
-            onStop={stopGeneration}
-            isLoading={isLoading}
-            providers={providers}
-            selectedModel={selectedModel}
-            onSelectModel={selectModel}
-            isLoadingModels={isLoadingModels}
-            currentVariants={currentVariants}
-            selectedVariant={selectedVariant}
-            onSelectVariant={selectVariant}
-            onCycleVariant={cycleVariant}
-            sessions={sessions}
-            activeSessionId={activeSession?.id ?? null}
-            onSelectSession={selectSession}
-          />
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+          {/* 主聊天区域面板 */}
+          <ResizablePanel id="main" minSize={sidebarVisible ? "50%" : "100%"}>
+            <div className="flex flex-1 h-full flex-col overflow-hidden">
+              {/* 顶部工具栏 - 简化版本，只显示连接状态 */}
+              <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-background/95 backdrop-blur">
+                {/* 连接状态指示器 */}
+                <div className="flex items-center gap-2">
+                  {isConnected ? (
+                    <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                      <Wifi className="h-4 w-4" />
+                      <span className="hidden sm:inline">{t("settings.serviceSettings.connected")}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <WifiOff className="h-4 w-4" />
+                      <span className="hidden sm:inline">{t("chat.connecting")}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 占位符，保持布局平衡 */}
+                <div />
+              </div>
+
+              {/* 错误提示 */}
+              {error && (
+                <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">{error}</span>
+                  <button
+                    onClick={clearError}
+                    className="text-xs underline hover:no-underline"
+                  >
+                    {t("common.close")}
+                  </button>
+                </div>
+              )}
+
+              {/* 聊天容器 */}
+              <ChatContainer
+                messages={messages}
+                onSend={sendMessage}
+                onStop={stopGeneration}
+                isLoading={isLoading}
+                providers={providers}
+                selectedModel={selectedModel}
+                onSelectModel={selectModel}
+                isLoadingModels={isLoadingModels}
+                currentVariants={currentVariants}
+                selectedVariant={selectedVariant}
+                onSelectVariant={selectVariant}
+                onCycleVariant={cycleVariant}
+                sessions={sessions}
+                activeSessionId={activeSession?.id ?? null}
+                onSelectSession={selectSession}
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+
+      {/* 活动栏 - 右侧位置 */}
+      {activityBarPosition === "right" && <ActivityBar />}
+    </div>
   );
 }

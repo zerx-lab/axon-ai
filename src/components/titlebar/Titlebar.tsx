@@ -7,15 +7,13 @@
  */
 
 import { useState, useCallback } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Settings, FolderOpen, ChevronDown } from "lucide-react";
+import { FolderOpen, ChevronDown } from "lucide-react";
 import { WindowControls } from "./WindowControls";
 import { ThemeToggle } from "./ThemeToggle";
 import { ServiceStatus } from "./ServiceStatus";
 import { ProjectPicker } from "./ProjectPicker";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -32,7 +30,6 @@ interface TitlebarProps {
 }
 
 export function Titlebar({ title = "Axon" }: TitlebarProps) {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const { activeSession, createNewSession } = useChat();
   const { getDisplayPath, state: workspaceState, openDirectoryPicker } = useWorkspace();
@@ -40,10 +37,6 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
   
   // 项目选择器状态
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  const handleSettingsClick = () => {
-    navigate({ to: "/settings" });
-  };
 
   // 获取当前会话的目录显示名称
   const currentDirectory = activeSession?.directory || workspaceState.defaultDirectory;
@@ -124,25 +117,6 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
           
           <div className="flex items-center gap-1 px-2">
             <ThemeToggle />
-            
-            {/* 设置按钮 */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleSettingsClick}
-                    className="h-7 w-7"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>{t("titlebar.settings")}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
           <WindowControls />
         </div>

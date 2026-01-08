@@ -359,4 +359,34 @@
   -webkit-app-region: no-drag;
 }
 
+/*
+ * Activity Bar Styles
+ * 极简主义设计 - 精致、克制、功能导向
+ */
+.activity-bar {
+  /* 固定宽度 - 紧凑但不局促 */
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+}
+
+.activity-btn {
+  /* 移除默认按钮样式 */
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* 按钮悬浮效果 - 微妙的背景变化 */
+.activity-btn:hover {
+  background: var(--accent);
+}
+
+/* 按钮焦点状态 */
+.activity-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
 
