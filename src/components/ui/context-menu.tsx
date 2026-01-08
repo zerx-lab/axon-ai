@@ -83,7 +83,22 @@ function ContextMenuSubContent({
     <ContextMenuPrimitive.SubContent
       data-slot="context-menu-sub-content"
       className={cn(
-        "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
+        // 基础样式
+        "z-50 min-w-[8rem] overflow-hidden",
+        // 背景与边框 - 更精致的视觉效果
+        "bg-popover/95 backdrop-blur-sm",
+        "border border-border/50 rounded-md shadow-lg",
+        // 内边距
+        "p-1",
+        // 文字
+        "text-popover-foreground text-xs",
+        // 动画 - 简短流畅
+        "origin-(--radix-context-menu-content-transform-origin)",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+        "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1",
+        "data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+        "duration-150",
         className
       )}
       {...props}
@@ -100,7 +115,25 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
+          // 基础样式
+          "z-50 min-w-[8rem] overflow-hidden",
+          // 背景与边框 - 更精致的视觉效果
+          "bg-popover/95 backdrop-blur-sm",
+          "border border-border/50 rounded-md shadow-lg",
+          // 内边距
+          "p-1",
+          // 尺寸限制
+          "max-h-(--radix-context-menu-content-available-height)",
+          "overflow-x-hidden overflow-y-auto",
+          // 文字
+          "text-popover-foreground text-xs",
+          // 动画 - 简短流畅
+          "origin-(--radix-context-menu-content-transform-origin)",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+          "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1",
+          "data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+          "duration-150",
           className
         )}
         {...props}
@@ -124,7 +157,29 @@ function ContextMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // 基础布局
+        "relative flex cursor-default items-center gap-2 select-none outline-hidden",
+        // 尺寸与间距 - 更紧凑精致
+        "rounded-sm px-2 py-1.5 text-xs",
+        // 默认状态
+        "text-foreground/80",
+        // 悬浮/聚焦状态 - 柔和过渡
+        "transition-colors duration-150",
+        "focus:bg-accent focus:text-accent-foreground",
+        // 图标样式
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "[&_svg:not([class*='size-'])]:size-3.5",
+        "[&_svg:not([class*='text-'])]:text-muted-foreground",
+        // 危险操作样式
+        "data-[variant=destructive]:text-destructive/80",
+        "data-[variant=destructive]:focus:bg-destructive/10",
+        "data-[variant=destructive]:focus:text-destructive",
+        "dark:data-[variant=destructive]:focus:bg-destructive/20",
+        "data-[variant=destructive]:*:[svg]:!text-destructive",
+        // 禁用状态
+        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        // 缩进
+        "data-[inset]:pl-8",
         className
       )}
       {...props}
@@ -209,7 +264,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn("bg-border -mx-1 my-1 h-px", className)}
+      className={cn("bg-border/50 -mx-1 my-1 h-px", className)}
       {...props}
     />
   )

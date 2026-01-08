@@ -169,28 +169,22 @@ export function ActivityBar() {
       </ContextMenuTrigger>
 
       {/* 右键菜单 */}
-      <ContextMenuContent className="min-w-[160px]">
-        <ContextMenuItem 
-          onClick={toggleSidebarVisible}
-          className="text-xs"
-        >
+      <ContextMenuContent>
+        <ContextMenuItem onClick={toggleSidebarVisible}>
           {sidebarVisible ? (
             <>
-              <PanelLeftClose className="mr-2 h-3.5 w-3.5" />
+              <PanelLeftClose className="h-3.5 w-3.5" />
               {t("activityBar.hideSidebar", "隐藏侧边栏")}
             </>
           ) : (
             <>
-              <PanelLeft className="mr-2 h-3.5 w-3.5" />
+              <PanelLeft className="h-3.5 w-3.5" />
               {t("activityBar.showSidebar", "显示侧边栏")}
             </>
           )}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem 
-          onClick={togglePosition}
-          className="text-xs"
-        >
+        <ContextMenuItem onClick={togglePosition}>
           {position === "left"
             ? t("activityBar.moveToRight", "移动到右侧")
             : t("activityBar.moveToLeft", "移动到左侧")}

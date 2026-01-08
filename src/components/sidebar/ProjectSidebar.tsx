@@ -15,6 +15,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { Session } from "@/types/chat";
 import type { Project } from "@/types/project";
 import {
@@ -203,77 +209,80 @@ function ProjectItem({
 }: ProjectItemProps) {
   const { t } = useTranslation();
 
-  return (
-    <div className="flex flex-col">
-      {/* 项目头部 */}
-      <div
-        className={cn(
-          "group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors",
-          "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-        )}
-        onClick={onToggleExpanded}
-      >
-        {/* 展开/折叠图标 */}
-        <div className="h-4 w-4 flex items-center justify-center">
-          {project.expanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronUp className="h-3 w-3" />
-          )}
-        </div>
-        
-        {/* 项目图标 */}
-        <Folder className={cn(
-          "h-4 w-4 shrink-0",
-          project.isDefault ? "text-primary" : "text-muted-foreground"
-        )} />
-        
-        {/* 项目名称 */}
-        <span className="flex-1 truncate text-sm font-medium">
-          {project.name}
-        </span>
-        
-        {/* 会话数量 */}
-        <span className="text-xs text-muted-foreground">
-          {sessions.length}
-        </span>
-        
-        {/* 新建会话按钮 */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-6 w-6 shrink-0 opacity-0 transition-opacity",
-            "group-hover:opacity-100"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            onNewSession();
-          }}
-          title={t("sidebar.newChat")}
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
-        
-        {/* 关闭项目按钮（非默认项目） */}
-        {onCloseProject && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-6 w-6 shrink-0 opacity-0 transition-opacity",
-              "group-hover:opacity-100"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCloseProject();
-            }}
-            title={t("sidebar.closeProject", "关闭项目")}
-          >
-            <X className="h-3 w-3" />
-          </Button>
+  // 项目头部内容
+  const projectHeader = (
+    <div
+      className={cn(
+        "group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors",
+        "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+      )}
+      onClick={onToggleExpanded}
+    >
+      {/* 展开/折叠图标 */}
+      <div className="h-4 w-4 flex items-center justify-center">
+        {project.expanded ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronUp className="h-3 w-3" />
         )}
       </div>
+      
+      {/* 项目图标 */}
+      <Folder className={cn(
+        "h-4 w-4 shrink-0",
+        project.isDefault ? "text-primary" : "text-muted-foreground"
+      )} />
+      
+      {/* 项目名称 */}
+      <span className="flex-1 truncate text-sm font-medium">
+        {project.name}
+      </span>
+      
+      {/* 会话数量 */}
+      <span className="text-xs text-muted-foreground">
+        {sessions.length}
+      </span>
+      
+      {/* 新建会话按钮 - 悬浮显示 */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "h-6 w-6 shrink-0 opacity-0 transition-opacity",
+          "group-hover:opacity-100"
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onNewSession();
+        }}
+        title={t("sidebar.newChat")}
+      >
+        <Plus className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col">
+      {/* 项目头部 - 非默认项目支持右键菜单关闭 */}
+      {onCloseProject ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            {projectHeader}
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              variant="destructive"
+              onClick={onCloseProject}
+            >
+              <X className="h-3.5 w-3.5" />
+              {t("sidebar.removeProject", "移除项目")}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      ) : (
+        projectHeader
+      )}
 
       {/* 会话列表（展开时显示） */}
       {project.expanded && (
