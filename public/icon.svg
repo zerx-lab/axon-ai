@@ -1,0 +1,90 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Axon Logo - 参考大厂设计语言 -->
+  <!-- 设计理念：神经元节点 + 字母 A 融合 -->
+  <!-- 黄金比例布局，视觉重心上移 -->
+
+  <defs>
+    <!-- 主渐变：增加层次感 -->
+    <linearGradient id="mainGradient" x1="64" y1="16" x2="64" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FAFAFA"/>
+      <stop offset="100%" stop-color="#A1A1AA"/>
+    </linearGradient>
+
+    <!-- 节点发光效果 -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 左主线 - 从顶点到左下节点 -->
+  <path
+    d="M64 28 L28 100"
+    stroke="url(#mainGradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+
+  <!-- 右主线 - 从顶点到右下节点 -->
+  <path
+    d="M64 28 L100 100"
+    stroke="url(#mainGradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+
+  <!-- 横线左段 - 带断口 -->
+  <path
+    d="M40 76 L56 76"
+    stroke="url(#mainGradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+
+  <!-- 横线右段 - 带断口 -->
+  <path
+    d="M72 76 L88 76"
+    stroke="url(#mainGradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+
+  <!-- 顶部主节点 - 较大，视觉焦点 -->
+  <circle
+    cx="64"
+    cy="24"
+    r="10"
+    fill="#FAFAFA"
+    filter="url(#glow)"
+  />
+
+  <!-- 左下节点 -->
+  <circle
+    cx="26"
+    cy="104"
+    r="7"
+    fill="#D4D4D8"
+  />
+
+  <!-- 右下节点 -->
+  <circle
+    cx="102"
+    cy="104"
+    r="7"
+    fill="#D4D4D8"
+  />
+
+  <!-- 中心断口装饰 - 小菱形，代表信号/数据流 -->
+  <rect
+    x="60"
+    y="72"
+    width="8"
+    height="8"
+    rx="1"
+    fill="#FAFAFA"
+    transform="rotate(45 64 76)"
+  />
+</svg>
