@@ -43,6 +43,7 @@
   },
   "chat": {
     "inputPlaceholder": "输入消息...",
+    "inputPlaceholderCommands": "输入 / 查看命令",
     "send": "发送",
     "stop": "停止",
     "regenerate": "重新生成",
@@ -50,12 +51,30 @@
     "copied": "已复制",
     "thinking": "思考中...",
     "welcome": "你好！我是 Axon AI 助手，有什么可以帮助你的吗？",
+    "welcomeTitle": "准备好开始了吗？",
     "errorMessage": "抱歉，发生了错误，请重试。",
     "emptyState": {
       "title": "开始对话",
       "description": "发送一条消息，开始与 Axon AI 助手聊天。"
     },
     "inputHint": "按 Enter 发送，Shift + Enter 换行",
+    "disclaimer": "AI 可能会出错，请仔细核查回复内容。",
+    "quickPrompts": {
+      "write": "写作",
+      "learn": "学习",
+      "code": "代码",
+      "life": "生活",
+      "random": "随机"
+    },
+    "quickPromptContent": {
+      "write": "帮我写一篇关于",
+      "learn": "解释一下什么是",
+      "code": "帮我写一段代码实现",
+      "life": "给我一些建议关于",
+      "random": "给我一个有趣的"
+    },
+    "attachFile": "添加附件",
+    "history": "历史记录",
     "user": "你",
     "assistant": "Axon",
     "selectModel": "选择模型",

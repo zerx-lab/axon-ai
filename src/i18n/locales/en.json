@@ -43,6 +43,7 @@
   },
   "chat": {
     "inputPlaceholder": "Type a message...",
+    "inputPlaceholderCommands": "Type / for commands",
     "send": "Send",
     "stop": "Stop",
     "regenerate": "Regenerate",
@@ -50,12 +51,30 @@
     "copied": "Copied",
     "thinking": "Thinking...",
     "welcome": "Hello! I'm Axon AI assistant. How can I help you today?",
+    "welcomeTitle": "Ready to get started?",
     "errorMessage": "Sorry, an error occurred. Please try again.",
     "emptyState": {
       "title": "Start a conversation",
       "description": "Send a message to begin chatting with Axon AI assistant."
     },
     "inputHint": "Press Enter to send, Shift + Enter for new line",
+    "disclaimer": "AI can make mistakes. Please double-check responses.",
+    "quickPrompts": {
+      "write": "Write",
+      "learn": "Learn",
+      "code": "Code",
+      "life": "Life stuff",
+      "random": "Random"
+    },
+    "quickPromptContent": {
+      "write": "Help me write about",
+      "learn": "Explain what is",
+      "code": "Help me write code to implement",
+      "life": "Give me some advice about",
+      "random": "Give me something interesting about"
+    },
+    "attachFile": "Attach file",
+    "history": "History",
     "user": "You",
     "assistant": "Axon",
     "selectModel": "Select Model",

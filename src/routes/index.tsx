@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChatContainer, ModelSelector } from "@/components/chat";
+import { ChatContainer } from "@/components/chat";
 import { ChatSidebar } from "@/components/sidebar";
 import { useChat } from "@/providers/ChatProvider";
 import { useWorkspace } from "@/stores/workspace";
@@ -73,7 +73,6 @@ function HomePage() {
     error,
     isConnected,
     providers,
-    models,
     selectedModel,
     isLoadingModels,
     sendMessage,
@@ -170,9 +169,9 @@ function HomePage() {
       {/* 主聊天区域面板 */}
       <ResizablePanel id="main" minSize="50%">
         <div className="flex flex-1 h-full flex-col overflow-hidden">
-          {/* 顶部工具栏 */}
+          {/* 顶部工具栏 - 简化版本，只显示连接状态 */}
           <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-background/95 backdrop-blur">
-            {/* 左侧：连接状态 */}
+            {/* 连接状态指示器 */}
             <div className="flex items-center gap-2">
               {isConnected ? (
                 <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
@@ -187,16 +186,8 @@ function HomePage() {
               )}
             </div>
 
-            {/* 右侧：模型选择器 */}
-            <ModelSelector
-              providers={providers}
-              models={models}
-              selectedModel={selectedModel}
-              onSelectModel={selectModel}
-              isLoading={isLoadingModels}
-              disabled={!isConnected}
-              className="max-w-[300px]"
-            />
+            {/* 占位符，保持布局平衡 */}
+            <div />
           </div>
 
           {/* 错误提示 */}
@@ -219,6 +210,10 @@ function HomePage() {
             onSend={sendMessage}
             onStop={stopGeneration}
             isLoading={isLoading}
+            providers={providers}
+            selectedModel={selectedModel}
+            onSelectModel={selectModel}
+            isLoadingModels={isLoadingModels}
           />
         </div>
       </ResizablePanel>
