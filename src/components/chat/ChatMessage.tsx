@@ -5,7 +5,7 @@
 
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { User, Bot, Loader2, AlertCircle } from "lucide-react";
+import { User, Bot, Loader2, AlertCircle, StopCircle } from "lucide-react";
 import { PartRenderer, MarkdownRenderer } from "./parts";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import type { 
@@ -43,6 +43,15 @@ function extractMessageError(error: unknown): string | null {
   }
   
   return "未知错误";
+}
+
+/**
+ * 判断错误是否为用户主动取消（MessageAbortedError）
+ */
+function isAbortedError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const errorObj = error as { name?: string };
+  return errorObj.name === "MessageAbortedError";
 }
 
 interface ChatMessageProps {
@@ -158,9 +167,11 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
   
   // 检查消息是否有错误
   const messageError = extractMessageError(messageInfo.error);
+  const isAborted = isAbortedError(messageInfo.error);
   const hasCompleted = messageInfo.time.completed !== undefined;
   
   // 判断是否正在加载
+  // 注意：被中止的消息不算"正在加载"状态
   const isLoading = !hasCompleted && !messageError;
   
   // 过滤掉一些不需要显示的 part 类型
@@ -178,7 +189,17 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
 
   // 如果没有可见的 parts
   if (visibleParts.length === 0) {
-    // 如果有错误，显示错误信息
+    // 如果是用户主动取消，显示 "已停止" 而非错误
+    if (isAborted) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <StopCircle className="h-4 w-4" />
+          <span>{t("errors.messageInterrupted")}</span>
+        </div>
+      );
+    }
+    
+    // 如果有真正的错误，显示错误信息
     if (messageError) {
       return (
         <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3">
@@ -229,8 +250,15 @@ function AssistantMessageContent({ parts, messageInfo, isLast }: AssistantMessag
           className="mt-2"
         />
       )}
-      {/* 如果有内容但也有错误，在底部显示错误 */}
-      {messageError && (
+      {/* 如果是用户主动取消，显示 "已停止" 提示（柔和样式） */}
+      {isAborted && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+          <StopCircle className="h-4 w-4" />
+          <span>{t("errors.messageInterrupted")}</span>
+        </div>
+      )}
+      {/* 如果有内容但也有真正的错误（非中止），在底部显示错误 */}
+      {messageError && !isAborted && (
         <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3 mt-2">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">

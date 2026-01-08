@@ -352,7 +352,8 @@
     "loadSessionsFailed": "Failed to load sessions",
     "deleteSessionFailed": "Failed to delete session",
     "modelNotSupported": "Model not supported, please enable it in your Copilot settings",
-    "messageError": "Message generation failed"
+    "messageError": "Message generation failed",
+    "messageInterrupted": "Interrupted"
   },
   "notifications": {
     "settingsSaved": "Settings saved",

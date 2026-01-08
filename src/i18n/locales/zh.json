@@ -352,7 +352,8 @@
     "loadSessionsFailed": "加载会话失败",
     "deleteSessionFailed": "删除会话失败",
     "modelNotSupported": "模型不支持，请在 Copilot 设置中启用该模型",
-    "messageError": "消息生成失败"
+    "messageError": "消息生成失败",
+    "messageInterrupted": "已停止"
   },
   "notifications": {
     "settingsSaved": "设置已保存",

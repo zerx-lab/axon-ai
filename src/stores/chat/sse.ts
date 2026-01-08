@@ -301,10 +301,26 @@ export function useSSEHandler({
           const { sessionID, error: sessionError } = event.properties;
           if (sessionID !== currentSessionId) return;
           
+          // 立即重置加载状态，避免 UI 一直转圈
+          setIsLoading(false);
+          isGeneratingRef.current = false;
+          
+          // 移除临时占位消息
+          setMessages((prev) => prev.filter((m) => !m.info.id.startsWith("temp-")));
+          
           if (sessionError) {
-            // 提取错误消息
+            // 提取错误信息
             // 错误类型结构: { name: string; data: { message: string; ... } }
             // 支持类型: ProviderAuthError, UnknownError, MessageOutputLengthError, MessageAbortedError, ApiError
+            const errorName = (sessionError as { name?: string }).name;
+            
+            // MessageAbortedError 是用户主动取消，不应该在顶部显示错误提示
+            // 这是正常的用户操作，不是真正的错误
+            if (errorName === "MessageAbortedError") {
+              console.log("[SSE] 用户主动取消消息生成");
+              break;
+            }
+            
             const errorData = (sessionError as { data?: { message?: string } }).data;
             const detail = errorData?.message || "";
             // 使用 tRef.current 获取最新的 t 函数
@@ -315,13 +331,6 @@ export function useSSEHandler({
           } else {
             setError(tRef.current("errors.sessionError"));
           }
-          
-          // 立即重置加载状态，避免 UI 一直转圈
-          setIsLoading(false);
-          isGeneratingRef.current = false;
-          
-          // 移除临时占位消息
-          setMessages((prev) => prev.filter((m) => !m.info.id.startsWith("temp-")));
           break;
         }
       }
