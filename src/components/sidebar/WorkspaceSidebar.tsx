@@ -31,8 +31,6 @@ import {
   Plus,
   MessageSquare,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Files,
 } from "lucide-react";
@@ -56,10 +54,6 @@ interface WorkspaceSidebarProps {
   onRefresh?: () => void;
   /** 是否正在刷新 */
   isRefreshing?: boolean;
-  /** 是否折叠侧边栏 */
-  collapsed?: boolean;
-  /** 切换侧边栏折叠 */
-  onToggleCollapse?: () => void;
 }
 
 // 面板展开状态的 localStorage 键名
@@ -104,8 +98,6 @@ export function WorkspaceSidebar({
   onDeleteSession,
   onRefresh,
   isRefreshing = false,
-  collapsed = false,
-  onToggleCollapse,
 }: WorkspaceSidebarProps) {
   const { t } = useTranslation();
   const [panelState, setPanelState] = useState(loadPanelState);
@@ -143,20 +135,11 @@ export function WorkspaceSidebar({
 
   return (
     <div
-      className={cn(
-        "flex h-full flex-col border-r border-sidebar-border/60 bg-sidebar",
-        "@container"
-      )}
-      style={{ containerType: "inline-size" }}
+      className="flex h-full flex-col border-r border-sidebar-border/60 bg-sidebar"
     >
       {/* 头部 - 简洁设计 */}
       <div className="flex h-10 items-center justify-between px-3 border-b border-sidebar-border/60">
-        <span
-          className={cn(
-            "text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80",
-            "hidden @[100px]:block"
-          )}
-        >
+        <span className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
           {currentProject?.name || t("sidebar.workspace", "工作区")}
         </span>
         <div className="flex items-center gap-1">
@@ -167,7 +150,7 @@ export function WorkspaceSidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded hover:bg-sidebar-accent/80 hidden @[100px]:flex"
+                  className="h-7 w-7 rounded hover:bg-sidebar-accent/80"
                   onClick={handleRefreshAll}
                   disabled={isRefreshing}
                 >
@@ -181,43 +164,11 @@ export function WorkspaceSidebar({
               </TooltipContent>
             </Tooltip>
           )}
-          {/* 折叠/展开切换按钮 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 rounded hover:bg-sidebar-accent/80"
-            onClick={onToggleCollapse}
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
         </div>
       </div>
 
-      {/* 折叠视图 - 只显示新建会话按钮 */}
-      <div className="flex flex-col items-center gap-2 py-3 @[100px]:hidden">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onNewSession}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            {t("sidebar.newChat", "新对话")}
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* 展开视图 - 折叠面板列表 */}
-      <div className="flex-1 overflow-hidden hidden @[100px]:flex flex-col min-h-0">
+      {/* 面板列表 */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {/* 会话列表面板 */}
         <CollapsiblePanel
           title={t("sidebar.sessionList", "会话列表")}
