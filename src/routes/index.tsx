@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
-import { ProjectSidebar } from "@/components/sidebar";
+import { WorkspaceSidebar } from "@/components/sidebar";
 import { ActivityBar } from "@/components/activitybar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
@@ -14,6 +14,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
+import { normalizeDirectory } from "@/types/project";
 
 // 侧边栏面板配置（使用像素值）
 const SIDEBAR_CONFIG = {
@@ -97,15 +98,31 @@ function HomePage() {
   
   // 项目状态
   const {
-    closeProject,
-    toggleProjectExpanded,
-    getProjectsWithSessions,
+    projects,
+    getProjectByDirectory,
   } = useProjectContext();
   
-  // 计算项目和会话列表
-  const projectsWithSessions = useMemo(() => {
-    return getProjectsWithSessions(sessions);
-  }, [getProjectsWithSessions, sessions]);
+  // 获取当前项目 - 基于活动会话的目录
+  const currentProject = useMemo(() => {
+    if (!activeSession?.directory) {
+      // 如果没有活动会话，返回第一个项目（通常是默认项目）
+      return projects.length > 0 ? projects[0] : null;
+    }
+    // 根据活动会话的目录找到对应的项目
+    const project = getProjectByDirectory(activeSession.directory);
+    return project || (projects.length > 0 ? projects[0] : null);
+  }, [activeSession?.directory, getProjectByDirectory, projects]);
+  
+  // 获取当前项目的会话列表
+  const currentProjectSessions = useMemo(() => {
+    if (!currentProject) return [];
+    
+    const projectDir = normalizeDirectory(currentProject.directory);
+    return sessions.filter((session) => {
+      const sessionDir = normalizeDirectory(session.directory || "");
+      return sessionDir === projectDir;
+    });
+  }, [currentProject, sessions]);
 
   // 处理刷新会话列表
   const handleRefreshSessions = useCallback(async () => {
@@ -117,41 +134,12 @@ function HomePage() {
     }
   }, [refreshSessions]);
   
-  // 处理在指定项目下新建会话
-  const handleNewSessionInProject = useCallback(async (directory: string) => {
-    await createNewSession(directory);
-  }, [createNewSession]);
-
-  // 处理关闭项目 - 同时删除该项目下的所有会话
-  const handleCloseProject = useCallback(async (projectId: string) => {
-    // 先找到该项目下的所有会话
-    const projectData = projectsWithSessions.find(
-      (p) => p.project.id === projectId
-    );
-    
-    if (!projectData) {
-      console.warn("[HomePage] 关闭项目时未找到项目数据:", projectId);
-      return;
+  // 处理新建会话（在当前项目下）
+  const handleNewSession = useCallback(async () => {
+    if (currentProject) {
+      await createNewSession(currentProject.directory);
     }
-    
-    // 关闭项目
-    const result = closeProject(projectId);
-    if (!result.success) {
-      return;
-    }
-    
-    // 删除该项目下的所有会话
-    const sessionsToDelete = projectData.sessions;
-    console.log(`[HomePage] 关闭项目 ${result.project?.name}，删除 ${sessionsToDelete.length} 个会话`);
-    
-    for (const session of sessionsToDelete) {
-      try {
-        await deleteSession(session.id);
-      } catch (e) {
-        console.error("[HomePage] 删除会话失败:", session.id, e);
-      }
-    }
-  }, [projectsWithSessions, closeProject, deleteSession]);
+  }, [currentProject, createNewSession]);
 
   // 切换侧边栏折叠状态
   const handleToggleCollapse = useCallback(() => {
@@ -203,14 +191,13 @@ function HomePage() {
                 collapsedSize={SIDEBAR_CONFIG.collapsedSize}
                 onResize={handlePanelResize}
               >
-                <ProjectSidebar
-                  projectsWithSessions={projectsWithSessions}
+                <WorkspaceSidebar
+                  currentProject={currentProject}
+                  sessions={currentProjectSessions}
                   activeSessionId={activeSession?.id ?? null}
                   onSelectSession={selectSession}
-                  onNewSession={handleNewSessionInProject}
+                  onNewSession={handleNewSession}
                   onDeleteSession={deleteSession}
-                  onCloseProject={handleCloseProject}
-                  onToggleProjectExpanded={toggleProjectExpanded}
                   onRefresh={handleRefreshSessions}
                   isRefreshing={isRefreshing}
                   collapsed={sidebarCollapsed}

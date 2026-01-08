@@ -53,6 +53,7 @@ pub fn run() {
             // 文件系统命令
             ensure_directory_exists,
             select_directory,
+            read_directory,
             // Diff 计算命令
             compute_diff,
             compute_unified_diff,

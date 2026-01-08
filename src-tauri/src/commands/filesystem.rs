@@ -3,10 +3,29 @@
 //! 提供目录操作功能，包括：
 //! - 确保目录存在
 //! - 打开目录选择对话框
+//! - 读取目录内容
 
+use serde::Serialize;
 use std::path::Path;
 use tauri::AppHandle;
 use tracing::{debug, error};
+
+/// 文件/目录条目信息
+#[derive(Debug, Clone, Serialize)]
+pub struct FileEntry {
+    /// 文件/目录名称
+    pub name: String,
+    /// 完整路径
+    pub path: String,
+    /// 是否为目录
+    pub is_directory: bool,
+    /// 是否为隐藏文件（以 . 开头）
+    pub is_hidden: bool,
+    /// 文件大小（字节），目录为 None
+    pub size: Option<u64>,
+    /// 修改时间（Unix 时间戳毫秒）
+    pub modified_at: Option<u64>,
+}
 
 /// 确保目录存在
 /// 如果目录不存在，则递归创建
@@ -34,6 +53,90 @@ pub async fn ensure_directory_exists(path: String) -> Result<(), String> {
     
     debug!("目录创建成功: {:?}", path);
     Ok(())
+}
+
+/// 读取目录内容
+/// 返回目录下的文件和子目录列表
+#[tauri::command]
+pub async fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
+    debug!("读取目录内容: {}, 显示隐藏文件: {}", path, show_hidden);
+
+    let dir_path = Path::new(&path);
+
+    if !dir_path.exists() {
+        error!("目录不存在: {:?}", dir_path);
+        return Err(format!("目录不存在: {}", path));
+    }
+
+    if !dir_path.is_dir() {
+        error!("路径不是目录: {:?}", dir_path);
+        return Err(format!("路径不是目录: {}", path));
+    }
+
+    let mut entries = Vec::new();
+
+    match std::fs::read_dir(dir_path) {
+        Ok(read_dir) => {
+            for entry_result in read_dir {
+                match entry_result {
+                    Ok(entry) => {
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        let is_hidden = file_name.starts_with('.');
+
+                        // 根据设置决定是否包含隐藏文件
+                        if !show_hidden && is_hidden {
+                            continue;
+                        }
+
+                        let file_path = entry.path();
+                        let metadata = entry.metadata().ok();
+
+                        let is_directory = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
+                        let size = if is_directory {
+                            None
+                        } else {
+                            metadata.as_ref().map(|m| m.len())
+                        };
+                        let modified_at = metadata.and_then(|m| {
+                            m.modified().ok().and_then(|t| {
+                                t.duration_since(std::time::UNIX_EPOCH)
+                                    .ok()
+                                    .map(|d| d.as_millis() as u64)
+                            })
+                        });
+
+                        entries.push(FileEntry {
+                            name: file_name,
+                            path: file_path.to_string_lossy().to_string(),
+                            is_directory,
+                            is_hidden,
+                            size,
+                            modified_at,
+                        });
+                    }
+                    Err(e) => {
+                        debug!("跳过无法读取的条目: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            error!("读取目录失败: {:?}, 错误: {}", dir_path, e);
+            return Err(format!("读取目录失败: {}", e));
+        }
+    }
+
+    // 排序：目录在前，然后按名称排序（不区分大小写）
+    entries.sort_by(|a, b| {
+        match (a.is_directory, b.is_directory) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+
+    debug!("读取到 {} 个条目", entries.len());
+    Ok(entries)
 }
 
 /// 打开目录选择对话框

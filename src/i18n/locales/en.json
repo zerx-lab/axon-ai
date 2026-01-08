@@ -56,6 +56,7 @@
     "openProject": "Open Project",
     "closeProject": "Close Project",
     "projects": "Projects",
+    "sessionList": "Sessions",
     "noProjects": "No projects",
     "searchPlaceholder": "Search chats...",
     "today": "Today",
@@ -66,7 +67,17 @@
     "noChats": "No chats yet",
     "deleteChat": "Delete chat",
     "renameChat": "Rename chat",
-    "refresh": "Refresh session list"
+    "refresh": "Refresh",
+    "removeProject": "Remove Project",
+    "workspace": "Workspace",
+    "explorer": "Explorer",
+    "refreshExplorer": "Refresh file list",
+    "explorerPanel": {
+      "noProject": "No project selected",
+      "selectSession": "Select a session to view project files",
+      "empty": "Directory is empty",
+      "loadError": "Failed to load"
+    }
   },
   "chat": {
     "inputPlaceholder": "Type a message...",
