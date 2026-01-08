@@ -1,9 +1,12 @@
 /**
  * Part 渲染组件
  * 根据消息 Part 类型渲染不同的 UI
+ * 
+ * 性能优化：
+ * 1. DiffViewer 懒加载（仅在 edit 工具需要时加载）
  */
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +44,9 @@ import type {
 } from "@/types/chat";
 import { getToolDisplayName } from "@/types/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { DiffViewer, DiffStatsDisplay } from "@/components/diff";
+// 懒加载 DiffViewer（减少首屏体积）
+const DiffViewer = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffViewer })));
+const DiffStatsDisplay = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffStatsDisplay })));
 
 // ============== Part 渲染器 ==============
 
@@ -383,10 +388,12 @@ function FileToolContent({
         </span>
         {hasFileDiff && (
           <div className="flex items-center gap-2">
-            <DiffStatsDisplay 
-              additions={fileDiff.additions} 
-              deletions={fileDiff.deletions} 
-            />
+            <Suspense fallback={<span className="text-xs text-muted-foreground">...</span>}>
+              <DiffStatsDisplay 
+                additions={fileDiff.additions} 
+                deletions={fileDiff.deletions} 
+              />
+            </Suspense>
             {/* 视图模式切换 */}
             <div className="flex items-center border border-border rounded-md overflow-hidden">
               <Button
@@ -420,15 +427,22 @@ function FileToolContent({
       
       {/* edit 工具使用 DiffViewer */}
       {hasFileDiff && (
-        <DiffViewer
-          oldText={fileDiff.before}
-          newText={fileDiff.after}
-          fileName={displayPath}
-          mode={diffMode}
-          showHeader={false}
-          showLineNumbers={true}
-          contextLines={3}
-        />
+        <Suspense fallback={
+          <div className="flex items-center justify-center py-4 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            加载差异视图...
+          </div>
+        }>
+          <DiffViewer
+            oldText={fileDiff.before}
+            newText={fileDiff.after}
+            fileName={displayPath}
+            mode={diffMode}
+            showHeader={false}
+            showLineNumbers={true}
+            contextLines={3}
+          />
+        </Suspense>
       )}
       
       {/* 其他工具使用原来的折叠输出 */}

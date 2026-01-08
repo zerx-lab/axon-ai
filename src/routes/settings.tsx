@@ -1,10 +1,11 @@
 /**
  * 设置页面路由
  * 使用 search params 记录当前激活的 tab 状态
+ * 
+ * 性能优化：使用 TanStack Router 的 lazy 加载
  */
 
-import { createFileRoute } from "@tanstack/react-router";
-import { SettingsPage } from "@/components/settings/SettingsPage";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
 // 设置页面的 tab 类型
 export type SettingsTab = "service" | "provider" | "mcp" | "language" | "appearance" | "about";
@@ -15,7 +16,11 @@ export interface SettingsSearch {
 }
 
 export const Route = createFileRoute("/settings")({
-  component: SettingsPage,
+  // 使用 lazyRouteComponent 懒加载设置页面
+  component: lazyRouteComponent(
+    () => import("@/components/settings/SettingsPage"),
+    "SettingsPage"
+  ),
   // 验证和解析 search params
   validateSearch: (search: Record<string, unknown>): SettingsSearch => {
     const validTabs: SettingsTab[] = ["service", "provider", "mcp", "language", "appearance", "about"];

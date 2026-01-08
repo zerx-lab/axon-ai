@@ -1,14 +1,20 @@
 /**
  * Markdown 渲染组件
  * 支持 GitHub Flavored Markdown 和代码语法高亮
+ * 
+ * 性能优化：
+ * 1. 代码高亮使用独立的 CodeBlock 组件（内部懒加载）
+ * 2. react-syntax-highlighter 是最大的依赖，懒加载它
  */
 
+import { memo, lazy, Suspense } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Components } from "react-markdown";
 import { cn } from "@/lib/utils";
+
+// 懒加载代码块组件（包含 react-syntax-highlighter）
+const CodeBlock = lazy(() => import("./CodeBlock"));
 
 interface MarkdownRendererProps {
   content: string;
@@ -16,34 +22,51 @@ interface MarkdownRendererProps {
 }
 
 /**
- * Markdown 渲染器
- * 支持 GFM（表格、删除线、任务列表等）和代码高亮
+ * 内联代码组件
  */
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+function InlineCode({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
   return (
-    <div
-      className={cn(
-        "prose prose-sm dark:prose-invert max-w-none",
-        // 自定义样式覆盖
-        "prose-p:my-2 prose-p:leading-relaxed",
-        "prose-pre:p-0 prose-pre:bg-transparent",
-        "prose-code:before:content-none prose-code:after:content-none",
-        "prose-headings:mt-4 prose-headings:mb-2",
-        "prose-ul:my-2 prose-ol:my-2",
-        "prose-li:my-0.5",
-        "prose-blockquote:my-2 prose-blockquote:border-l-primary",
-        "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
-        "prose-table:my-2",
-        className
-      )}
+    <code
+      className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-sm"
+      {...props}
     >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={markdownComponents}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
+      {children}
+    </code>
+  );
+}
+
+/**
+ * 代码块渲染适配器
+ */
+function CodeRenderer({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLElement>) {
+  // 检查是否是代码块（有语言标识）
+  const match = /language-(\w+)/.exec(className || "");
+  const codeContent = String(children).replace(/\n$/, "");
+
+  // 判断是否是内联代码（没有语言标识且不包含换行符）
+  const isInline = !match && !codeContent.includes("\n");
+
+  if (isInline) {
+    return <InlineCode {...props}>{children}</InlineCode>;
+  }
+
+  // 代码块使用懒加载的 CodeBlock 组件
+  const language = match ? match[1] : "text";
+
+  return (
+    <Suspense
+      fallback={
+        <pre className="rounded-md bg-[#282c34] p-4 overflow-x-auto text-gray-300 text-sm my-2">
+          <code>{codeContent}</code>
+        </pre>
+      }
+    >
+      <CodeBlock code={codeContent} language={language} />
+    </Suspense>
   );
 }
 
@@ -52,58 +75,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
  */
 const markdownComponents: Components = {
   // 代码块渲染
-  code({ className, children, ...props }) {
-    // 检查是否是代码块（有语言标识）
-    const match = /language-(\w+)/.exec(className || "");
-    const codeContent = String(children).replace(/\n$/, "");
-    
-    // 判断是否是内联代码（没有语言标识且不包含换行符）
-    const isInline = !match && !codeContent.includes("\n");
-    
-    if (isInline) {
-      // 内联代码
-      return (
-        <code
-          className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-sm"
-          {...props}
-        >
-          {children}
-        </code>
-      );
-    }
-
-    // 代码块
-    const language = match ? match[1] : "text";
-    
-    return (
-      <div className="relative group my-2">
-        {/* 语言标签 */}
-        {match && (
-          <div className="absolute right-2 top-2 text-xs text-muted-foreground opacity-70 z-10">
-            {language}
-          </div>
-        )}
-        <SyntaxHighlighter
-          style={oneDark}
-          language={language}
-          PreTag="div"
-          customStyle={{
-            margin: 0,
-            borderRadius: "0.375rem",
-            fontSize: "0.8125rem",
-            lineHeight: "1.5",
-          }}
-          codeTagProps={{
-            style: {
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-            },
-          }}
-        >
-          {codeContent}
-        </SyntaxHighlighter>
-      </div>
-    );
-  },
+  code: CodeRenderer as Components["code"],
 
   // 预格式化文本
   pre({ children }) {
@@ -157,7 +129,7 @@ const markdownComponents: Components = {
   li({ children, className, ...props }) {
     // 检查是否是任务列表项（GFM task list）
     const isTaskListItem = className?.includes("task-list-item");
-    
+
     if (isTaskListItem) {
       return (
         <li className="flex items-start gap-2 list-none" {...props}>
@@ -165,7 +137,7 @@ const markdownComponents: Components = {
         </li>
       );
     }
-    
+
     return <li {...props}>{children}</li>;
   },
 
@@ -199,5 +171,40 @@ const markdownComponents: Components = {
     return <hr className="my-4 border-border" />;
   },
 };
+
+/**
+ * Markdown 渲染器
+ * 支持 GFM（表格、删除线、任务列表等）和代码高亮
+ */
+export const MarkdownRenderer = memo(function MarkdownRenderer({
+  content,
+  className,
+}: MarkdownRendererProps) {
+  return (
+    <div
+      className={cn(
+        "prose prose-sm dark:prose-invert max-w-none",
+        // 自定义样式覆盖
+        "prose-p:my-2 prose-p:leading-relaxed",
+        "prose-pre:p-0 prose-pre:bg-transparent",
+        "prose-code:before:content-none prose-code:after:content-none",
+        "prose-headings:mt-4 prose-headings:mb-2",
+        "prose-ul:my-2 prose-ol:my-2",
+        "prose-li:my-0.5",
+        "prose-blockquote:my-2 prose-blockquote:border-l-primary",
+        "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+        "prose-table:my-2",
+        className
+      )}
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+});
 
 export default MarkdownRenderer;

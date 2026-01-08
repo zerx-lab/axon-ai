@@ -357,3 +357,54 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
 export function getToolDisplayName(toolName: string): string {
   return TOOL_DISPLAY_NAMES[toolName] || toolName;
 }
+
+// ============== 权限请求类型 ==============
+
+/** 权限动作类型 */
+export type PermissionAction = "allow" | "deny" | "ask";
+
+/** 权限回复类型 */
+export type PermissionReply = "once" | "always" | "reject";
+
+/** 权限请求 */
+export interface PermissionRequest {
+  id: string;
+  sessionID: string;
+  permission: string;
+  patterns: string[];
+  metadata: Record<string, unknown>;
+  always: string[];
+  tool?: {
+    messageID: string;
+    callID: string;
+  };
+}
+
+/** 权限回复事件 */
+export interface PermissionReplyEvent {
+  sessionID: string;
+  requestID: string;
+  reply: PermissionReply;
+}
+
+// ============== Todo 任务类型 ==============
+
+/** 任务状态 */
+export type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+/** 任务优先级 */
+export type TodoPriority = "low" | "medium" | "high";
+
+/** 任务项 */
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+}
+
+/** Todo 更新事件 */
+export interface TodoUpdatedEvent {
+  sessionID: string;
+  todos: TodoItem[];
+}

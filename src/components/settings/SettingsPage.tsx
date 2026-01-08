@@ -3,26 +3,45 @@
  * 包含服务设置、AI 渠道商设置、MCP设置、语言设置、外观设置等
  * 采用左侧导航 + 右侧内容的双栏布局
  * Tab 状态通过 URL search params 记录，支持刷新保持状态
+ * 
+ * 性能优化：
+ * 1. 所有设置子面板懒加载
+ * 2. 仅当切换到对应 tab 时才加载组件
  */
 
+import { lazy, Suspense } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Server, Globe, Palette, Info, Sparkles, Blocks } from "lucide-react";
+import { ArrowLeft, Server, Globe, Palette, Info, Sparkles, Blocks, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ServiceSettings } from "./ServiceSettings";
-import { ProviderSettings } from "./ProviderSettings";
-import { McpSettings } from "./McpSettings";
-import { LanguageSettings } from "./LanguageSettings";
-import { AppearanceSettings } from "./AppearanceSettings";
-import { AboutSettings } from "./AboutSettings";
 import type { SettingsTab } from "@/routes/settings";
+
+// 懒加载所有设置子面板（按需加载，减少首屏体积）
+const ServiceSettings = lazy(() => import("./ServiceSettings").then(m => ({ default: m.ServiceSettings })));
+const ProviderSettings = lazy(() => import("./ProviderSettings").then(m => ({ default: m.ProviderSettings })));
+const McpSettings = lazy(() => import("./McpSettings").then(m => ({ default: m.McpSettings })));
+const LanguageSettings = lazy(() => import("./LanguageSettings").then(m => ({ default: m.LanguageSettings })));
+const AppearanceSettings = lazy(() => import("./AppearanceSettings").then(m => ({ default: m.AppearanceSettings })));
+const AboutSettings = lazy(() => import("./AboutSettings").then(m => ({ default: m.AboutSettings })));
 
 interface NavItem {
   id: SettingsTab;
   label: string;
   icon: typeof Server;
+}
+
+/**
+ * 设置面板加载占位符
+ */
+function SettingsLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <span className="ml-2 text-sm text-muted-foreground">加载中...</span>
+    </div>
+  );
 }
 
 export function SettingsPage() {
@@ -55,22 +74,30 @@ export function SettingsPage() {
   ];
 
   const renderContent = () => {
-    switch (activeTab) {
-      case "service":
-        return <ServiceSettings />;
-      case "provider":
-        return <ProviderSettings />;
-      case "mcp":
-        return <McpSettings />;
-      case "language":
-        return <LanguageSettings />;
-      case "appearance":
-        return <AppearanceSettings />;
-      case "about":
-        return <AboutSettings />;
-      default:
-        return null;
-    }
+    const content = (() => {
+      switch (activeTab) {
+        case "service":
+          return <ServiceSettings />;
+        case "provider":
+          return <ProviderSettings />;
+        case "mcp":
+          return <McpSettings />;
+        case "language":
+          return <LanguageSettings />;
+        case "appearance":
+          return <AppearanceSettings />;
+        case "about":
+          return <AboutSettings />;
+        default:
+          return null;
+      }
+    })();
+
+    return (
+      <Suspense fallback={<SettingsLoadingFallback />}>
+        {content}
+      </Suspense>
+    );
   };
 
   return (

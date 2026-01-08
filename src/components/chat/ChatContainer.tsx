@@ -8,6 +8,8 @@ import { useTranslation } from "react-i18next";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInputCard } from "./ChatInputCard";
 import { QuickPrompts } from "./QuickPrompts";
+import { TodoListCompact } from "./TodoList";
+import { AutoAcceptToggle } from "./PermissionPrompt";
 import type { Message, Session } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
 import { Sparkles, ArrowDown } from "lucide-react";
@@ -196,7 +198,13 @@ export function ChatContainer({
 
       {/* 输入区域 - 精致底部栏 */}
       <div className="border-t border-border/60 bg-background/95 backdrop-blur-sm px-4 py-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-3">
+          {/* 任务列表（在输入框上方显示） */}
+          {activeSessionId && (
+            <TodoListCompact sessionId={activeSessionId} />
+          )}
+          
+          {/* 输入卡片 */}
           <ChatInputCard
             onSend={onSend}
             onStop={onStop}
@@ -215,10 +223,16 @@ export function ChatContainer({
             activeSessionId={activeSessionId}
             onSelectSession={onSelectSession}
           />
+          
+          {/* 底部工具栏：自动批准开关 */}
+          {activeSessionId && (
+            <div className="flex items-center justify-between">
+              <AutoAcceptToggle sessionId={activeSessionId} />
+              <Disclaimer />
+            </div>
+          )}
+          {!activeSessionId && <Disclaimer className="mt-3" />}
         </div>
-
-        {/* 底部免责声明 */}
-        <Disclaimer className="mt-3" />
       </div>
     </div>
   );

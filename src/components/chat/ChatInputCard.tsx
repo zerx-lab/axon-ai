@@ -1,9 +1,11 @@
 /**
  * 聊天输入卡片组件
  * 参考 Claude 风格的输入框设计：圆角卡片，内嵌功能按钮
+ * 
+ * 性能优化：SessionSearchDialog 懒加载
  */
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, lazy, Suspense, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -31,7 +33,8 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import { SessionSearchDialog } from "./SessionSearchDialog";
+// 懒加载 SessionSearchDialog
+const SessionSearchDialog = lazy(() => import("./SessionSearchDialog").then(m => ({ default: m.SessionSearchDialog })));
 import { VariantSelector } from "./VariantSelector";
 import type { Provider } from "@/stores/chat";
 import type { Session } from "@/types/chat";
@@ -420,13 +423,15 @@ export function ChatInputCard({
 
       {/* 会话搜索弹窗 */}
       {onSelectSession && (
-        <SessionSearchDialog
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-        />
+        <Suspense fallback={null}>
+          <SessionSearchDialog
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={handleSelectSession}
+          />
+        </Suspense>
       )}
     </div>
   );

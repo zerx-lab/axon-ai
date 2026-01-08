@@ -15,9 +15,13 @@ import type {
   Session, 
   Part, 
   UserMessageInfo, 
-  AssistantMessageInfo 
+  AssistantMessageInfo,
+  PermissionRequest,
+  TodoItem,
 } from "@/types/chat";
 import { mapApiSession } from "./utils";
+import { usePermissionStore, shouldAutoAccept } from "@/stores/permission";
+import { useTodoStore } from "@/stores/todo";
 
 // ============== 类型定义 ==============
 
@@ -331,6 +335,47 @@ export function useSSEHandler({
           } else {
             setError(tRef.current("errors.sessionError"));
           }
+          break;
+        }
+
+        case "permission.asked": {
+          // 权限请求事件
+          const permissionRequest = event.properties as PermissionRequest;
+          
+          // 检查是否应该自动批准
+          const isAutoAccepting = usePermissionStore.getState().isAutoAccepting(permissionRequest.sessionID);
+          if (isAutoAccepting && shouldAutoAccept(permissionRequest)) {
+            // 自动批准 - 立即响应
+            console.log("[SSE] 自动批准权限请求:", permissionRequest.id);
+            // 实际的自动响应会在 PermissionPrompt 组件中处理
+          }
+          
+          // 添加到待处理列表
+          usePermissionStore.getState().addRequest(permissionRequest);
+          break;
+        }
+
+        case "permission.replied": {
+          // 权限回复事件
+          const { sessionID, requestID } = event.properties as { 
+            sessionID: string; 
+            requestID: string 
+          };
+          
+          // 从待处理列表移除
+          usePermissionStore.getState().removeRequest(requestID, sessionID);
+          break;
+        }
+
+        case "todo.updated": {
+          // Todo 更新事件
+          const { sessionID, todos } = event.properties as {
+            sessionID: string;
+            todos: TodoItem[];
+          };
+          
+          // 更新 Todo Store
+          useTodoStore.getState().updateTodos(sessionID, todos);
           break;
         }
       }
