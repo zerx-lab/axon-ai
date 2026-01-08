@@ -231,13 +231,13 @@ export function ChatInputCard({
   return (
     <div
       className={cn(
-        "border border-border rounded-xl bg-background shadow-sm",
-        "transition-shadow duration-200",
-        "focus-within:shadow-md focus-within:border-border/80"
+        "border border-border/60 rounded-2xl bg-card shadow-sm",
+        "transition-all duration-200",
+        "focus-within:shadow-md focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10"
       )}
     >
       {/* 输入区域 */}
-      <div className="p-3 pb-2">
+      <div className="p-4 pb-2">
         <Textarea
           ref={textareaRef}
           value={value}
@@ -248,24 +248,24 @@ export function ChatInputCard({
           disabled={disabled}
           rows={1}
           className={cn(
-            "min-h-[24px] max-h-[200px] resize-none",
-            "border-0 p-0 shadow-none",
+            "min-h-[28px] max-h-[200px] resize-none",
+            "border-0 p-0 shadow-none bg-transparent",
             "focus-visible:ring-0 focus-visible:ring-offset-0",
-            "placeholder:text-muted-foreground/60",
-            "text-base"
+            "placeholder:text-muted-foreground/50",
+            "text-base leading-relaxed"
           )}
         />
       </div>
 
       {/* 底部工具栏 */}
-      <div className="flex items-center justify-between px-2 pb-2">
+      <div className="flex items-center justify-between px-3 pb-3">
         {/* 左侧按钮组 */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {/* 附件按钮 */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80"
             disabled={disabled}
             title={t("chat.attachFile")}
           >
@@ -276,7 +276,7 @@ export function ChatInputCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80"
             disabled={disabled || sessions.length === 0}
             title={t("chat.history")}
             onClick={() => setHistoryOpen(true)}
@@ -287,18 +287,18 @@ export function ChatInputCard({
 
         {/* 右侧：模型选择器 + 发送按钮 */}
         <div className="flex items-center gap-2">
-          {/* 模型选择器 */}
+          {/* 模型选择器 - 精致设计 */}
           {showModelSelector && (
             <Popover open={modelOpen} onOpenChange={setModelOpen}>
               <PopoverTrigger asChild>
                 <button
                   className={cn(
                     "inline-flex items-center gap-1.5",
-                    "h-8 px-2.5 rounded-lg",
-                    "text-sm text-muted-foreground",
-                    "hover:bg-muted/50 hover:text-foreground",
-                    "transition-colors duration-100",
-                    "focus:outline-none focus:ring-1 focus:ring-ring",
+                    "h-8 px-3 rounded-lg",
+                    "text-sm text-muted-foreground font-medium",
+                    "bg-accent/50 hover:bg-accent hover:text-foreground",
+                    "transition-all duration-150",
+                    "focus:outline-none focus:ring-2 focus:ring-ring/40",
                     disabled && "pointer-events-none opacity-50"
                   )}
                   disabled={disabled}
@@ -315,13 +315,13 @@ export function ChatInputCard({
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[300px] p-0 rounded-lg shadow-lg border border-border"
+                className="w-[320px] p-0 rounded-xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-sm"
                 align="end"
                 sideOffset={8}
               >
-                <Command className="rounded-lg" filter={filterFn}>
-                  <CommandInput placeholder={t("chat.searchModel")} />
-                  <CommandList>
+                <Command className="rounded-xl" filter={filterFn}>
+                  <CommandInput placeholder={t("chat.searchModel")} className="h-10" />
+                  <CommandList className="max-h-[300px]">
                     <CommandEmpty>{t("chat.noModelFound")}</CommandEmpty>
                     {providers.map((provider) => (
                       <CommandGroup key={provider.id} heading={provider.name}>
@@ -333,15 +333,15 @@ export function ChatInputCard({
                               key={modelValue}
                               value={modelValue}
                               onSelect={handleSelectModel}
-                              className="gap-2"
+                              className="gap-2.5 py-2.5 rounded-lg mx-1"
                             >
                               <div
                                 className={cn(
                                   "flex items-center justify-center h-4 w-4 shrink-0",
-                                  "rounded-sm border",
+                                  "rounded border transition-colors",
                                   isSelected
                                     ? "bg-primary border-primary text-primary-foreground"
-                                    : "border-input bg-transparent"
+                                    : "border-border/60 bg-transparent"
                                 )}
                               >
                                 {isSelected && <Check className="h-3 w-3" />}
@@ -386,13 +386,13 @@ export function ChatInputCard({
             </div>
           )}
 
-          {/* 发送/停止按钮 */}
+          {/* 发送/停止按钮 - 精致设计 */}
           {isLoading ? (
             <Button
               variant="destructive"
               size="icon"
               onClick={onStop}
-              className="h-8 w-8 rounded-lg shrink-0"
+              className="h-9 w-9 rounded-xl shrink-0 shadow-sm"
             >
               <Square className="h-4 w-4" />
             </Button>
@@ -402,9 +402,10 @@ export function ChatInputCard({
               disabled={!value.trim() || disabled}
               size="icon"
               className={cn(
-                "h-8 w-8 rounded-lg shrink-0",
+                "h-9 w-9 rounded-xl shrink-0 shadow-sm",
                 "bg-primary hover:bg-primary/90",
-                "disabled:bg-muted disabled:text-muted-foreground"
+                "disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none",
+                "transition-all duration-150"
               )}
             >
               {disabled && !isLoading ? (

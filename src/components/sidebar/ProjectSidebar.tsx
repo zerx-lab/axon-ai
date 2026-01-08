@@ -30,7 +30,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
   RefreshCw,
   Folder,
   X,
@@ -86,46 +85,46 @@ export function ProjectSidebar({
   return (
     <div
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar",
+        "flex h-full flex-col border-r border-sidebar-border/60 bg-sidebar",
         "@container"
       )}
       style={{ containerType: "inline-size" }}
     >
-      {/* 头部 */}
-      <div className="flex h-12 items-center justify-between px-3 border-b border-sidebar-border">
+      {/* 头部 - 精致设计 */}
+      <div className="flex h-12 items-center justify-between px-3 border-b border-sidebar-border/60">
         <span 
           className={cn(
-            "text-sm font-medium text-sidebar-foreground whitespace-nowrap",
+            "text-sm font-medium text-sidebar-foreground tracking-tight whitespace-nowrap",
             "hidden @[100px]:block"
           )}
         >
           {t("sidebar.projects", "项目")}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {/* 刷新按钮 */}
           {onRefresh && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 hidden @[100px]:flex"
+              className="h-7 w-7 rounded-lg hidden @[100px]:flex hover:bg-sidebar-accent/80"
               onClick={onRefresh}
               disabled={isRefreshing}
               title={t("sidebar.refresh")}
             >
-              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
             </Button>
           )}
           {/* 折叠/展开切换按钮 */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 rounded-lg hover:bg-sidebar-accent/80"
             onClick={onToggleCollapse}
           >
             {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             ) : (
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             )}
           </Button>
         </div>
@@ -209,21 +208,21 @@ function ProjectItem({
 }: ProjectItemProps) {
   const { t } = useTranslation();
 
-  // 项目头部内容
+  // 项目头部内容 - 精致设计
   const projectHeader = (
     <div
       className={cn(
-        "group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors",
-        "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+        "group flex items-center gap-2 rounded-lg px-2 py-2 cursor-pointer transition-all duration-150",
+        "hover:bg-sidebar-accent/60 text-sidebar-foreground"
       )}
       onClick={onToggleExpanded}
     >
       {/* 展开/折叠图标 */}
-      <div className="h-4 w-4 flex items-center justify-center">
+      <div className="h-4 w-4 flex items-center justify-center text-muted-foreground">
         {project.expanded ? (
           <ChevronDown className="h-3 w-3" />
         ) : (
-          <ChevronUp className="h-3 w-3" />
+          <ChevronRight className="h-3 w-3" />
         )}
       </div>
       
@@ -238,8 +237,8 @@ function ProjectItem({
         {project.name}
       </span>
       
-      {/* 会话数量 */}
-      <span className="text-xs text-muted-foreground">
+      {/* 会话数量 - 精致徽章 */}
+      <span className="text-xs text-muted-foreground/80 bg-sidebar-accent/50 px-1.5 py-0.5 rounded">
         {sessions.length}
       </span>
       
@@ -248,8 +247,8 @@ function ProjectItem({
         variant="ghost"
         size="icon"
         className={cn(
-          "h-6 w-6 shrink-0 opacity-0 transition-opacity",
-          "group-hover:opacity-100"
+          "h-6 w-6 shrink-0 rounded-md opacity-0 transition-all duration-150",
+          "group-hover:opacity-100 hover:bg-sidebar-accent"
         )}
         onClick={(e) => {
           e.stopPropagation();
@@ -331,21 +330,24 @@ function SessionItem({
       <TooltipTrigger asChild>
         <div
           className={cn(
-            "group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors overflow-hidden",
+            "group flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer transition-all duration-150 overflow-hidden",
             isActive
-              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+              : "hover:bg-sidebar-accent/60 text-sidebar-foreground"
           )}
           onClick={onSelect}
         >
-          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+          <MessageSquare className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            isActive ? "text-primary" : "text-muted-foreground"
+          )} />
           <span className="flex-1 truncate text-sm">{session.title}</span>
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "h-5 w-5 shrink-0 opacity-0 transition-opacity",
-              "group-hover:opacity-100",
+              "h-5 w-5 shrink-0 rounded opacity-0 transition-all duration-150",
+              "group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive",
               isActive && "opacity-100"
             )}
             onClick={(e) => {

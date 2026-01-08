@@ -167,35 +167,37 @@ export function ServiceSettings() {
   return (
     <div className="space-y-8">
       {/* 页面标题 */}
-      <div>
+      <div className="space-y-1">
         <h2 className="text-xl font-semibold tracking-tight">{t("settings.serviceSettings.title")}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground leading-relaxed">
           {t("settings.serviceSettings.description")}
         </p>
       </div>
 
       {/* 服务模式选择 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("settings.serviceSettings.mode")}</CardTitle>
-          <CardDescription>{t("settings.serviceSettings.modeDescription")}</CardDescription>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium">{t("settings.serviceSettings.mode")}</CardTitle>
+          <CardDescription className="text-sm">{t("settings.serviceSettings.modeDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <RadioGroup value={selectedMode} onValueChange={handleModeChange} className="space-y-4">
+          <RadioGroup value={selectedMode} onValueChange={handleModeChange} className="space-y-3">
             {/* 本地服务 */}
             <label
               htmlFor="local"
-              className="flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+              className="flex cursor-pointer items-start gap-4 rounded-xl border border-border/60 p-4 transition-all duration-150 hover:bg-accent/50 hover:border-border has-[[data-state=checked]]:border-primary/60 has-[[data-state=checked]]:bg-primary/5 has-[[data-state=checked]]:shadow-sm"
             >
-              <RadioGroupItem value="local" id="local" className="mt-1" />
+              <RadioGroupItem value="local" id="local" className="mt-0.5" />
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <Server className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                    <Server className="h-3.5 w-3.5 text-primary" />
+                  </div>
                   <span className="font-medium">
                     {t("settings.serviceSettings.local")}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed pl-9">
                   {t("settings.serviceSettings.localDescription")}
                 </p>
               </div>
@@ -204,25 +206,27 @@ export function ServiceSettings() {
             {/* 远程服务 */}
             <label
               htmlFor="remote"
-              className="flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+              className="flex cursor-pointer items-start gap-4 rounded-xl border border-border/60 p-4 transition-all duration-150 hover:bg-accent/50 hover:border-border has-[[data-state=checked]]:border-primary/60 has-[[data-state=checked]]:bg-primary/5 has-[[data-state=checked]]:shadow-sm"
             >
-              <RadioGroupItem value="remote" id="remote" className="mt-1" />
+              <RadioGroupItem value="remote" id="remote" className="mt-0.5" />
               <div className="flex-1 space-y-3">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <Cloud className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Cloud className="h-3.5 w-3.5 text-blue-500" />
+                    </div>
                     <span className="font-medium">
                       {t("settings.serviceSettings.remote")}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed pl-9">
                     {t("settings.serviceSettings.remoteDescription")}
                   </p>
                 </div>
                 
                 {selectedMode === "remote" && (
-                  <div className="space-y-2 pt-2 border-t">
-                    <Label htmlFor="remoteUrl" className="text-sm">
+                  <div className="space-y-3 pt-3 border-t border-border/60 ml-9">
+                    <Label htmlFor="remoteUrl" className="text-sm font-medium">
                       {t("settings.serviceSettings.remoteUrl")}
                     </Label>
                     <Input
@@ -231,7 +235,7 @@ export function ServiceSettings() {
                       placeholder={t("settings.serviceSettings.remoteUrlPlaceholder")}
                       value={remoteUrl}
                       onChange={(e) => setRemoteUrl(e.target.value)}
-                      className="max-w-md"
+                      className="max-w-md h-9 rounded-lg"
                     />
                     <p className="text-xs text-muted-foreground">
                       {t("settings.serviceSettings.remoteUrlHint")}
@@ -243,7 +247,11 @@ export function ServiceSettings() {
           </RadioGroup>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={isSaving || isLoading}>
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving || isLoading}
+              className="rounded-lg px-5"
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("common.save")}
             </Button>
@@ -252,21 +260,23 @@ export function ServiceSettings() {
       </Card>
 
       {/* 连接状态 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("settings.serviceSettings.status")}</CardTitle>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium">{t("settings.serviceSettings.status")}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5">
           {/* 连接状态显示 */}
-          <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
-            <div className="flex items-center gap-3">
-              {connectionStatus.icon}
+          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-surface-1 p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background border border-border/60">
+                {connectionStatus.icon}
+              </div>
               <div>
                 <p className={`font-medium ${connectionStatus.color}`}>
                   {connectionStatus.text}
                 </p>
                 {state.endpoint && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                     {state.endpoint}
                   </p>
                 )}
@@ -277,6 +287,7 @@ export function ServiceSettings() {
               size="sm"
               onClick={handleTestConnection}
               disabled={isLoading}
+              className="rounded-lg"
             >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -289,11 +300,11 @@ export function ServiceSettings() {
 
           {/* 本地服务控制（仅在本地模式下显示） */}
           {selectedMode === "local" && (
-            <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-4 rounded-xl border border-border/60 p-4 bg-surface-1">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{t("settings.serviceSettings.backendService")}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {backendStatus.text}
                   </p>
                 </div>
@@ -304,8 +315,9 @@ export function ServiceSettings() {
                   size="sm"
                   onClick={startBackend}
                   disabled={!backendStatus.canStart || isLoading}
+                  className="rounded-lg"
                 >
-                  <Play className="mr-2 h-4 w-4" />
+                  <Play className="mr-2 h-3.5 w-3.5" />
                   {t("settings.serviceSettings.startService")}
                 </Button>
                 <Button
@@ -313,8 +325,9 @@ export function ServiceSettings() {
                   size="sm"
                   onClick={stopBackend}
                   disabled={!backendStatus.canStop || isLoading}
+                  className="rounded-lg"
                 >
-                  <Square className="mr-2 h-4 w-4" />
+                  <Square className="mr-2 h-3.5 w-3.5" />
                   {t("settings.serviceSettings.stopService")}
                 </Button>
                 <Button
@@ -322,8 +335,9 @@ export function ServiceSettings() {
                   size="sm"
                   onClick={restartBackend}
                   disabled={!backendStatus.canStop || isLoading}
+                  className="rounded-lg"
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
                   {t("settings.serviceSettings.restartService")}
                 </Button>
               </div>

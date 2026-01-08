@@ -81,17 +81,17 @@ export function ChatMessage({ message, isLast = false }: ChatMessageProps) {
   return (
     <div
       className={cn(
-        "group flex gap-3 py-4 px-4",
-        isUser ? "bg-transparent" : "bg-surface-1"
+        "group flex gap-4 py-5 px-6",
+        isUser ? "bg-transparent" : "bg-surface-1/50"
       )}
     >
-      {/* 头像 */}
+      {/* 头像 - 精致圆角设计 */}
       <div
         className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-secondary text-secondary-foreground"
+            ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+            : "bg-card border border-border/60 text-foreground"
         )}
       >
         {isUser ? (
@@ -104,15 +104,15 @@ export function ChatMessage({ message, isLast = false }: ChatMessageProps) {
       {/* 内容 */}
       <div className="flex-1 space-y-2 overflow-hidden min-w-0">
         {/* 消息头部 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span className="text-sm font-medium text-foreground">
             {isUser ? t("chat.user") : t("chat.assistant")}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground/70">
             {formatTime(message.info.time.created)}
           </span>
           {isLoading && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
           )}
         </div>
 

@@ -75,41 +75,46 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-background">
-      {/* 头部 */}
-      <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
+      {/* 头部 - 精致的导航栏 */}
+      <div className="flex h-14 shrink-0 items-center gap-4 border-b border-border/60 px-5 bg-background/80 backdrop-blur-sm">
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={handleBack}
-          className="shrink-0"
+          className="shrink-0 hover:bg-accent/80 rounded-lg"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-base font-semibold">{t("settings.title")}</h1>
+        <div className="h-4 w-px bg-border/60" />
+        <h1 className="text-base font-semibold tracking-tight">{t("settings.title")}</h1>
       </div>
 
       {/* 主体区域 - 双栏布局 */}
       <div className="flex flex-1 overflow-hidden">
-        {/* 左侧导航栏 */}
-        <nav className="w-48 shrink-0 border-r border-border bg-muted/30">
+        {/* 左侧导航栏 - 精致的侧边导航 */}
+        <nav className="w-56 shrink-0 border-r border-border/60 bg-surface-0">
           <ScrollArea className="h-full">
-            <div className="flex flex-col gap-1 p-3">
+            <div className="flex flex-col gap-1 p-4">
               {navItems.map((item) => {
                 const Icon = item.icon;
+                const isActive = activeTab === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleTabChange(item.id)}
                     className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      activeTab === item.id
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground"
+                      "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
+                      "hover:bg-accent/80",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      isActive
+                        ? "bg-accent text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
                     <span className="truncate">{item.label}</span>
                   </button>
                 );
@@ -119,9 +124,9 @@ export function SettingsPage() {
         </nav>
 
         {/* 右侧内容区域 */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden bg-background">
           <ScrollArea className="h-full">
-            <div className="min-h-full p-6 lg:p-8">
+            <div className="min-h-full p-8 lg:p-10">
               <div className="mx-auto w-full max-w-3xl">
                 {renderContent()}
               </div>

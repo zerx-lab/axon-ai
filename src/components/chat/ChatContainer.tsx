@@ -108,17 +108,17 @@ export function ChatContainer({
     onSend(prompt);
   };
 
-  // 空状态布局（新会话）- 参考 Claude 风格
+  // 空状态布局（新会话）- Supabase 风格精致设计
   if (isEmptyState) {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden bg-background">
         {/* 中心内容区域 */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
           {/* 欢迎标题 */}
           <WelcomeHeader />
 
           {/* 输入框卡片 */}
-          <div className="w-full max-w-2xl mt-6">
+          <div className="w-full max-w-2xl mt-8">
             <ChatInputCard
               onSend={onSend}
               onStop={onStop}
@@ -140,7 +140,7 @@ export function ChatContainer({
           </div>
 
           {/* 快捷提示按钮 */}
-          <div className="mt-6">
+          <div className="mt-8">
             <QuickPrompts
               onSelect={handleQuickPromptSelect}
               disabled={disabled || isLoading}
@@ -154,9 +154,9 @@ export function ChatContainer({
     );
   }
 
-  // 会话聊天布局（有消息时）
+  // 会话聊天布局（有消息时）- 精致现代风格
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden bg-background">
       {/* 消息区域 - 使用原生滚动 */}
       <div className="relative flex-1">
         <div
@@ -171,20 +171,20 @@ export function ChatContainer({
           </div>
         </div>
 
-        {/* 滚动到底部按钮 */}
+        {/* 滚动到底部按钮 - 精致设计 */}
         {showScrollButton && (
           <button
             onClick={scrollToBottom}
             className={cn(
-              "absolute bottom-4 right-4 z-10",
+              "absolute bottom-5 right-5 z-10",
               "flex items-center justify-center",
-              "w-8 h-8 rounded-full",
-              "bg-background/90 backdrop-blur-sm",
-              "border border-border/60 shadow-md",
+              "w-9 h-9 rounded-xl",
+              "bg-card/95 backdrop-blur-md",
+              "border border-border/60 shadow-lg shadow-black/5",
               "text-muted-foreground hover:text-foreground",
-              "hover:bg-accent",
+              "hover:bg-accent hover:border-border",
               "transition-all duration-200",
-              "opacity-0 animate-in fade-in duration-200",
+              "opacity-0 animate-in fade-in slide-in-from-bottom-2 duration-200",
               showScrollButton && "opacity-100"
             )}
             aria-label="滚动到底部"
@@ -194,8 +194,8 @@ export function ChatContainer({
         )}
       </div>
 
-      {/* 输入区域 */}
-      <div className="border-t border-border bg-background p-4">
+      {/* 输入区域 - 精致底部栏 */}
+      <div className="border-t border-border/60 bg-background/95 backdrop-blur-sm px-4 py-4">
         <div className="max-w-3xl mx-auto">
           <ChatInputCard
             onSend={onSend}
@@ -225,34 +225,42 @@ export function ChatContainer({
 }
 
 /**
- * 欢迎标题组件
+ * 欢迎标题组件 - Supabase 风格精致设计
  */
 function WelcomeHeader() {
   const { t } = useTranslation();
 
   return (
     <div className="flex flex-col items-center text-center">
-      {/* 图标 */}
-      <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-primary/10 mb-4">
-        <Sparkles className="h-6 w-6 text-primary" />
+      {/* 图标 - 精致的渐变背景 */}
+      <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mb-5 shadow-sm border border-primary/10">
+        <Sparkles className="h-7 w-7 text-primary" />
       </div>
 
       {/* 标题 */}
-      <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+      <h1 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight">
         {t("chat.welcomeTitle")}
       </h1>
+      
+      {/* 副标题 */}
+      <p className="mt-2 text-sm text-muted-foreground max-w-md">
+        {t("chat.welcomeSubtitle", "开始与 AI 助手对话，获取智能帮助")}
+      </p>
     </div>
   );
 }
 
 /**
- * 底部免责声明组件
+ * 底部免责声明组件 - 精致样式
  */
 function Disclaimer({ className }: { className?: string }) {
   const { t } = useTranslation();
 
   return (
-    <p className={`text-xs text-muted-foreground text-center ${className || ""}`}>
+    <p className={cn(
+      "text-xs text-muted-foreground/80 text-center leading-relaxed",
+      className
+    )}>
       {t("chat.disclaimer")}
     </p>
   );

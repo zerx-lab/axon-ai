@@ -4,22 +4,22 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Zed-style Design System
- * - No gradients
- * - Small border radius (2px)
- * - Flat, minimal design
- * - High contrast, clear hierarchy
+ * Supabase-inspired Design System
+ * - Clean, modern aesthetic
+ * - Subtle shadows and depth
+ * - Refined color palette
+ * - Premium, polished feel
  */
 
 @theme inline {
-  /* Zed uses very small radius - 2px base */
-  --radius-sm: 1px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
-  --radius-2xl: 6px;
-  --radius-3xl: 8px;
-  --radius-4xl: 8px;
+  /* Refined border radius - slightly larger for modern feel */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
 
   /* Color mappings */
   --color-background: var(--background);
@@ -66,137 +66,153 @@
 }
 
 /*
- * Light theme - Zed One Light inspired
- * Clean, minimal, paper-like
+ * Light theme - Modern & Refined
+ * Clean, premium feel with Ant Design blue
  */
 :root {
-  --radius: 2px;
+  --radius: 6px;
 
-  /* Base colors - warm gray tone */
-  --background: #fafafa;
-  --foreground: #1f2328;
+  /* Base colors - refined neutral palette */
+  --background: #f8f9fa;
+  --foreground: #171717;
 
-  /* Card - slightly elevated */
+  /* Card - elevated with subtle distinction */
   --card: #ffffff;
-  --card-foreground: #1f2328;
+  --card-foreground: #171717;
 
-  /* Popover/dropdown */
+  /* Popover/dropdown - crisp white */
   --popover: #ffffff;
-  --popover-foreground: #1f2328;
+  --popover-foreground: #171717;
 
-  /* Primary - Zed blue */
-  --primary: #0969da;
+  /* Primary - Ant Design blue */
+  --primary: #1677ff;
   --primary-foreground: #ffffff;
 
-  /* Secondary - subtle gray */
-  --secondary: #f0f0f0;
-  --secondary-foreground: #1f2328;
+  /* Secondary - refined gray */
+  --secondary: #f1f3f5;
+  --secondary-foreground: #171717;
 
-  /* Muted - for disabled/secondary text */
-  --muted: #f6f6f6;
-  --muted-foreground: #656d76;
+  /* Muted - subtle backgrounds and text */
+  --muted: #f1f3f5;
+  --muted-foreground: #6b7280;
 
-  /* Accent - hover states */
-  --accent: #eaeef2;
-  --accent-foreground: #1f2328;
+  /* Accent - hover states with subtle warmth */
+  --accent: #f1f3f5;
+  --accent-foreground: #171717;
 
-  /* Destructive - error/delete */
-  --destructive: #cf222e;
+  /* Destructive - refined red */
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  /* Borders - subtle */
-  --border: #d8dee4;
-  --input: #d8dee4;
-  --ring: #0969da;
+  /* Success - green */
+  --success: #52c41a;
+  --success-foreground: #ffffff;
 
-  /* Surface layers */
-  --surface-0: #fafafa;
+  /* Warning */
+  --warning: #faad14;
+  --warning-foreground: #171717;
+
+  /* Borders - refined and subtle */
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #1677ff;
+
+  /* Surface layers - refined depth */
+  --surface-0: #f8f9fa;
   --surface-1: #ffffff;
-  --surface-2: #f6f6f6;
+  --surface-2: #f1f3f5;
 
-  /* Sidebar */
-  --sidebar: #f6f6f6;
-  --sidebar-foreground: #1f2328;
-  --sidebar-primary: #0969da;
+  /* Sidebar - subtle distinction */
+  --sidebar: #f8f9fa;
+  --sidebar-foreground: #171717;
+  --sidebar-primary: #1677ff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eaeef2;
-  --sidebar-accent-foreground: #1f2328;
-  --sidebar-border: #d8dee4;
-  --sidebar-ring: #0969da;
+  --sidebar-accent: #f1f3f5;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #1677ff;
 
-  /* Chart colors */
-  --chart-1: #0969da;
-  --chart-2: #1a7f37;
-  --chart-3: #9a6700;
-  --chart-4: #8250df;
-  --chart-5: #bf3989;
+  /* Chart colors - vibrant palette */
+  --chart-1: #1677ff;
+  --chart-2: #52c41a;
+  --chart-3: #faad14;
+  --chart-4: #722ed1;
+  --chart-5: #eb2f96;
 }
 
 /*
- * Dark theme - Zed One Dark inspired
- * Deep, rich, easy on eyes
+ * Dark theme - Modern & Refined
+ * Premium dark aesthetic with Ant Design blue
  */
 .dark {
-  --radius: 2px;
+  --radius: 6px;
 
-  /* Base - deep charcoal */
-  --background: #1e1e1e;
-  --foreground: #e6e6e6;
+  /* Base - refined dark */
+  --background: #111113;
+  --foreground: #ededed;
 
-  /* Card - slightly lighter */
-  --card: #252526;
-  --card-foreground: #e6e6e6;
+  /* Card - elevated dark surface */
+  --card: #1c1c1f;
+  --card-foreground: #ededed;
 
-  /* Popover */
-  --popover: #2d2d30;
-  --popover-foreground: #e6e6e6;
+  /* Popover - slightly elevated */
+  --popover: #1c1c1f;
+  --popover-foreground: #ededed;
 
-  /* Primary - brighter blue for dark mode */
-  --primary: #58a6ff;
-  --primary-foreground: #0d1117;
+  /* Primary - Ant Design blue, brighter for dark mode */
+  --primary: #4096ff;
+  --primary-foreground: #ffffff;
 
-  /* Secondary */
-  --secondary: #2d2d30;
-  --secondary-foreground: #e6e6e6;
+  /* Secondary - refined dark gray */
+  --secondary: #2a2a2d;
+  --secondary-foreground: #ededed;
 
-  /* Muted */
-  --muted: #2d2d30;
-  --muted-foreground: #8b949e;
+  /* Muted - subtle dark backgrounds */
+  --muted: #2a2a2d;
+  --muted-foreground: #888888;
 
-  /* Accent - subtle highlight */
-  --accent: #3c3c3c;
-  --accent-foreground: #e6e6e6;
+  /* Accent - hover states */
+  --accent: #2a2a2d;
+  --accent-foreground: #ededed;
 
-  /* Destructive */
-  --destructive: #f85149;
+  /* Destructive - refined for dark mode */
+  --destructive: #f87171;
   --destructive-foreground: #ffffff;
 
-  /* Borders - subtle in dark mode */
-  --border: #3c3c3c;
-  --input: #3c3c3c;
-  --ring: #58a6ff;
+  /* Success */
+  --success: #73d13d;
+  --success-foreground: #111113;
 
-  /* Surface layers */
-  --surface-0: #1e1e1e;
-  --surface-1: #252526;
-  --surface-2: #2d2d30;
+  /* Warning */
+  --warning: #ffc53d;
+  --warning-foreground: #111113;
 
-  /* Sidebar - darker than main content */
-  --sidebar: #181818;
-  --sidebar-foreground: #e6e6e6;
-  --sidebar-primary: #58a6ff;
-  --sidebar-primary-foreground: #0d1117;
-  --sidebar-accent: #2d2d30;
-  --sidebar-accent-foreground: #e6e6e6;
-  --sidebar-border: #3c3c3c;
-  --sidebar-ring: #58a6ff;
+  /* Borders - refined subtle borders */
+  --border: #2e2e32;
+  --input: #2e2e32;
+  --ring: #4096ff;
+
+  /* Surface layers - refined depth */
+  --surface-0: #111113;
+  --surface-1: #1c1c1f;
+  --surface-2: #2a2a2d;
+
+  /* Sidebar - darker for contrast */
+  --sidebar: #0d0d0f;
+  --sidebar-foreground: #ededed;
+  --sidebar-primary: #4096ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2a2a2d;
+  --sidebar-accent-foreground: #ededed;
+  --sidebar-border: #2e2e32;
+  --sidebar-ring: #4096ff;
 
   /* Chart colors - vibrant for dark mode */
-  --chart-1: #58a6ff;
-  --chart-2: #3fb950;
-  --chart-3: #d29922;
-  --chart-4: #a371f7;
-  --chart-5: #db61a2;
+  --chart-1: #4096ff;
+  --chart-2: #73d13d;
+  --chart-3: #ffc53d;
+  --chart-4: #b37feb;
+  --chart-5: #ff85c0;
 }
 
 @layer base {
@@ -207,16 +223,16 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* 更精致的字体渲染 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Zed-style focus ring - subtle and precise */
-  *:focus-visible {
-    @apply outline-none ring-1 ring-ring ring-offset-1 ring-offset-background;
-  }
-
-  /* Disable default browser focus styles */
+  /* 全局禁用默认聚焦样式 - 简洁无高亮 */
+  *:focus-visible,
   :focus {
-    outline: none;
+    @apply outline-none;
   }
 
   /* Smooth scrolling */
@@ -224,10 +240,10 @@
     scroll-behavior: smooth;
   }
 
-  /* Custom scrollbar - 细滚动条样式 */
+  /* Custom scrollbar - refined thin style */
   ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -236,33 +252,33 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    opacity: 0.3;
-    border-radius: 2px;
+    opacity: 0.2;
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    opacity: 0.5;
+    opacity: 0.4;
+    background: var(--foreground);
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    background: #4a4a4a;
+    background: #444;
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: #5a5a5a;
+    background: #666;
   }
 
-  /* 侧边栏滚动区域 - overlay 样式滚动条，避免与拖拽手柄冲突 */
+  /* 侧边栏滚动区域 - overlay 样式滚动条 */
   .sidebar-scroll-area {
-    /* 使用 overlay 滚动条，不占用内容空间 */
     overflow-y: overlay;
     scrollbar-gutter: stable;
   }
 
-  /* 侧边栏滚动条 - 悬浮变宽效果 */
+  /* 侧边栏滚动条 - 精致悬浮效果 */
   .sidebar-scroll-area::-webkit-scrollbar {
-    width: 4px;
-    transition: width 0.2s ease;
+    width: 6px;
+    transition: width 0.15s ease;
   }
 
   .sidebar-scroll-area::-webkit-scrollbar-track {
@@ -271,38 +287,36 @@
 
   .sidebar-scroll-area::-webkit-scrollbar-thumb {
     background: transparent;
-    border-radius: 2px;
-    transition: background 0.2s ease, width 0.2s ease;
+    border-radius: 999px;
+    transition: background 0.15s ease;
   }
 
-  /* 容器悬浮时显示滚动条 */
   .sidebar-scroll-area:hover::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    opacity: 0.4;
+    opacity: 0.3;
   }
 
   .dark .sidebar-scroll-area:hover::-webkit-scrollbar-thumb {
-    background: #4a4a4a;
+    background: #444;
   }
 
-  /* 滚动条悬浮时变宽 - 便于快速拖拽 */
   .sidebar-scroll-area:hover::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   .sidebar-scroll-area:hover::-webkit-scrollbar-thumb:hover {
     background: var(--foreground);
-    opacity: 0.6;
+    opacity: 0.5;
   }
 
   .dark .sidebar-scroll-area:hover::-webkit-scrollbar-thumb:hover {
-    background: #6a6a6a;
+    background: #666;
   }
 
-  /* 聊天内容区域滚动条 - 悬浮变宽效果 */
+  /* 聊天内容区域滚动条 - 精致效果 */
   .chat-scroll-area::-webkit-scrollbar {
-    width: 4px;
-    transition: width 0.2s ease;
+    width: 6px;
+    transition: width 0.15s ease;
   }
 
   .chat-scroll-area::-webkit-scrollbar-track {
@@ -311,32 +325,31 @@
 
   .chat-scroll-area::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    opacity: 0.3;
-    border-radius: 2px;
-    transition: background 0.2s ease, width 0.2s ease;
+    opacity: 0.2;
+    border-radius: 999px;
+    transition: background 0.15s ease;
   }
 
-  /* 容器悬浮时滚动条变宽 */
   .chat-scroll-area:hover::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   .chat-scroll-area:hover::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    opacity: 0.5;
+    opacity: 0.4;
   }
 
   .chat-scroll-area:hover::-webkit-scrollbar-thumb:hover {
     background: var(--foreground);
-    opacity: 0.6;
+    opacity: 0.5;
   }
 
   .dark .chat-scroll-area::-webkit-scrollbar-thumb {
-    background: #4a4a4a;
+    background: #444;
   }
 
   .dark .chat-scroll-area:hover::-webkit-scrollbar-thumb:hover {
-    background: #6a6a6a;
+    background: #666;
   }
 }
 
@@ -361,32 +374,60 @@
 
 /*
  * Activity Bar Styles
- * 极简主义设计 - 精致、克制、功能导向
+ * Supabase-inspired - 精致、现代、功能导向
  */
 .activity-bar {
-  /* 固定宽度 - 紧凑但不局促 */
-  width: 40px;
-  min-width: 40px;
-  max-width: 40px;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
 }
 
 .activity-btn {
-  /* 移除默认按钮样式 */
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 }
 
-/* 按钮悬浮效果 - 微妙的背景变化 */
 .activity-btn:hover {
   background: var(--accent);
 }
 
-/* 按钮焦点状态 */
 .activity-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--ring);
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
+/*
+ * 精致的卡片悬浮效果
+ */
+.hover-card {
+  transition: all 0.2s ease;
+}
+
+.hover-card:hover {
+  background: var(--accent);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+/*
+ * 精致的分隔线
+ */
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--border),
+    transparent
+  );
+}
+
+/*
+ * 精致的输入框焦点效果
+ */
+.input-focus-glow:focus-within {
+  box-shadow: 0 0 0 3px var(--ring);
+}
 
