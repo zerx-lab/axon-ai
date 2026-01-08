@@ -153,6 +153,14 @@ export function ChatInputCard({
     return selectedModel.modelId;
   };
 
+  // 聚焦输入框
+  const focusInput = useCallback(() => {
+    // 使用 requestAnimationFrame 确保在 DOM 更新后聚焦
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, []);
+
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || isLoading || disabled) return;
@@ -163,7 +171,10 @@ export function ChatInputCard({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [value, isLoading, disabled, onSend]);
+
+    // 发送后聚焦输入框
+    focusInput();
+  }, [value, isLoading, disabled, onSend, focusInput]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -188,8 +199,30 @@ export function ChatInputCard({
     if (providerId && modelId && onSelectModel) {
       onSelectModel(providerId, modelId);
       setModelOpen(false);
+      // 选择模型后聚焦输入框
+      focusInput();
     }
   };
+
+  // 处理选择推理深度
+  const handleSelectVariant = useCallback(
+    (variant: string | undefined) => {
+      onSelectVariant?.(variant);
+      // 选择推理深度后聚焦输入框
+      focusInput();
+    },
+    [onSelectVariant, focusInput]
+  );
+
+  // 处理选择历史会话
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      onSelectSession?.(sessionId);
+      // 选择会话后聚焦输入框（Dialog 关闭由 SessionSearchDialog 内部处理）
+      focusInput();
+    },
+    [onSelectSession, focusInput]
+  );
 
   // 是否显示模型选择器
   const showModelSelector =
@@ -330,7 +363,7 @@ export function ChatInputCard({
             <VariantSelector
               variants={currentVariants}
               selectedVariant={selectedVariant}
-              onSelectVariant={onSelectVariant}
+              onSelectVariant={handleSelectVariant}
               onCycleVariant={onCycleVariant}
               disabled={disabled}
               mode="dropdown"
@@ -391,7 +424,7 @@ export function ChatInputCard({
           onOpenChange={setHistoryOpen}
           sessions={sessions}
           activeSessionId={activeSessionId}
-          onSelectSession={onSelectSession}
+          onSelectSession={handleSelectSession}
         />
       )}
     </div>

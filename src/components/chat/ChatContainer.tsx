@@ -3,14 +3,15 @@
  * 整合消息列表和输入框，支持空状态展示和会话聊天两种布局
  */
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInputCard } from "./ChatInputCard";
 import { QuickPrompts } from "./QuickPrompts";
 import type { Message, Session } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ChatContainerProps {
   messages: Message[];
@@ -54,13 +55,53 @@ export function ChatContainer({
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isEmptyState = messages.length === 0;
+  
+  // 是否应该自动滚动（用户未手动向上滚动时为 true）
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  // 是否显示"滚动到底部"按钮
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // 当有新消息时自动滚动到底部
-  useEffect(() => {
+  // 检查是否滚动到底部附近（允许 50px 的误差）
+  const isNearBottom = useCallback((element: HTMLElement) => {
+    const threshold = 50;
+    return element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+  }, []);
+
+  // 处理滚动事件
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    
+    const nearBottom = isNearBottom(scrollRef.current);
+    
+    // 如果用户滚动到底部附近，恢复自动滚动
+    if (nearBottom) {
+      setShouldAutoScroll(true);
+      setShowScrollButton(false);
+    } else {
+      // 用户向上滚动，禁用自动滚动
+      setShouldAutoScroll(false);
+      setShowScrollButton(true);
+    }
+  }, [isNearBottom]);
+
+  // 滚动到底部
+  const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+      setShouldAutoScroll(true);
+      setShowScrollButton(false);
+    }
+  }, []);
+
+  // 当有新消息时，仅在 shouldAutoScroll 为 true 时自动滚动到底部
+  useEffect(() => {
+    if (scrollRef.current && shouldAutoScroll) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, shouldAutoScroll]);
 
   // 处理快捷提示选择
   const handleQuickPromptSelect = (prompt: string) => {
@@ -117,12 +158,40 @@ export function ChatContainer({
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* 消息区域 - 使用原生滚动 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area">
-        <div className="flex flex-col">
-          {messages.map((message) => (
-            <ChatMessage key={message.info.id} message={message} />
-          ))}
+      <div className="relative flex-1">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="absolute inset-0 overflow-y-auto chat-scroll-area"
+        >
+          <div className="flex flex-col">
+            {messages.map((message) => (
+              <ChatMessage key={message.info.id} message={message} />
+            ))}
+          </div>
         </div>
+
+        {/* 滚动到底部按钮 */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className={cn(
+              "absolute bottom-4 right-4 z-10",
+              "flex items-center justify-center",
+              "w-8 h-8 rounded-full",
+              "bg-background/90 backdrop-blur-sm",
+              "border border-border/60 shadow-md",
+              "text-muted-foreground hover:text-foreground",
+              "hover:bg-accent",
+              "transition-all duration-200",
+              "opacity-0 animate-in fade-in duration-200",
+              showScrollButton && "opacity-100"
+            )}
+            aria-label="滚动到底部"
+          >
+            <ArrowDown className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* 输入区域 */}
