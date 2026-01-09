@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 /// Default fallback version when API is rate-limited
-const FALLBACK_VERSION: &str = "v1.1.4";
+const FALLBACK_VERSION: &str = "v1.1.8";
 
 /// Downloader for opencode binary
 pub struct OpencodeDownloader {
@@ -83,13 +83,10 @@ impl OpencodeDownloader {
             )));
         }
 
-        let release: GithubRelease = response
-            .json()
-            .await
-            .map_err(|e| {
-                warn!("Failed to parse release info, using fallback: {}", e);
-                OpencodeError::DownloadError(e.to_string())
-            })?;
+        let release: GithubRelease = response.json().await.map_err(|e| {
+            warn!("Failed to parse release info, using fallback: {}", e);
+            OpencodeError::DownloadError(e.to_string())
+        })?;
 
         info!("Latest opencode version: {}", release.tag_name);
         Ok(release.tag_name)
@@ -114,8 +111,9 @@ impl OpencodeDownloader {
         info!("Downloading opencode from: {}", url);
 
         // Create bin directory
-        let bin_dir = get_bin_dir()
-            .ok_or_else(|| OpencodeError::ConfigError("Cannot determine bin directory".to_string()))?;
+        let bin_dir = get_bin_dir().ok_or_else(|| {
+            OpencodeError::ConfigError("Cannot determine bin directory".to_string())
+        })?;
         std::fs::create_dir_all(&bin_dir)?;
 
         // Download archive
@@ -186,7 +184,11 @@ impl OpencodeDownloader {
     }
 
     /// Extract binary from archive
-    fn extract_binary(&self, archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, OpencodeError> {
+    fn extract_binary(
+        &self,
+        archive_path: &Path,
+        dest_dir: &Path,
+    ) -> Result<PathBuf, OpencodeError> {
         let binary_name = get_binary_name();
         let binary_path = dest_dir.join(binary_name);
 
@@ -213,8 +215,8 @@ impl OpencodeDownloader {
         binary_name: &str,
     ) -> Result<(), OpencodeError> {
         let file = std::fs::File::open(archive_path)?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
 
         for i in 0..archive.len() {
             let mut file = archive
@@ -248,11 +250,18 @@ impl OpencodeDownloader {
         use std::process::Command;
 
         let status = Command::new("tar")
-            .args(["-xzf", archive_path.to_str().unwrap(), "-C", dest_dir.to_str().unwrap()])
+            .args([
+                "-xzf",
+                archive_path.to_str().unwrap(),
+                "-C",
+                dest_dir.to_str().unwrap(),
+            ])
             .status()?;
 
         if !status.success() {
-            return Err(OpencodeError::ExtractError("tar extraction failed".to_string()));
+            return Err(OpencodeError::ExtractError(
+                "tar extraction failed".to_string(),
+            ));
         }
 
         // Find and move the binary to the expected location
