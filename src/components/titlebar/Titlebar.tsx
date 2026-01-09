@@ -13,6 +13,7 @@ import { WindowControls } from "./WindowControls";
 import { ThemeToggle } from "./ThemeToggle";
 import { ServiceStatus } from "./ServiceStatus";
 import { ProjectPicker } from "./ProjectPicker";
+import { AxonLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -25,11 +26,7 @@ import { useWorkspace } from "@/stores/workspace";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { cn } from "@/lib/utils";
 
-interface TitlebarProps {
-  title?: string;
-}
-
-export function Titlebar({ title = "Axon" }: TitlebarProps) {
+export function Titlebar() {
   const { t } = useTranslation();
   const { activeSession, createNewSession } = useChat();
   const { getDisplayPath, state: workspaceState, openDirectoryPicker } = useWorkspace();
@@ -85,7 +82,7 @@ export function Titlebar({ title = "Axon" }: TitlebarProps) {
           data-tauri-drag-region
           className="flex h-full items-center gap-2 px-3"
         >
-          <span className="text-sm font-medium text-foreground">{title}</span>
+          <AxonLogo size={18} className="text-foreground" />
           
           {/* 项目选择器触发器 (VSCode 风格) */}
           <TooltipProvider>

@@ -1,0 +1,1 @@
+export { AxonLogo } from "./AxonLogo";
