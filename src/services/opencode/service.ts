@@ -22,6 +22,7 @@ import {
   type BackendServiceStatus,
   type ServiceMode,
   type OpencodeEvent,
+  type GlobalEvent,
   type EventListener,
   DEFAULT_CONFIG,
   getEndpointUrl,
@@ -288,12 +289,8 @@ export class OpencodeService {
 
         const { directory, payload: event } = globalEvent;
         
-        // 调试日志：打印所有 SSE 事件
-        console.log("[OpencodeService] SSE global event received:", {
-          directory: directory ?? "global",
-          type: event.type,
-          event,
-        });
+        // 调试日志：打印所有 SSE 事件（详细模式）
+        console.log("[OpencodeService] SSE event:", event.type, JSON.stringify(globalEvent, null, 2));
 
         // 处理心跳事件（服务器可能发送此类型，但 SDK 类型定义可能不包含）
         // 使用类型断言处理未知事件类型
@@ -307,8 +304,8 @@ export class OpencodeService {
         // 更新心跳时间（任何事件都表示连接活跃）
         this.lastHeartbeatTime = Date.now();
 
-        // 通知所有监听器（传递原始的 payload 事件）
-        this.notifyEventListeners(event);
+        // 通知所有监听器（传递完整的全局事件，包含 directory）
+        this.notifyEventListeners({ directory, payload: event });
       }
       
       // 流正常结束，可能是服务器主动关闭
@@ -332,7 +329,7 @@ export class OpencodeService {
    * 通知事件监听器（优化版本）
    * 使用 queueMicrotask 批量处理，减少同步阻塞
    */
-  private notifyEventListeners(event: OpencodeEvent): void {
+  private notifyEventListeners(event: GlobalEvent): void {
     // 使用 Set 转数组避免迭代中修改问题
     const listeners = Array.from(this.eventListeners);
     

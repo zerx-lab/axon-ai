@@ -6,7 +6,7 @@
  * 1. DiffViewer 懒加载（仅在 edit 工具需要时加载）
  */
 
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,10 @@ import {
   Clock,
   Columns2,
   Rows2,
+  ShieldAlert,
+  Check,
+  X,
+  Zap,
 } from "lucide-react";
 import type {
   Part,
@@ -41,9 +45,14 @@ import type {
   ToolStateError,
   ToolStateRunning,
   AssistantMessageInfo,
+  PermissionRequest,
+  PermissionReply,
 } from "@/types/chat";
 import { getToolDisplayName } from "@/types/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { useShallow } from "zustand/react/shallow";
+import { usePermissionStore } from "@/stores/permission";
+import { useOpencode } from "@/hooks/useOpencode";
 // 懒加载 DiffViewer（减少首屏体积）
 const DiffViewer = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffViewer })));
 const DiffStatsDisplay = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffStatsDisplay })));
@@ -172,8 +181,88 @@ interface ToolPartViewProps {
 
 function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
   const { state } = part;
+  const { client } = useOpencode();
+  
+  // 获取与当前工具调用相关的权限请求 - 使用 useShallow 避免无限循环
+  const pendingRequests = usePermissionStore(
+    useShallow((s) => s.pendingRequests[messageInfo.sessionID] || [])
+  );
+  
+  // 查找匹配当前工具调用的权限请求
+  const permission = pendingRequests.find(
+    (p) => p.tool?.callID === part.callID
+  );
+  
+  // 使用 useMemo 缓存 permission.id 避免不必要的重渲染
+  const permissionId = permission?.id;
+  
+  // 延迟显示权限提示（避免闪烁）
+  const [showPermission, setShowPermission] = useState(false);
+  useEffect(() => {
+    if (permissionId) {
+      const timeout = setTimeout(() => setShowPermission(true), 50);
+      return () => clearTimeout(timeout);
+    } else {
+      setShowPermission(false);
+    }
+  }, [permissionId]);
+  
+  // 如果有权限请求，强制展开
+  const [forceExpanded, setForceExpanded] = useState(false);
+  useEffect(() => {
+    if (permissionId) {
+      setForceExpanded(true);
+    }
+  }, [permissionId]);
+  
   // 默认收起状态（已完成的工具）
   const [expanded, setExpanded] = useState(state.status !== "completed");
+  const isExpanded = expanded || forceExpanded;
+  
+  // 获取权限请求的 directory（用于权限回复）
+  const permissionDirectory = permission?.directory;
+  
+  // 处理权限回复
+  const handlePermissionRespond = useCallback(async (response: PermissionReply) => {
+    if (!permissionId || !client) {
+      console.warn("[Permission] 缺少必要参数:", { permissionId, hasClient: !!client });
+      return;
+    }
+    
+    const store = usePermissionStore.getState();
+    if (store.hasResponded(permissionId)) {
+      console.log("[Permission] 已响应过此请求:", permissionId);
+      return;
+    }
+    
+    // 标记为已响应
+    store.markResponded(permissionId);
+    
+    console.log("[Permission] 发送权限回复:", { 
+      requestID: permissionId, 
+      reply: response,
+      directory: permissionDirectory,
+      sessionID: messageInfo.sessionID
+    });
+    
+    try {
+      // 调用 SDK API 发送权限回复（包含 directory 参数）
+      const result = await client.permission.reply({
+        requestID: permissionId,
+        reply: response,
+        directory: permissionDirectory,
+      });
+      
+      console.log("[Permission] 回复成功:", result);
+      
+      // 从待处理列表移除
+      store.removeRequest(permissionId, messageInfo.sessionID);
+    } catch (error) {
+      console.error("[Permission] 回复失败:", error);
+      // 重置响应状态，允许重试
+      // store.respondedIds.delete(permissionId); // 暂时不开放重试
+    }
+  }, [permissionId, client, messageInfo.sessionID]);
   
   // 根据状态选择图标
   const StatusIcon = getStatusIcon(state.status);
@@ -183,7 +272,10 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
   const canCollapse = state.status === "completed" || state.status === "error";
   
   return (
-    <div className="rounded-md border border-border bg-card my-2">
+    <div className={cn(
+      "rounded-md border bg-card my-2",
+      permission ? "border-amber-500/50" : "border-border"
+    )}>
       {/* 工具标题栏 - 可点击切换展开/收起 */}
       <button
         onClick={() => canCollapse && setExpanded(!expanded)}
@@ -192,12 +284,12 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
           "flex w-full items-center gap-2 px-3 py-2 bg-muted/30 text-left transition-colors",
           canCollapse && "hover:bg-muted/50 cursor-pointer",
           !canCollapse && "cursor-default",
-          expanded && "border-b border-border"
+          isExpanded && "border-b border-border"
         )}
       >
         {/* 展开/收起指示器 */}
         {canCollapse ? (
-          expanded ? (
+          isExpanded ? (
             <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
           ) : (
             <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -208,6 +300,9 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
         <ToolIcon className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-medium">{getToolDisplayName(part.tool)}</span>
         <div className="ml-auto flex items-center gap-2">
+          {permission && (
+            <ShieldAlert className="h-4 w-4 text-amber-500" />
+          )}
           <StatusIcon
             className={cn(
               "h-4 w-4",
@@ -221,7 +316,7 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
       </button>
       
       {/* 工具内容 - 根据展开状态显示 */}
-      {expanded && (
+      {isExpanded && (
         <div className="p-3">
           {state.status === "completed" && (
             <ToolCompletedContent tool={part.tool} state={state} messageInfo={messageInfo} />
@@ -237,8 +332,130 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
           )}
         </div>
       )}
+      
+      {/* 权限请求提示 */}
+      {showPermission && permission && (
+        <PermissionPromptBar 
+          permission={permission} 
+          onRespond={handlePermissionRespond}
+        />
+      )}
     </div>
   );
+}
+
+// ============== 权限提示栏组件 ==============
+
+interface PermissionPromptBarProps {
+  permission: PermissionRequest;
+  onRespond: (response: PermissionReply) => void;
+}
+
+/**
+ * 权限提示栏 - 显示在工具卡片底部
+ */
+function PermissionPromptBar({ permission, onRespond }: PermissionPromptBarProps) {
+  const [isResponding, setIsResponding] = useState(false);
+  
+  const handleRespond = useCallback((response: PermissionReply) => {
+    if (isResponding) return;
+    setIsResponding(true);
+    onRespond(response);
+  }, [isResponding, onRespond]);
+  
+  // 获取权限描述
+  const permissionDescription = getPermissionDescription(permission);
+  
+  return (
+    <div 
+      className={cn(
+        "flex items-center gap-2 px-3 py-2",
+        "bg-amber-500/10 border-t border-amber-500/30",
+        "animate-in fade-in slide-in-from-bottom-2 duration-200"
+      )}
+    >
+      {/* 权限图标和说明 */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />
+        <span className="text-xs text-muted-foreground truncate">
+          {permissionDescription}
+        </span>
+      </div>
+
+      {/* 操作按钮 */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* 拒绝 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          onClick={() => handleRespond("reject")}
+          disabled={isResponding}
+        >
+          <X className="h-3.5 w-3.5 mr-1" />
+          拒绝
+        </Button>
+
+        {/* 总是允许 */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2.5 text-xs"
+          onClick={() => handleRespond("always")}
+          disabled={isResponding}
+        >
+          <Zap className="h-3.5 w-3.5 mr-1" />
+          总是允许
+        </Button>
+
+        {/* 允许一次 */}
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 px-2.5 text-xs"
+          onClick={() => handleRespond("once")}
+          disabled={isResponding}
+        >
+          <Check className="h-3.5 w-3.5 mr-1" />
+          允许一次
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 获取权限请求的描述文本
+ */
+function getPermissionDescription(permission: PermissionRequest): string {
+  const { permission: permType, metadata } = permission;
+  
+  switch (permType) {
+    case "edit":
+      return `编辑文件 ${metadata?.filepath || ""}`;
+    case "write":
+      return `写入文件 ${metadata?.filepath || ""}`;
+    case "read":
+      return `读取文件 ${metadata?.filePath || ""}`;
+    case "bash":
+      return `执行命令: ${metadata?.description || metadata?.command || ""}`;
+    case "glob":
+      return `搜索文件: ${metadata?.pattern || ""}`;
+    case "grep":
+      return `搜索内容: ${metadata?.pattern || ""}`;
+    case "webfetch":
+      return `访问网址: ${metadata?.url || ""}`;
+    case "websearch":
+      return `网页搜索: ${metadata?.query || ""}`;
+    case "task":
+      return `执行任务: ${metadata?.description || ""}`;
+    case "external_directory":
+      return `访问外部目录: ${metadata?.parentDir || metadata?.filepath || metadata?.path || ""}`;
+    case "doom_loop":
+      return "继续执行（多次失败后）";
+    default:
+      return `需要权限: ${permType}`;
+  }
 }
 
 // ============== Tool Content Components ==============

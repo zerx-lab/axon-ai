@@ -378,6 +378,8 @@ export interface PermissionRequest {
     messageID: string;
     callID: string;
   };
+  /** 请求来源的工作目录（从 SSE 全局事件中提取） */
+  directory?: string;
 }
 
 /** 权限回复事件 */

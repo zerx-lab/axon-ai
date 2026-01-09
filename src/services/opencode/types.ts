@@ -11,9 +11,20 @@ import type { Event as SDKEvent } from "@opencode-ai/sdk/v2";
 export type OpencodeEvent = SDKEvent;
 
 /**
- * 事件监听器类型
+ * 带有 directory 的全局事件（从 global.event() 接收）
  */
-export type EventListener = (event: OpencodeEvent) => void;
+export interface GlobalEvent {
+  /** 事件来源的工作目录 */
+  directory?: string;
+  /** 实际的事件负载 */
+  payload: OpencodeEvent;
+}
+
+/**
+ * 事件监听器类型
+ * 接收完整的全局事件，包含 directory 信息
+ */
+export type EventListener = (event: GlobalEvent) => void;
 
 /**
  * 服务连接模式

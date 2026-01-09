@@ -8,8 +8,8 @@ import { useEffect, useCallback, useRef } from "react";
 import type {
   Session as ApiSession,
   Part as ApiPart,
-  Event as OpencodeEvent,
 } from "@opencode-ai/sdk/v2";
+import type { GlobalEvent } from "@/services/opencode/types";
 import type { 
   Message, 
   Session, 
@@ -27,7 +27,7 @@ import { useTodoStore } from "@/stores/todo";
 
 interface SSEHandlerParams {
   isConnected: boolean;
-  onEvent: (listener: (event: OpencodeEvent) => void) => () => void;
+  onEvent: (listener: (event: GlobalEvent) => void) => () => void;
   activeSessionIdRef: React.MutableRefObject<string | null>;
   tRef: React.MutableRefObject<(key: string, options?: Record<string, unknown>) => string>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -148,7 +148,10 @@ export function useSSEHandler({
   useEffect(() => {
     if (!isConnected) return;
 
-    const unsubscribe = onEvent((event: OpencodeEvent) => {
+    const unsubscribe = onEvent((globalEvent: GlobalEvent) => {
+      // 从全局事件中提取 directory 和 payload
+      const { directory: eventDirectory, payload: event } = globalEvent;
+      
       // 只处理与当前会话相关的事件
       const currentSessionId = activeSessionIdRef.current;
       
@@ -340,7 +343,11 @@ export function useSSEHandler({
 
         case "permission.asked": {
           // 权限请求事件
-          const permissionRequest = event.properties as PermissionRequest;
+          // 附带 directory 信息，用于后续权限回复
+          const permissionRequest: PermissionRequest = {
+            ...(event.properties as Omit<PermissionRequest, "directory">),
+            directory: eventDirectory,
+          };
           
           // 检查是否应该自动批准
           const isAutoAccepting = usePermissionStore.getState().isAutoAccepting(permissionRequest.sessionID);
@@ -350,7 +357,7 @@ export function useSSEHandler({
             // 实际的自动响应会在 PermissionPrompt 组件中处理
           }
           
-          // 添加到待处理列表
+          // 添加到待处理列表（包含 directory 信息）
           usePermissionStore.getState().addRequest(permissionRequest);
           break;
         }

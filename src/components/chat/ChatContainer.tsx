@@ -10,6 +10,7 @@ import { ChatInputCard } from "./ChatInputCard";
 import { QuickPrompts } from "./QuickPrompts";
 import { TodoListCompact } from "./TodoList";
 import { AutoAcceptToggle } from "./PermissionPrompt";
+import { FloatingPermissionPrompt } from "./FloatingPermissionPrompt";
 import type { Message, Session } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
 import { Sparkles, ArrowDown } from "lucide-react";
@@ -190,6 +191,12 @@ export function ChatContainer({
             {messages.map((message) => (
               <ChatMessage key={message.info.id} message={message} />
             ))}
+            {/* 浮动权限提示（没有工具调用关联的权限请求） */}
+            {activeSessionId && (
+              <div className="px-6 py-3">
+                <FloatingPermissionPrompt sessionId={activeSessionId} />
+              </div>
+            )}
           </div>
         </div>
 
