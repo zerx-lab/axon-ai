@@ -235,6 +235,19 @@ function HomePage() {
     }
   }, [currentProject, createNewSession]);
 
+  // 监听 Ctrl+N 快捷键创建新会话
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "n") {
+        e.preventDefault();
+        handleNewSession();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNewSession]);
+
   // 处理文件点击 - 打开文件预览
   const handleFileClick = useCallback(
     (path: string, name: string) => {

@@ -61,6 +61,9 @@ interface ChatInputCardProps {
   sessions?: Session[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
+  // 外部填充输入框的值（用于快捷提示等）
+  fillValue?: string;
+  onFillValueConsumed?: () => void;
 }
 
 /**
@@ -115,6 +118,8 @@ export function ChatInputCard({
   sessions = [],
   activeSessionId = null,
   onSelectSession,
+  fillValue,
+  onFillValueConsumed,
 }: ChatInputCardProps) {
   const { t } = useTranslation();
   const inputPlaceholder =
@@ -167,11 +172,34 @@ export function ChatInputCard({
     });
   }, []);
 
+  // 调整输入框高度
+  const handleInput = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }, []);
+
   // 组件挂载时自动聚焦输入框
   // 这解决了从空状态切换到会话状态时（发送第一条消息）输入框失焦的问题
   useEffect(() => {
     focusInput();
   }, [focusInput]);
+
+  // 处理外部填充值（如快捷提示）
+  useEffect(() => {
+    if (fillValue !== undefined && fillValue !== "") {
+      setValue(fillValue);
+      onFillValueConsumed?.();
+      // 填充后聚焦输入框并调整高度
+      focusInput();
+      // 延迟调整高度，确保值已经更新
+      requestAnimationFrame(() => {
+        handleInput();
+      });
+    }
+  }, [fillValue, onFillValueConsumed, focusInput, handleInput]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
@@ -197,14 +225,6 @@ export function ChatInputCard({
     },
     [handleSubmit]
   );
-
-  const handleInput = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-  }, []);
 
   const handleSelectModel = (modelValue: string) => {
     const [providerId, modelId] = modelValue.split("/");

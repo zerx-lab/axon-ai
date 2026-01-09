@@ -59,6 +59,9 @@ export function ChatContainer({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isEmptyState = messages.length === 0;
   
+  // 快捷提示填充值状态
+  const [quickPromptFillValue, setQuickPromptFillValue] = useState("");
+  
   // 是否应该自动滚动（用户未手动向上滚动时为 true）
   const shouldAutoScrollRef = useRef(true);
   // 是否显示"滚动到底部"按钮
@@ -126,10 +129,15 @@ export function ChatContainer({
     }
   }, [messages.length]);
 
-  // 处理快捷提示选择
+  // 处理快捷提示选择 - 填充到输入框而不是直接发送
   const handleQuickPromptSelect = (prompt: string) => {
-    onSend(prompt);
+    setQuickPromptFillValue(prompt);
   };
+
+  // 快捷提示填充值消费后清空
+  const handleFillValueConsumed = useCallback(() => {
+    setQuickPromptFillValue("");
+  }, []);
 
   // 空状态布局（新会话）- Supabase 风格精致设计
   if (isEmptyState) {
@@ -159,6 +167,8 @@ export function ChatContainer({
               sessions={sessions}
               activeSessionId={activeSessionId}
               onSelectSession={onSelectSession}
+              fillValue={quickPromptFillValue}
+              onFillValueConsumed={handleFillValueConsumed}
             />
           </div>
 
