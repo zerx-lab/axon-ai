@@ -189,7 +189,7 @@ function getPermissionDescription(permission: PermissionRequest): string {
     case "task":
       return `执行任务: ${metadata?.description || ""}`;
     case "external_directory":
-      return `访问外部目录: ${metadata?.path || ""}`;
+      return `访问外部目录: ${metadata?.parentDir || metadata?.filepath || metadata?.path || ""}`;
     case "doom_loop":
       return "继续执行（多次失败后）";
     default:
