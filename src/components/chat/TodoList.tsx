@@ -229,9 +229,11 @@ interface TodoListCompactProps {
 
 /**
  * 紧凑版任务列表
- * 只显示当前进行中的任务和进度
+ * 显示当前进行中的任务和进度，可展开查看全部任务
  */
 export function TodoListCompact({ sessionId, className }: TodoListCompactProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   // 直接选择状态，避免在选择器中调用方法导致无限循环
   const allTodos = useTodoStore((s) => s.todos);
   
@@ -250,6 +252,17 @@ export function TodoListCompact({ sessionId, className }: TodoListCompactProps) 
     [todos]
   );
 
+  // 按状态排序：进行中 > 待处理 > 已完成 > 已取消
+  const sortedTodos = useMemo(() => {
+    const statusOrder: Record<TodoStatus, number> = {
+      in_progress: 0,
+      pending: 1,
+      completed: 2,
+      cancelled: 3,
+    };
+    return [...todos].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+  }, [todos]);
+
   // 没有任务时不渲染
   if (todos.length === 0) return null;
   
@@ -261,42 +274,67 @@ export function TodoListCompact({ sessionId, className }: TodoListCompactProps) 
   const progressPercent = Math.round((completedCount / todos.length) * 100);
 
   return (
-    <div
+    <Collapsible
+      open={isExpanded}
+      onOpenChange={setIsExpanded}
       className={cn(
-        "flex items-center gap-3 px-3 py-2",
         "bg-accent/30 rounded-lg border border-border/40",
         "text-xs text-muted-foreground",
+        "transition-all duration-200",
         className
       )}
     >
-      {/* 进度指示 */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-        <span className="font-medium">
-          {completedCount}/{todos.length}
-        </span>
-      </div>
+      <CollapsibleTrigger asChild>
+        <button
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2",
+            "hover:bg-accent/50 rounded-lg",
+            "transition-colors duration-150",
+            "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          )}
+        >
+          <div className="flex items-center gap-2 shrink-0">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+            <span className="font-medium">
+              {completedCount}/{todos.length}
+            </span>
+          </div>
 
-      {/* 分隔线 */}
-      <div className="w-px h-4 bg-border" />
+          <div className="w-px h-4 bg-border" />
 
-      {/* 当前任务 */}
-      {currentTask ? (
-        <span className="truncate flex-1">{currentTask.content}</span>
-      ) : (
-        <span className="truncate flex-1 text-muted-foreground/70">
-          等待下一个任务...
-        </span>
-      )}
+          {currentTask ? (
+            <span className="truncate flex-1 text-left">{currentTask.content}</span>
+          ) : (
+            <span className="truncate flex-1 text-left text-muted-foreground/70">
+              等待下一个任务...
+            </span>
+          )}
 
-      {/* 进度条 */}
-      <div className="w-12 h-1 bg-muted rounded-full overflow-hidden shrink-0">
-        <div
-          className="h-full bg-primary rounded-full transition-all duration-300"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-    </div>
+          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden shrink-0">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+
+          {isExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+          )}
+        </button>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div className="px-2 pb-2 pt-1 border-t border-border/30">
+          <div className="space-y-0.5 max-h-48 overflow-y-auto">
+            {sortedTodos.map((todo) => (
+              <TodoItemView key={todo.id} todo={todo} />
+            ))}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

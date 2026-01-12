@@ -389,13 +389,10 @@ export function useSSEHandler({
         }
 
         case "todo.updated": {
-          // Todo 更新事件
           const { sessionID, todos } = event.properties as {
             sessionID: string;
             todos: TodoItem[];
           };
-          
-          // 更新 Todo Store
           useTodoStore.getState().updateTodos(sessionID, todos);
           break;
         }
@@ -405,5 +402,5 @@ export function useSSEHandler({
     return () => {
       unsubscribe();
     };
-  }, [isConnected, onEvent, activeSessionIdRef, tRef, setMessages, setIsLoading, isGeneratingRef, setSessions, setError, mapApiSession, scheduleFlush]);
+  }, [isConnected, onEvent, activeSessionIdRef, tRef, setMessages, setIsLoading, isGeneratingRef, setSessions, setError, scheduleFlush]);
 }

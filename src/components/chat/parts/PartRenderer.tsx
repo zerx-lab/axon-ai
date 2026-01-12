@@ -236,7 +236,6 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
       return;
     }
     
-    // 标记为已响应
     store.markResponded(permissionId);
     
     console.log("[Permission] 发送权限回复:", { 
@@ -247,7 +246,6 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
     });
     
     try {
-      // 调用 SDK API 发送权限回复（包含 directory 参数）
       const result = await client.permission.reply({
         requestID: permissionId,
         reply: response,
@@ -256,16 +254,12 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
       
       console.log("[Permission] 回复成功:", result);
       
-      // 从待处理列表移除
       store.removeRequest(permissionId, messageInfo.sessionID);
     } catch (error) {
       console.error("[Permission] 回复失败:", error);
-      // 重置响应状态，允许重试
-      // store.respondedIds.delete(permissionId); // 暂时不开放重试
     }
-  }, [permissionId, client, messageInfo.sessionID]);
+  }, [permissionId, client, messageInfo.sessionID, permissionDirectory]);
   
-  // 根据状态选择图标
   const StatusIcon = getStatusIcon(state.status);
   const ToolIcon = getToolIcon(part.tool);
   
@@ -334,7 +328,6 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
         </div>
       )}
       
-      {/* 权限请求提示 */}
       {showPermission && permission && (
         <PermissionPromptBar 
           permission={permission} 

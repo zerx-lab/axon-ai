@@ -331,7 +331,6 @@ export function extractTextContent(parts: Part[]): string {
     .join("");
 }
 
-/** 工具名称映射（用于显示） */
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   bash: "终端命令",
   read: "读取文件",
@@ -351,6 +350,7 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   lsp: "LSP",
   skill: "技能",
   batch: "批量操作",
+  question: "提问",
 };
 
 /** 获取工具显示名称 */
@@ -410,3 +410,4 @@ export interface TodoUpdatedEvent {
   sessionID: string;
   todos: TodoItem[];
 }
+
