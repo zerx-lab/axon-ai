@@ -623,10 +623,10 @@ export function PermissionSettings() {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
+              <Shield className="h-4.5 w-4.5 text-primary" />
               {t("settings.permissionSettings.title")}
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground/80">
               {t("settings.permissionSettings.description")}
             </p>
           </div>

@@ -445,7 +445,7 @@ export function ProviderSettings() {
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {filteredProviders.map((provider) => {
           const meta = providerMeta[provider.id] || { color: "bg-gray-500/10 text-gray-600", desc: "" };
           const isExpanded = expandedProvider === provider.id;
@@ -456,33 +456,33 @@ export function ProviderSettings() {
           return (
             <div
               key={provider.id}
-              className="rounded-lg border bg-card transition-colors"
+              className="rounded-md border border-border/50 bg-card transition-colors"
             >
               <button
                 onClick={() => toggleExpand(provider.id)}
-                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
+                className="flex w-full items-center gap-2.5 p-2.5 text-left hover:bg-accent/40"
               >
                 <div className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold",
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold",
                   meta.color
                 )}>
                   {provider.name.charAt(0).toUpperCase()}
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{provider.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{provider.name}</span>
                     {meta.desc && (
-                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                      <span className="text-xs text-muted-foreground/60 hidden sm:inline">
                         {meta.desc}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
                     <span>{modelCount} {t("settings.providerSettings.models")}</span>
                     {isConnected && (
                       <span className="flex items-center gap-0.5 text-green-500">
-                        <Check className="h-3 w-3" />
+                        <Check className="h-2.5 w-2.5" />
                         {t("settings.providerSettings.configured")}
                       </span>
                     )}
@@ -490,39 +490,39 @@ export function ProviderSettings() {
                 </div>
 
                 <ChevronRight className={cn(
-                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform duration-150",
                   isExpanded && "rotate-90"
                 )} />
               </button>
 
               {isExpanded && (
-                <div className="border-t px-3 py-3 space-y-3">
+                <div className="border-t border-border/40 px-2.5 py-2.5 space-y-2.5">
                   {provider.env.length > 0 && (
-                    <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
+                    <p className="text-xs text-muted-foreground/70 bg-muted/40 rounded px-2 py-1">
                       {t("settings.providerSettings.envVar")}: {provider.env.join(", ")}
                     </p>
                   )}
 
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label className="text-xs">{t("settings.providerSettings.apiKey")}</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <Input
                         type="password"
                         placeholder={isConnected ? t("settings.providerSettings.apiKeyConfigured") : t("settings.providerSettings.apiKeyPlaceholder")}
                         value={apiKeys[provider.id] || ""}
                         onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))}
-                        className="h-8 text-sm"
+                        className="h-7 text-xs"
                       />
                       <Button
                         size="sm"
-                        className="h-8 px-3"
+                        className="h-7 px-2.5"
                         onClick={() => handleSaveApiKey(provider.id)}
                         disabled={!apiKeys[provider.id]?.trim() || savingProvider === provider.id}
                       >
                         {savingProvider === provider.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <Key className="h-3.5 w-3.5" />
+                          <Key className="h-3 w-3" />
                         )}
                       </Button>
                     </div>
@@ -533,30 +533,30 @@ export function ProviderSettings() {
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="h-8"
+                      className="h-7 text-xs"
                       onClick={() => handleOAuthAuthorize(provider.id, provider.name, index)}
                       disabled={savingProvider === provider.id}
                     >
                       {savingProvider === provider.id ? (
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                       ) : (
-                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                        <ExternalLink className="mr-1 h-3 w-3" />
                       )}
                       {method.label || t("settings.providerSettings.oauthAuthorize")}
                     </Button>
                   ))}
 
                   {modelCount > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label className="text-xs">{t("settings.providerSettings.models")}</Label>
                       <div className="flex flex-wrap gap-1">
                         {Object.entries(provider.models).slice(0, 6).map(([id, model]) => (
-                          <span key={id} className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                          <span key={id} className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px]">
                             {model.name || id}
                           </span>
                         ))}
                         {modelCount > 6 && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                             +{modelCount - 6}
                           </span>
                         )}
@@ -575,36 +575,36 @@ export function ProviderSettings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
+          <p className="text-[13px] text-muted-foreground/80">
             {t("settings.providerSettings.description")}
           </p>
         </div>
-        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isContentLoading}>
-          <RefreshCw className={cn("h-4 w-4", isContentLoading && "animate-spin")} />
+        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isContentLoading} className="h-7 w-7">
+          <RefreshCw className={cn("h-3.5 w-3.5", isContentLoading && "animate-spin")} />
         </Button>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
         <Input
           placeholder={t("settings.providerSettings.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
+          className="pl-8 h-8 text-[13px]"
           disabled={isContentLoading || hasError}
         />
       </div>
 
-      <div className="min-h-[200px]">
+      <div className="min-h-[180px]">
         {renderContent()}
       </div>
 
       {!isContentLoading && !hasError && (
-        <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
-          <Key className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
+        <div className="flex items-start gap-2 rounded-md bg-muted/30 p-2.5 border border-border/30">
+          <Key className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 mt-0.5" />
+          <p className="text-xs text-muted-foreground/70 leading-relaxed">
             {t("settings.providerSettings.hint")}
           </p>
         </div>

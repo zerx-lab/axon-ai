@@ -610,40 +610,40 @@ export function McpSettings() {
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {filteredServers.map(([name, status]) => {
           const statusInfo = getStatusInfo(status);
           const isExpanded = expandedServer === name;
           const isConnecting = connectingServer === name;
 
           return (
-            <div key={name} className="rounded-lg border bg-card transition-colors">
+            <div key={name} className="rounded-md border border-border/50 bg-card transition-colors">
               <button
                 onClick={() => setExpandedServer(isExpanded ? null : name)}
-                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
+                className="flex w-full items-center gap-2.5 p-2.5 text-left hover:bg-accent/40"
               >
                 <div
                   className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
                     statusInfo.bgColor,
                     statusInfo.color
                   )}
                 >
                   {status.status === "connected" ? (
-                    <Server className="h-4 w-4" />
+                    <Server className="h-3.5 w-3.5" />
                   ) : (
-                    <Cloud className="h-4 w-4" />
+                    <Cloud className="h-3.5 w-3.5" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{name}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-xs">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium",
+                        "inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium",
                         statusInfo.bgColor,
                         statusInfo.color
                       )}
@@ -656,33 +656,33 @@ export function McpSettings() {
 
                 <ChevronRight
                   className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    "h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform duration-150",
                     isExpanded && "rotate-90"
                   )}
                 />
               </button>
 
               {isExpanded && (
-                <div className="border-t px-3 py-3 space-y-3">
+                <div className="border-t border-border/40 px-2.5 py-2.5 space-y-2.5">
                   {"error" in status && status.error && (
-                    <div className="rounded bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                    <div className="rounded bg-red-500/10 px-2.5 py-2 text-xs text-red-500">
                       {status.error}
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {status.status === "connected" ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8"
+                        className="h-7 text-xs"
                         onClick={() => handleDisconnect(name)}
                         disabled={isConnecting}
                       >
                         {isConnecting ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                         ) : (
-                          <Unlink className="mr-1.5 h-3.5 w-3.5" />
+                          <Unlink className="mr-1 h-3 w-3" />
                         )}
                         {t("settings.mcpSettings.disconnect")}
                       </Button>
@@ -690,14 +690,14 @@ export function McpSettings() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8"
+                        className="h-7 text-xs"
                         onClick={() => handleConnect(name)}
                         disabled={isConnecting}
                       >
                         {isConnecting ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                         ) : (
-                          <Link className="mr-1.5 h-3.5 w-3.5" />
+                          <Link className="mr-1 h-3 w-3" />
                         )}
                         {t("settings.mcpSettings.connect")}
                       </Button>
@@ -707,10 +707,10 @@ export function McpSettings() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8"
+                        className="h-7 text-xs"
                         onClick={() => handleOpenEditDialog(name)}
                       >
-                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        <Pencil className="mr-1 h-3 w-3" />
                         {t("common.edit")}
                       </Button>
                     )}
@@ -727,49 +727,50 @@ export function McpSettings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-semibold tracking-tight">
             {t("settings.mcpSettings.title")}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground/80">
             {t("settings.mcpSettings.description")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setAddDialog((prev) => ({ ...prev, isOpen: true }))}
             disabled={isContentLoading || hasError}
+            className="h-7 text-xs"
           >
-            <Plus className="mr-1.5 h-4 w-4" />
+            <Plus className="mr-1 h-3 w-3" />
             {t("settings.mcpSettings.add")}
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={refreshMcpStatus} disabled={isContentLoading}>
-            <RefreshCw className={cn("h-4 w-4", isContentLoading && "animate-spin")} />
+          <Button variant="ghost" size="icon-sm" onClick={refreshMcpStatus} disabled={isContentLoading} className="h-7 w-7">
+            <RefreshCw className={cn("h-3.5 w-3.5", isContentLoading && "animate-spin")} />
           </Button>
         </div>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
         <Input
           placeholder={t("settings.mcpSettings.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
+          className="pl-8 h-8 text-[13px]"
           disabled={isContentLoading || hasError}
         />
       </div>
 
-      <div className="min-h-[200px]">
+      <div className="min-h-[180px]">
         {renderContent()}
       </div>
 
       {!isContentLoading && !hasError && (
-        <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
-          <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
+        <div className="flex items-start gap-2 rounded-md bg-muted/30 p-2.5 border border-border/30">
+          <Settings2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 mt-0.5" />
+          <p className="text-xs text-muted-foreground/70 leading-relaxed">
             {t("settings.mcpSettings.hint")}
           </p>
         </div>

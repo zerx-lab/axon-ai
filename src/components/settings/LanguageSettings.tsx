@@ -26,44 +26,44 @@ export function LanguageSettings() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* 页面标题 */}
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t("settings.languageSettings.title")}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-tight">{t("settings.languageSettings.title")}</h2>
+        <p className="text-[13px] text-muted-foreground/80">
           {t("settings.languageSettings.description")}
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("settings.language")}</CardTitle>
-          <CardDescription>
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">{t("settings.language")}</CardTitle>
+          <CardDescription className="text-xs">
             {t("settings.languageSettings.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {Object.entries(supportedLanguages).map(([code, { nativeName }]) => (
               <button
                 key={code}
                 onClick={() => handleLanguageChange(code as SupportedLanguage)}
                 className={cn(
-                  "relative flex items-center justify-between rounded-lg border p-4 text-left transition-colors",
-                  "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "relative flex items-center justify-between rounded-md border p-3 text-left transition-colors duration-150",
+                  "hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
                   currentLanguage === code
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
+                    ? "border-primary/60 bg-primary/5"
+                    : "border-border/50"
                 )}
               >
-                <div className="space-y-1">
-                  <p className="font-medium">{nativeName}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">{nativeName}</p>
+                  <p className="text-xs text-muted-foreground/70">
                     {t(`settings.languageSettings.${code === "zh" ? "chineseDesc" : "englishDesc"}`)}
                   </p>
                 </div>
                 {currentLanguage === code && (
-                  <Check className="h-5 w-5 text-primary" />
+                  <Check className="h-4 w-4 text-primary" />
                 )}
               </button>
             ))}
