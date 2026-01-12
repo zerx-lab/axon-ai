@@ -373,7 +373,18 @@
     "failed": "连接失败",
     "needsAuth": "需要授权",
     "needsRegistration": "需要注册",
-    "unknown": "未知状态"
+    "unknown": "未知状态",
+    "tools": "工具",
+    "availableTools": "可用工具",
+    "totalTools": "共 {{count}} 个工具",
+    "noTools": "暂无可用工具"
+  },
+  "editor": {
+    "refresh": "刷新文件",
+    "closeTab": "关闭",
+    "closeOthers": "关闭其他",
+    "closeAll": "关闭全部",
+    "emptyFile": "文件为空"
   },
   "errors": {
     "connectionFailed": "连接失败",

@@ -29,3 +29,4 @@ export type {
   OpencodeEvent,
   EventListener,
 } from "./types";
+export { getToolIds, getTools, getToolsSimple, type ToolInfo } from "./tools";

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   StopCircle,
   PlayCircle,
+  Wrench,
 } from "lucide-react";
 import {
   Popover,
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useOpencode } from "@/hooks";
 import type { McpStatus, McpServersStatus } from "@/types/mcp";
 import { getMcpStatusStats } from "@/types/mcp";
+import { getToolsSimple, CATEGORY_NAMES, getToolCategory } from "@/services/opencode/tools";
 
 export function StatusBar() {
   const { t } = useTranslation();
@@ -38,6 +40,10 @@ export function StatusBar() {
   const [isLoading, setIsLoading] = useState(false);
   const [togglingServer, setTogglingServer] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+
+  const [tools, setTools] = useState<{ id: string; description?: string }[]>([]);
+  const [isToolsLoading, setIsToolsLoading] = useState(false);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   // 判断后端是否就绪
   const isBackendReady = state.backendStatus.type === "running" && isConnected;
@@ -59,15 +65,41 @@ export function StatusBar() {
     }
   }, [client, isConnected]);
 
-  // 初始加载
+  const loadTools = useCallback(async () => {
+    if (!client || !isConnected) return;
+
+    setIsToolsLoading(true);
+    try {
+      const result = await getToolsSimple();
+      setTools(result);
+    } catch (error) {
+      console.error("加载工具列表失败:", error);
+    } finally {
+      setIsToolsLoading(false);
+    }
+  }, [client, isConnected]);
+
   useEffect(() => {
     if (isBackendReady) {
       loadMcpStatus();
+      loadTools();
     }
-  }, [isBackendReady, loadMcpStatus]);
+  }, [isBackendReady, loadMcpStatus, loadTools]);
 
   // 计算统计信息
   const stats = useMemo(() => getMcpStatusStats(mcpServers), [mcpServers]);
+
+  const toolsByCategory = useMemo(() => {
+    const grouped: Record<string, typeof tools> = {};
+    tools.forEach(tool => {
+      const category = getToolCategory(tool.id);
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(tool);
+    });
+    return grouped;
+  }, [tools]);
 
   // 切换 MCP 服务器状态（启用/禁用）
   // 与 opencode desktop 实现一致：connected -> disconnect, 其他状态 -> connect
@@ -345,6 +377,82 @@ export function StatusBar() {
               </Button>
             </div>
           )}
+        </PopoverContent>
+      </Popover>
+
+      {/* Tools 工具列表 */}
+      <Popover open={isToolsOpen} onOpenChange={setIsToolsOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className={cn(
+              "flex items-center gap-1.5 px-2 h-full ml-2",
+              "text-muted-foreground/70 hover:text-foreground",
+              "hover:bg-accent/50",
+              "transition-colors duration-150"
+            )}
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            <span className="tabular-nums">
+              {tools.length} {t("statusBar.tools", "工具")}
+            </span>
+          </button>
+        </PopoverTrigger>
+
+        <PopoverContent
+          side="top"
+          align="start"
+          sideOffset={4}
+          className="w-80 p-0"
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+            <span className="text-xs font-medium text-foreground">
+              {t("statusBar.availableTools", "可用工具")}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={loadTools}
+              disabled={isToolsLoading}
+            >
+              <RefreshCw className={cn("h-3 w-3", isToolsLoading && "animate-spin")} />
+            </Button>
+          </div>
+
+          <ScrollArea className="h-64">
+            {tools.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                {t("statusBar.noTools", "暂无可用工具")}
+              </div>
+            ) : (
+              <div className="py-1">
+                {Object.entries(toolsByCategory).map(([category, categoryTools]) => (
+                  <div key={category} className="mb-2 last:mb-0">
+                    <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                      {CATEGORY_NAMES[category] || category}
+                    </div>
+                    {categoryTools.map(tool => (
+                      <div
+                        key={tool.id}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-accent/50 transition-colors"
+                      >
+                        <code className="text-[11px] font-mono text-foreground/90 flex-shrink-0">
+                          {tool.id}
+                        </code>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {tool.description}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+
+          <div className="px-3 py-2 border-t border-border/50 text-[10px] text-muted-foreground">
+            {t("statusBar.totalTools", `共 ${tools.length} 个工具`)}
+          </div>
         </PopoverContent>
       </Popover>
     </div>
