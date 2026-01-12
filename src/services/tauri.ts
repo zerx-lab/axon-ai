@@ -59,6 +59,7 @@ export const settings = {
   set: (settings: AppSettings) => invoke("set_app_settings", { settings }),
   setAutoUpdate: (enabled: boolean) => invoke("set_auto_update", { enabled }),
   setCustomOpencodePath: (path: string | null) => invoke("set_custom_opencode_path", { path }),
+  getOpencodeConfigPath: () => invoke<string>("get_opencode_config_path"),
 };
 
 // Window control commands
@@ -68,4 +69,10 @@ export const window = {
   close: () => invoke("window_close"),
   isMaximized: () => invoke<boolean>("window_is_maximized"),
   toggleFullscreen: () => invoke("window_toggle_fullscreen"),
+};
+
+// File system commands
+export const fs = {
+  readFileContent: (path: string) => invoke<string>("read_file_content", { path }),
+  writeFileContent: (path: string, content: string) => invoke("write_file_content", { path, content }),
 };

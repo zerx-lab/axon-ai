@@ -2,6 +2,7 @@
 
 use crate::opencode::AppSettings;
 use crate::state::AppState;
+use crate::utils::paths;
 use tauri::State;
 
 #[tauri::command]
@@ -25,4 +26,11 @@ pub fn set_custom_opencode_path(
     path: Option<String>,
 ) -> Result<(), String> {
     state.settings.set_custom_opencode_path(path)
+}
+
+#[tauri::command]
+pub fn get_opencode_config_path() -> Result<String, String> {
+    paths::get_opencode_config_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "应用数据目录未初始化".to_string())
 }

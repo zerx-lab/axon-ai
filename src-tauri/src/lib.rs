@@ -74,6 +74,7 @@ pub fn run() {
             set_app_settings,
             set_auto_update,
             set_custom_opencode_path,
+            get_opencode_config_path,
             // 窗口命令
             window_minimize,
             window_maximize,

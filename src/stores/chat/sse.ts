@@ -17,10 +17,12 @@ import type {
   UserMessageInfo, 
   AssistantMessageInfo,
   PermissionRequest,
+  QuestionRequest,
   TodoItem,
 } from "@/types/chat";
 import { mapApiSession } from "./utils";
 import { usePermissionStore, shouldAutoAccept } from "@/stores/permission";
+import { useQuestionStore } from "@/stores/question";
 import { useTodoStore } from "@/stores/todo";
 import { useEditor } from "@/stores/editor";
 
@@ -155,6 +157,11 @@ export function useSSEHandler({
       
       // 只处理与当前会话相关的事件
       const currentSessionId = activeSessionIdRef.current;
+      
+      // 调试：记录所有事件类型
+      if (event.type.startsWith("question")) {
+        console.log("[SSE] Question event received:", event.type, event);
+      }
       
       switch (event.type) {
         case "message.part.updated": {
@@ -385,6 +392,27 @@ export function useSSEHandler({
           
           // 从待处理列表移除
           usePermissionStore.getState().removeRequest(requestID, sessionID);
+          break;
+        }
+
+        case "question.asked" as never: {
+          const questionRequest: QuestionRequest = {
+            ...(event as unknown as {properties: QuestionRequest}).properties,
+            directory: eventDirectory,
+          };
+          useQuestionStore.getState().addRequest(questionRequest);
+          break;
+        }
+
+        case "question.replied" as never: {
+          const { sessionID, requestID } = (event as unknown as {properties: {sessionID: string; requestID: string}}).properties;
+          useQuestionStore.getState().removeRequest(requestID, sessionID);
+          break;
+        }
+
+        case "question.rejected" as never: {
+          const { sessionID, requestID } = (event as unknown as {properties: {sessionID: string; requestID: string}}).properties;
+          useQuestionStore.getState().removeRequest(requestID, sessionID);
           break;
         }
 

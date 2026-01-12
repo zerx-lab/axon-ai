@@ -1,5 +1,5 @@
 import * as React from "react"
-import { GripVerticalIcon } from "lucide-react"
+import { GripVerticalIcon, GripHorizontalIcon } from "lucide-react"
 import { Group, Panel, Separator } from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
@@ -37,22 +37,43 @@ function ResizablePanel({
 function ResizableHandle({
   withHandle,
   className,
+  orientation = "horizontal",
   ...props
 }: React.ComponentProps<typeof Separator> & {
   withHandle?: boolean
+  /** 
+   * 分割方向：
+   * - horizontal: 水平分割（左右面板），显示垂直拖拽条
+   * - vertical: 垂直分割（上下面板），显示水平拖拽条
+   */
+  orientation?: "horizontal" | "vertical"
 }) {
+  // 垂直分割 = 上下面板 = 水平拖拽条
+  const isVerticalSplit = orientation === "vertical"
+  
   return (
     <Separator
       data-slot="resizable-handle"
       className={cn(
-        // 基础样式：宽度、背景、光标
-        "relative flex w-1 shrink-0 items-center justify-center",
-        "bg-border cursor-col-resize",
-        // 悬停和激活状态
-        "hover:bg-primary/30 active:bg-primary/50",
+        // 基础样式
+        "relative flex shrink-0 items-center justify-center",
         "transition-colors duration-150",
-        // 扩展可点击区域（使用 after 伪元素）
-        "after:absolute after:inset-y-0 after:-left-1 after:-right-1",
+        
+        // 方向特定样式
+        isVerticalSplit ? [
+          // 垂直分割（上下面板）：水平拖拽条
+          "h-1 w-full cursor-row-resize",
+          "bg-sidebar-border/40 hover:bg-primary/30 active:bg-primary/50",
+          // 扩展点击区域
+          "after:absolute after:inset-x-0 after:-top-1 after:-bottom-1",
+        ] : [
+          // 水平分割（左右面板）：垂直拖拽条
+          "w-1 h-full cursor-col-resize",
+          "bg-border hover:bg-primary/30 active:bg-primary/50",
+          // 扩展点击区域
+          "after:absolute after:inset-y-0 after:-left-1 after:-right-1",
+        ],
+        
         // focus 样式
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
         className
@@ -60,8 +81,15 @@ function ResizableHandle({
       {...props}
     >
       {withHandle && (
-        <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-          <GripVerticalIcon className="size-2.5" />
+        <div className={cn(
+          "z-10 flex items-center justify-center rounded-sm border bg-border",
+          isVerticalSplit ? "w-4 h-3" : "h-4 w-3"
+        )}>
+          {isVerticalSplit ? (
+            <GripHorizontalIcon className="size-2.5" />
+          ) : (
+            <GripVerticalIcon className="size-2.5" />
+          )}
         </div>
       )}
     </Separator>

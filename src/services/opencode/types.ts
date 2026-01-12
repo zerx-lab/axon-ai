@@ -84,7 +84,7 @@ export type OpencodeClient = SDKClient;
  */
 export const DEFAULT_CONFIG: OpencodeServiceConfig = {
   mode: { type: "local" },
-  port: 9120,
+  port: 0,
   autoStart: true,
   autoConnect: true,
 };

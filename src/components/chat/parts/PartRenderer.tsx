@@ -52,11 +52,14 @@ import { getToolDisplayName } from "@/types/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { useShallow } from "zustand/react/shallow";
 import { usePermissionStore } from "@/stores/permission";
+import { useQuestionStore } from "@/stores/question";
 import { useOpencode } from "@/hooks/useOpencode";
+import { QuestionPrompt } from "../QuestionPrompt";
 
 const DiffViewer = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffViewer })));
 const DiffStatsDisplay = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffStatsDisplay })));
 const CodeBlock = lazy(() => import("./CodeBlock"));
+const CollapsibleCodeViewer = lazy(() => import("./CollapsibleCodeViewer").then(m => ({ default: m.CollapsibleCodeViewer })));
 
 // ============== Part 渲染器 ==============
 
@@ -189,13 +192,24 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
     useShallow((s) => s.pendingRequests[messageInfo.sessionID] || [])
   );
   
+  // 获取与当前工具调用相关的 question 请求
+  const pendingQuestions = useQuestionStore(
+    useShallow((s) => s.pendingRequests[messageInfo.sessionID] || [])
+  );
+  
   // 查找匹配当前工具调用的权限请求
   const permission = pendingRequests.find(
     (p) => p.tool?.callID === part.callID
   );
   
-  // 使用 useMemo 缓存 permission.id 避免不必要的重渲染
+  // 查找匹配当前工具调用的 question 请求
+  const question = pendingQuestions.find(
+    (q) => q.tool?.callID === part.callID
+  );
+  
+  // 使用 useMemo 缓存 permission.id 和 question.id 避免不必要的重渲染
   const permissionId = permission?.id;
+  const questionId = question?.id;
   
   // 延迟显示权限提示（避免闪烁）
   const [showPermission, setShowPermission] = useState(false);
@@ -208,13 +222,24 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
     }
   }, [permissionId]);
   
-  // 如果有权限请求，强制展开
+  // 延迟显示 question 提示（避免闪烁）
+  const [showQuestion, setShowQuestion] = useState(false);
+  useEffect(() => {
+    if (questionId) {
+      const timeout = setTimeout(() => setShowQuestion(true), 50);
+      return () => clearTimeout(timeout);
+    } else {
+      setShowQuestion(false);
+    }
+  }, [questionId]);
+  
+  // 如果有权限请求或 question 请求，强制展开
   const [forceExpanded, setForceExpanded] = useState(false);
   useEffect(() => {
-    if (permissionId) {
+    if (permissionId || questionId) {
       setForceExpanded(true);
     }
-  }, [permissionId]);
+  }, [permissionId, questionId]);
   
   // 默认收起状态（已完成的工具）
   const [expanded, setExpanded] = useState(state.status !== "completed");
@@ -259,6 +284,83 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
       console.error("[Permission] 回复失败:", error);
     }
   }, [permissionId, client, messageInfo.sessionID, permissionDirectory]);
+  
+  const handleQuestionReply = useCallback(async (answers: import("@/types/chat").QuestionAnswer[]) => {
+    if (!question || !client) {
+      console.warn("[Question] 缺少必要参数:", { hasQuestion: !!question, hasClient: !!client });
+      return;
+    }
+    
+    const store = useQuestionStore.getState();
+    if (store.hasResponded(question.id)) {
+      console.log("[Question] 已响应过此请求:", question.id);
+      return;
+    }
+    
+    store.markResponded(question.id);
+    
+    // 立即隐藏 Question 组件，不等待服务器确认
+    setShowQuestion(false);
+    
+    console.log("[Question] 发送回复:", {
+      requestID: question.id,
+      answers,
+      sessionID: messageInfo.sessionID,
+    });
+    
+    try {
+      await client.question.reply({
+        requestID: question.id,
+        answers,
+        directory: question.directory,
+      });
+      
+      console.log("[Question] 回复成功");
+      
+      // 从 store 中移除请求（即使没有收到 SSE 确认）
+      store.removeRequest(question.id, messageInfo.sessionID);
+    } catch (error) {
+      console.error("[Question] 回复失败:", error);
+      // 恢复显示，允许重试
+      setShowQuestion(true);
+      // 清除已响应标记，允许重新提交
+      store.clearResponded(question.id);
+    }
+  }, [question, client, messageInfo.sessionID]);
+  
+  const handleQuestionReject = useCallback(async () => {
+    if (!question || !client) {
+      console.warn("[Question] 缺少必要参数:", { hasQuestion: !!question, hasClient: !!client });
+      return;
+    }
+    
+    const store = useQuestionStore.getState();
+    if (store.hasResponded(question.id)) {
+      console.log("[Question] 已响应过此请求:", question.id);
+      return;
+    }
+    
+    store.markResponded(question.id);
+    setShowQuestion(false);
+    
+    console.log("[Question] 拒绝请求:", {
+      requestID: question.id,
+      sessionID: messageInfo.sessionID,
+    });
+    
+    try {
+      await client.question.reject({
+        requestID: question.id,
+        directory: question.directory,
+      });
+      
+      console.log("[Question] 拒绝成功");
+      store.removeRequest(question.id, messageInfo.sessionID);
+    } catch (error) {
+      console.error("[Question] 拒绝失败:", error);
+      setShowQuestion(true);
+    }
+  }, [question, client, messageInfo.sessionID]);
   
   const StatusIcon = getStatusIcon(state.status);
   const ToolIcon = getToolIcon(part.tool);
@@ -333,6 +435,16 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
           permission={permission} 
           onRespond={handlePermissionRespond}
         />
+      )}
+      
+      {showQuestion && question && (
+        <div className="border-t border-amber-500/30">
+          <QuestionPrompt
+            request={question}
+            onReply={handleQuestionReply}
+            onReject={handleQuestionReject}
+          />
+        </div>
       )}
     </div>
   );
@@ -806,7 +918,6 @@ function TaskToolContent({ state }: { state: ToolStateCompleted }) {
   );
 }
 
-// 默认工具内容
 function DefaultToolContent({
   state,
   showOutput,
@@ -816,23 +927,50 @@ function DefaultToolContent({
   showOutput: boolean;
   setShowOutput: (v: boolean) => void;
 }) {
-  // 显示输入参数
   const inputEntries = Object.entries(state.input).filter(
     ([key]) => !["raw"].includes(key)
   );
+
+  const isComplexValue = (value: unknown): boolean => {
+    if (typeof value !== "object" || value === null) return false;
+    const jsonStr = JSON.stringify(value);
+    return jsonStr.length > 80 || Array.isArray(value);
+  };
   
   return (
     <div className="space-y-2">
       {inputEntries.length > 0 && (
-        <div className="text-sm space-y-1">
-          {inputEntries.slice(0, 3).map(([key, value]) => (
-            <div key={key} className="flex gap-2">
-              <span className="text-muted-foreground">{key}:</span>
-              <span className="font-mono truncate">
-                {typeof value === "string" ? value : JSON.stringify(value)}
-              </span>
-            </div>
-          ))}
+        <div className="text-sm space-y-2">
+          {inputEntries.slice(0, 5).map(([key, value]) => {
+            if (isComplexValue(value)) {
+              return (
+                <div key={key} className="space-y-1">
+                  <span className="text-muted-foreground">{key}:</span>
+                  <Suspense
+                    fallback={
+                      <pre className="text-xs bg-muted/50 rounded p-2 overflow-x-auto font-mono">
+                        {JSON.stringify(value, null, 2).slice(0, 200)}...
+                      </pre>
+                    }
+                  >
+                    <CollapsibleCodeViewer
+                      content={JSON.stringify(value, null, 2)}
+                      language="json"
+                      maxCollapsedLines={6}
+                    />
+                  </Suspense>
+                </div>
+              );
+            }
+            return (
+              <div key={key} className="flex gap-2">
+                <span className="text-muted-foreground">{key}:</span>
+                <span className="font-mono break-all">
+                  {typeof value === "string" ? value : JSON.stringify(value)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
       {state.output && (
@@ -889,20 +1027,30 @@ function CollapsibleOutput({
   const lines = output.split("\n").length;
   const shouldCollapse = lines > 5;
   
+  const isJsonContent = language === "json" || language === "json5" || isLikelyJson(output);
+  const effectiveLanguage = isJsonContent ? "json" : language;
+  
+  if (effectiveLanguage || isJsonContent) {
+    return (
+      <Suspense
+        fallback={
+          <pre className="text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words font-mono">
+            {output.slice(0, 500)}...
+          </pre>
+        }
+      >
+        <CollapsibleCodeViewer
+          content={output}
+          language={effectiveLanguage}
+          maxCollapsedLines={8}
+          defaultExpanded={showOutput}
+          title={label !== "输出" ? label : undefined}
+        />
+      </Suspense>
+    );
+  }
+  
   const renderContent = (content: string) => {
-    if (language) {
-      return (
-        <Suspense
-          fallback={
-            <pre className="text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words font-mono">
-              {content}
-            </pre>
-          }
-        >
-          <CodeBlock code={content} language={language} />
-        </Suspense>
-      );
-    }
     return (
       <pre className={cn(
         "text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words",
@@ -944,6 +1092,20 @@ function CollapsibleOutput({
       )}
     </div>
   );
+}
+
+function isLikelyJson(content: string): boolean {
+  const trimmed = content.trim();
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    try {
+      JSON.parse(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 // ============== 辅助函数 ==============

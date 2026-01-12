@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+
 import {
   Dialog,
   DialogContent,
@@ -394,76 +394,186 @@ export function ProviderSettings() {
     setExpandedProvider(expandedProvider === providerId ? null : providerId);
   };
 
-  // 渲染连接状态 UI（初始化中或连接失败）
-  const renderConnectionStatus = () => {
-    // 正在初始化/连接中（显示 loading）
-    if (isInitializing) {
-      // 根据不同阶段显示不同的提示文字
-      let loadingMessage = t("settings.providerSettings.connecting");
-      if (backendStatus === "downloading") {
-        loadingMessage = t("settings.providerSettings.downloading");
-      } else if (backendStatus === "starting") {
-        loadingMessage = t("settings.providerSettings.starting");
-      } else if (backendStatus === "uninitialized") {
-        loadingMessage = t("settings.providerSettings.initializing");
-      }
-      
-      return (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("settings.providerSettings.description")}
-            </p>
-          </div>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">{loadingMessage}</p>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
+  const isContentLoading = isInitializing || isLoadingProviders;
 
-    // 连接失败或有错误
-    if (hasError || !isConnected) {
-      return (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("settings.providerSettings.description")}
-            </p>
-          </div>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <AlertCircle className="h-6 w-6 text-destructive" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                {errorMessage || t("settings.providerSettings.serviceUnavailable")}
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {t("settings.providerSettings.retry")}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    return null;
+  const getLoadingMessage = () => {
+    if (backendStatus === "downloading") return t("settings.providerSettings.downloading");
+    if (backendStatus === "starting") return t("settings.providerSettings.starting");
+    if (backendStatus === "uninitialized") return t("settings.providerSettings.initializing");
+    return t("settings.providerSettings.connecting");
   };
 
-  // 如果未连接，显示连接状态 UI
-  const connectionStatusUI = renderConnectionStatus();
-  if (connectionStatusUI) {
-    return connectionStatusUI;
-  }
+  const renderContent = () => {
+    if (isInitializing) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">{getLoadingMessage()}</p>
+        </div>
+      );
+    }
+
+    if (hasError || !isConnected) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <AlertCircle className="h-6 w-6 text-destructive" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            {errorMessage || t("settings.providerSettings.serviceUnavailable")}
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {t("settings.providerSettings.retry")}
+          </Button>
+        </div>
+      );
+    }
+
+    if (isLoadingProviders && providers.length === 0) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    if (filteredProviders.length === 0) {
+      return (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          {searchQuery ? t("settings.providerSettings.noProvidersFound") : t("settings.providerSettings.noProviders")}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {filteredProviders.map((provider) => {
+          const meta = providerMeta[provider.id] || { color: "bg-gray-500/10 text-gray-600", desc: "" };
+          const isExpanded = expandedProvider === provider.id;
+          const isConnected = isProviderConnected(provider.id);
+          const methods = authMethods[provider.id] || [];
+          const modelCount = Object.keys(provider.models || {}).length;
+
+          return (
+            <div
+              key={provider.id}
+              className="rounded-lg border bg-card transition-colors"
+            >
+              <button
+                onClick={() => toggleExpand(provider.id)}
+                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
+              >
+                <div className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold",
+                  meta.color
+                )}>
+                  {provider.name.charAt(0).toUpperCase()}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{provider.name}</span>
+                    {meta.desc && (
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {meta.desc}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{modelCount} {t("settings.providerSettings.models")}</span>
+                    {isConnected && (
+                      <span className="flex items-center gap-0.5 text-green-500">
+                        <Check className="h-3 w-3" />
+                        {t("settings.providerSettings.configured")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <ChevronRight className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  isExpanded && "rotate-90"
+                )} />
+              </button>
+
+              {isExpanded && (
+                <div className="border-t px-3 py-3 space-y-3">
+                  {provider.env.length > 0 && (
+                    <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
+                      {t("settings.providerSettings.envVar")}: {provider.env.join(", ")}
+                    </p>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">{t("settings.providerSettings.apiKey")}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder={isConnected ? t("settings.providerSettings.apiKeyConfigured") : t("settings.providerSettings.apiKeyPlaceholder")}
+                        value={apiKeys[provider.id] || ""}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))}
+                        className="h-8 text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 px-3"
+                        onClick={() => handleSaveApiKey(provider.id)}
+                        disabled={!apiKeys[provider.id]?.trim() || savingProvider === provider.id}
+                      >
+                        {savingProvider === provider.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Key className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {methods.filter((m) => m.type === "oauth").map((method, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleOAuthAuthorize(provider.id, provider.name, index)}
+                      disabled={savingProvider === provider.id}
+                    >
+                      {savingProvider === provider.id ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      {method.label || t("settings.providerSettings.oauthAuthorize")}
+                    </Button>
+                  ))}
+
+                  {modelCount > 0 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">{t("settings.providerSettings.models")}</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(provider.models).slice(0, 6).map(([id, model]) => (
+                          <span key={id} className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                            {model.name || id}
+                          </span>
+                        ))}
+                        {modelCount > 6 && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            +{modelCount - 6}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* 标题和刷新按钮 */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">{t("settings.providerSettings.title")}</h2>
@@ -471,12 +581,11 @@ export function ProviderSettings() {
             {t("settings.providerSettings.description")}
           </p>
         </div>
-        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isLoadingProviders}>
-          <RefreshCw className={cn("h-4 w-4", isLoadingProviders && "animate-spin")} />
+        <Button variant="ghost" size="icon-sm" onClick={loadProviders} disabled={isContentLoading}>
+          <RefreshCw className={cn("h-4 w-4", isContentLoading && "animate-spin")} />
         </Button>
       </div>
 
-      {/* 搜索框 */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -484,161 +593,22 @@ export function ProviderSettings() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
+          disabled={isContentLoading || hasError}
         />
       </div>
 
-      {/* Provider 列表 */}
-      <div className="space-y-2">
-        {isLoadingProviders && providers.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredProviders.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            {searchQuery ? t("settings.providerSettings.noProvidersFound") : t("settings.providerSettings.noProviders")}
-          </div>
-        ) : (
-          filteredProviders.map((provider) => {
-            const meta = providerMeta[provider.id] || { color: "bg-gray-500/10 text-gray-600", desc: "" };
-            const isExpanded = expandedProvider === provider.id;
-            const isConnected = isProviderConnected(provider.id);
-            const methods = authMethods[provider.id] || [];
-            const modelCount = Object.keys(provider.models || {}).length;
-
-            return (
-              <div
-                key={provider.id}
-                className="rounded-lg border bg-card transition-colors"
-              >
-                {/* 头部 - 紧凑版 */}
-                <button
-                  onClick={() => toggleExpand(provider.id)}
-                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
-                >
-                  {/* 图标 */}
-                  <div className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold",
-                    meta.color
-                  )}>
-                    {provider.name.charAt(0).toUpperCase()}
-                  </div>
-                  
-                  {/* 名称和状态 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{provider.name}</span>
-                      {meta.desc && (
-                        <span className="text-xs text-muted-foreground hidden sm:inline">
-                          {meta.desc}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{modelCount} {t("settings.providerSettings.models")}</span>
-                      {isConnected && (
-                        <span className="flex items-center gap-0.5 text-green-500">
-                          <Check className="h-3 w-3" />
-                          {t("settings.providerSettings.configured")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 展开图标 */}
-                  <ChevronRight className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                    isExpanded && "rotate-90"
-                  )} />
-                </button>
-
-                {/* 展开内容 */}
-                {isExpanded && (
-                  <div className="border-t px-3 py-3 space-y-3">
-                    {/* 环境变量提示 */}
-                    {provider.env.length > 0 && (
-                      <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
-                        {t("settings.providerSettings.envVar")}: {provider.env.join(", ")}
-                      </p>
-                    )}
-
-                    {/* API Key 输入 */}
-                    <div className="space-y-2">
-                      <Label className="text-xs">{t("settings.providerSettings.apiKey")}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="password"
-                          placeholder={isConnected ? t("settings.providerSettings.apiKeyConfigured") : t("settings.providerSettings.apiKeyPlaceholder")}
-                          value={apiKeys[provider.id] || ""}
-                          onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))}
-                          className="h-8 text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 px-3"
-                          onClick={() => handleSaveApiKey(provider.id)}
-                          disabled={!apiKeys[provider.id]?.trim() || savingProvider === provider.id}
-                        >
-                          {savingProvider === provider.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Key className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* OAuth 授权按钮 */}
-                    {methods.filter((m) => m.type === "oauth").map((method, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        className="h-8"
-                        onClick={() => handleOAuthAuthorize(provider.id, provider.name, index)}
-                        disabled={savingProvider === provider.id}
-                      >
-                        {savingProvider === provider.id ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                        )}
-                        {method.label || t("settings.providerSettings.oauthAuthorize")}
-                      </Button>
-                    ))}
-
-                    {/* 模型预览 */}
-                    {modelCount > 0 && (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">{t("settings.providerSettings.models")}</Label>
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(provider.models).slice(0, 6).map(([id, model]) => (
-                            <span key={id} className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                              {model.name || id}
-                            </span>
-                          ))}
-                          {modelCount > 6 && (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                              +{modelCount - 6}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
+      <div className="min-h-[200px]">
+        {renderContent()}
       </div>
 
-      {/* 帮助提示 */}
-      <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
-        <Key className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {t("settings.providerSettings.hint")}
-        </p>
-      </div>
+      {!isContentLoading && !hasError && (
+        <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
+          <Key className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("settings.providerSettings.hint")}
+          </p>
+        </div>
+      )}
 
       {/* OAuth 授权对话框 */}
       <Dialog open={oauthDialog.isOpen} onOpenChange={(open) => !open && handleCloseOAuthDialog()}>

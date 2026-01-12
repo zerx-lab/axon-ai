@@ -10,7 +10,6 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
-  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,10 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+
+// ============== 常量 ==============
+
+const PANEL_HEADER_HEIGHT = 26;
 
 // ============== 类型定义 ==============
 
@@ -52,28 +55,14 @@ export interface ContextMenuAction {
 }
 
 export interface CollapsiblePanelProps {
-  /** 面板标题 */
   title: string;
-  /** 是否展开 */
   isOpen: boolean;
-  /** 展开/折叠切换回调 */
   onToggle: () => void;
-  /** 面板内容 */
   children: ReactNode;
-  /** 标题栏操作按钮（悬浮时显示） */
   actions?: PanelAction[];
-  /** 右键菜单操作 */
   contextMenuActions?: ContextMenuAction[];
-  /** 内容区域类名 */
   contentClassName?: string;
-  /** 是否显示项目数量徽章 */
   count?: number;
-  /** 
-   * 面板的 flex 占比
-   * - 0: 不占空间（折叠状态）
-   * - 1: 均匀分配空间
-   * - 其他值: 相对占比
-   */
   flexGrow?: number;
 }
 
@@ -156,43 +145,48 @@ export function CollapsiblePanel({
     <Collapsible 
       open={isOpen} 
       onOpenChange={onToggle} 
-      className="flex flex-col min-h-0"
+      className="flex flex-col"
       style={{ 
         flexGrow: isOpen ? flexGrow : 0,
         flexShrink: isOpen ? 1 : 0,
-        flexBasis: 'auto',
+        flexBasis: isOpen ? 0 : 'auto',
+        minHeight: PANEL_HEADER_HEIGHT,
       }}
     >
       {/* 带右键菜单的头部 */}
-      {contextMenuActions && contextMenuActions.length > 0 ? (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>{panelHeader}</ContextMenuTrigger>
-          <ContextMenuContent>
-            {contextMenuActions.map((action, index) => (
-              <ContextMenuItem
-                key={index}
-                onClick={action.onClick}
-                className={cn(
-                  "text-xs",
-                  action.destructive && "text-destructive"
-                )}
-              >
-                {action.icon && <span className="mr-2">{action.icon}</span>}
-                {action.label}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuContent>
-        </ContextMenu>
-      ) : (
-        panelHeader
-      )}
+      <div className="shrink-0">
+        {contextMenuActions && contextMenuActions.length > 0 ? (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>{panelHeader}</ContextMenuTrigger>
+            <ContextMenuContent>
+              {contextMenuActions.map((action, index) => (
+                <ContextMenuItem
+                  key={index}
+                  onClick={action.onClick}
+                  className={cn(
+                    "text-xs",
+                    action.destructive && "text-destructive"
+                  )}
+                >
+                  {action.icon && <span className="mr-2">{action.icon}</span>}
+                  {action.label}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuContent>
+          </ContextMenu>
+        ) : (
+          panelHeader
+        )}
+      </div>
 
       {/* 内容区域 */}
-      <CollapsibleContent className="flex-1 min-h-0 overflow-hidden">
-        <div className={cn("h-full overflow-y-auto overflow-x-hidden sidebar-scroll-area", contentClassName)}>
-          {children}
+      {isOpen && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className={cn("h-full overflow-y-auto overflow-x-hidden sidebar-scroll-area", contentClassName)}>
+            {children}
+          </div>
         </div>
-      </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

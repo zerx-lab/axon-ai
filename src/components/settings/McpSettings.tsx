@@ -27,7 +27,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -558,77 +557,175 @@ export function McpSettings() {
     }
   };
 
-  // 渲染连接状态 UI
-  const renderConnectionStatus = () => {
-    if (isInitializing) {
-      let loadingMessage = t("settings.mcpSettings.connecting");
-      if (backendStatus === "downloading") {
-        loadingMessage = t("settings.mcpSettings.downloading");
-      } else if (backendStatus === "starting") {
-        loadingMessage = t("settings.mcpSettings.starting");
-      } else if (backendStatus === "uninitialized") {
-        loadingMessage = t("settings.mcpSettings.initializing");
-      }
+  const isContentLoading = isInitializing || isLoading;
 
+  const getLoadingMessage = () => {
+    if (backendStatus === "downloading") return t("settings.mcpSettings.downloading");
+    if (backendStatus === "starting") return t("settings.mcpSettings.starting");
+    if (backendStatus === "uninitialized") return t("settings.mcpSettings.initializing");
+    return t("settings.mcpSettings.connecting");
+  };
+
+  const renderContent = () => {
+    if (isInitializing) {
       return (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {t("settings.mcpSettings.title")}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("settings.mcpSettings.description")}
-            </p>
-          </div>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">{loadingMessage}</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">{getLoadingMessage()}</p>
         </div>
       );
     }
 
     if (hasError || !isConnected) {
       return (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {t("settings.mcpSettings.title")}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("settings.mcpSettings.description")}
-            </p>
-          </div>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <AlertCircle className="h-6 w-6 text-destructive" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                {errorMessage || t("settings.mcpSettings.serviceUnavailable")}
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {t("settings.mcpSettings.retry")}
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="flex flex-col items-center justify-center py-12">
+          <AlertCircle className="h-6 w-6 text-destructive" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            {errorMessage || t("settings.mcpSettings.serviceUnavailable")}
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => connect()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {t("settings.mcpSettings.retry")}
+          </Button>
         </div>
       );
     }
 
-    return null;
-  };
+    if (isLoading && Object.keys(mcpServers).length === 0) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
 
-  // 如果未连接，显示连接状态 UI
-  const connectionStatusUI = renderConnectionStatus();
-  if (connectionStatusUI) {
-    return connectionStatusUI;
-  }
+    if (filteredServers.length === 0) {
+      return (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          {searchQuery
+            ? t("settings.mcpSettings.noServersFound")
+            : t("settings.mcpSettings.noServers")}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {filteredServers.map(([name, status]) => {
+          const statusInfo = getStatusInfo(status);
+          const isExpanded = expandedServer === name;
+          const isConnecting = connectingServer === name;
+
+          return (
+            <div key={name} className="rounded-lg border bg-card transition-colors">
+              <button
+                onClick={() => setExpandedServer(isExpanded ? null : name)}
+                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
+              >
+                <div
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                    statusInfo.bgColor,
+                    statusInfo.color
+                  )}
+                >
+                  {status.status === "connected" ? (
+                    <Server className="h-4 w-4" />
+                  ) : (
+                    <Cloud className="h-4 w-4" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium",
+                        statusInfo.bgColor,
+                        statusInfo.color
+                      )}
+                    >
+                      {statusInfo.icon}
+                      <span>{statusInfo.text}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    isExpanded && "rotate-90"
+                  )}
+                />
+              </button>
+
+              {isExpanded && (
+                <div className="border-t px-3 py-3 space-y-3">
+                  {"error" in status && status.error && (
+                    <div className="rounded bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                      {status.error}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {status.status === "connected" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleDisconnect(name)}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Unlink className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        {t("settings.mcpSettings.disconnect")}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleConnect(name)}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Link className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        {t("settings.mcpSettings.connect")}
+                      </Button>
+                    )}
+                    
+                    {mcpConfigs[name] && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleOpenEditDialog(name)}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        {t("common.edit")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* 标题和操作按钮 */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
@@ -643,17 +740,17 @@ export function McpSettings() {
             variant="outline"
             size="sm"
             onClick={() => setAddDialog((prev) => ({ ...prev, isOpen: true }))}
+            disabled={isContentLoading || hasError}
           >
             <Plus className="mr-1.5 h-4 w-4" />
             {t("settings.mcpSettings.add")}
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={refreshMcpStatus} disabled={isLoading}>
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          <Button variant="ghost" size="icon-sm" onClick={refreshMcpStatus} disabled={isContentLoading}>
+            <RefreshCw className={cn("h-4 w-4", isContentLoading && "animate-spin")} />
           </Button>
         </div>
       </div>
 
-      {/* 搜索框 */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -661,149 +758,22 @@ export function McpSettings() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
+          disabled={isContentLoading || hasError}
         />
       </div>
 
-      {/* MCP 服务器列表 */}
-      <div className="space-y-2">
-        {isLoading && Object.keys(mcpServers).length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredServers.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            {searchQuery
-              ? t("settings.mcpSettings.noServersFound")
-              : t("settings.mcpSettings.noServers")}
-          </div>
-        ) : (
-          filteredServers.map(([name, status]) => {
-            const statusInfo = getStatusInfo(status);
-            const isExpanded = expandedServer === name;
-            const isConnecting = connectingServer === name;
-
-            return (
-              <div key={name} className="rounded-lg border bg-card transition-colors">
-                {/* 头部 */}
-                <button
-                  onClick={() => setExpandedServer(isExpanded ? null : name)}
-                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
-                >
-                  {/* 图标 */}
-                  <div
-                    className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                      statusInfo.bgColor,
-                      statusInfo.color
-                    )}
-                  >
-                    {status.status === "connected" ? (
-                      <Server className="h-4 w-4" />
-                    ) : (
-                      <Cloud className="h-4 w-4" />
-                    )}
-                  </div>
-
-                  {/* 名称和状态 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium",
-                          statusInfo.bgColor,
-                          statusInfo.color
-                        )}
-                      >
-                        {statusInfo.icon}
-                        <span>{statusInfo.text}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 展开图标 */}
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                      isExpanded && "rotate-90"
-                    )}
-                  />
-                </button>
-
-                {/* 展开内容 */}
-                {isExpanded && (
-                  <div className="border-t px-3 py-3 space-y-3">
-                    {/* 错误信息 */}
-                    {"error" in status && status.error && (
-                      <div className="rounded bg-red-500/10 px-3 py-2 text-sm text-red-500">
-                        {status.error}
-                      </div>
-                    )}
-
-                    {/* 操作按钮 */}
-                    <div className="flex flex-wrap gap-2">
-                      {status.status === "connected" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => handleDisconnect(name)}
-                          disabled={isConnecting}
-                        >
-                          {isConnecting ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Unlink className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {t("settings.mcpSettings.disconnect")}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => handleConnect(name)}
-                          disabled={isConnecting}
-                        >
-                          {isConnecting ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Link className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {t("settings.mcpSettings.connect")}
-                        </Button>
-                      )}
-                      
-                      {/* 编辑按钮 */}
-                      {mcpConfigs[name] && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => handleOpenEditDialog(name)}
-                        >
-                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                          {t("common.edit")}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
+      <div className="min-h-[200px]">
+        {renderContent()}
       </div>
 
-      {/* 帮助提示 */}
-      <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
-        <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {t("settings.mcpSettings.hint")}
-        </p>
-      </div>
+      {!isContentLoading && !hasError && (
+        <div className="flex items-start gap-2.5 rounded-lg bg-muted/40 p-3">
+          <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("settings.mcpSettings.hint")}
+          </p>
+        </div>
+      )}
 
       {/* 添加 MCP 对话框 */}
       <Dialog

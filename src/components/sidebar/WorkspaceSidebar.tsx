@@ -8,7 +8,7 @@
  * 项目切换通过 TitleBar 的 ProjectPicker 进行
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,12 +60,16 @@ interface WorkspaceSidebarProps {
 
 // 面板展开状态的 localStorage 键名
 const PANEL_STATE_KEY = "axon-sidebar-panels";
+const PANEL_RATIO_KEY = "axon-sidebar-panel-ratio";
 
-// 默认面板状态
 const DEFAULT_PANEL_STATE = {
   sessions: true,
   explorer: true,
 };
+
+const DEFAULT_RATIO = 0.4;
+const MIN_RATIO = 0.15;
+const MAX_RATIO = 0.85;
 
 // ============== 辅助函数 ==============
 
@@ -89,6 +93,29 @@ function savePanelState(state: typeof DEFAULT_PANEL_STATE) {
   }
 }
 
+function loadPanelRatio(): number {
+  try {
+    const saved = localStorage.getItem(PANEL_RATIO_KEY);
+    if (saved) {
+      const ratio = parseFloat(saved);
+      if (!isNaN(ratio) && ratio >= MIN_RATIO && ratio <= MAX_RATIO) {
+        return ratio;
+      }
+    }
+  } catch {
+    // 忽略
+  }
+  return DEFAULT_RATIO;
+}
+
+function savePanelRatio(ratio: number) {
+  try {
+    localStorage.setItem(PANEL_RATIO_KEY, JSON.stringify(ratio));
+  } catch {
+    // 忽略
+  }
+}
+
 // ============== 主组件 ==============
 
 export function WorkspaceSidebar({
@@ -104,10 +131,11 @@ export function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const { t } = useTranslation();
   const [panelState, setPanelState] = useState(loadPanelState);
-  // 用于强制刷新 FileExplorer 的 key
+  const [panelRatio, setPanelRatio] = useState(loadPanelRatio);
   const [explorerKey, setExplorerKey] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // 切换面板展开状态
   const togglePanel = useCallback((panel: keyof typeof DEFAULT_PANEL_STATE) => {
     setPanelState((prev) => {
       const next = { ...prev, [panel]: !prev[panel] };
@@ -116,39 +144,65 @@ export function WorkspaceSidebar({
     });
   }, []);
 
-  // 统一刷新：刷新会话和文件列表
   const handleRefreshAll = useCallback(() => {
     onRefresh?.();
     setExplorerKey((k) => k + 1);
   }, [onRefresh]);
 
-  // 计算面板 flexGrow 值
-  // VS Code 风格：第一个展开的面板获得最大空间，其他展开的面板均分剩余空间
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const startY = e.clientY;
+    const containerRect = container.getBoundingClientRect();
+    const containerHeight = containerRect.height;
+    const startRatio = panelRatio;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const deltaRatio = deltaY / containerHeight;
+      const newRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, startRatio + deltaRatio));
+      setPanelRatio(newRatio);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setPanelRatio((currentRatio) => {
+        savePanelRatio(currentRatio);
+        return currentRatio;
+      });
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [panelRatio]);
+
   const panelFlexGrow = useMemo(() => {
-    const openPanels: (keyof typeof DEFAULT_PANEL_STATE)[] = [];
-    if (panelState.sessions) openPanels.push("sessions");
-    if (panelState.explorer) openPanels.push("explorer");
+    const bothOpen = panelState.sessions && panelState.explorer;
     
-    // 如果没有展开的面板，都返回 0
-    if (openPanels.length === 0) {
+    if (!panelState.sessions && !panelState.explorer) {
       return { sessions: 0, explorer: 0 };
     }
     
-    // 如果只有一个展开的面板，它获得全部空间
-    if (openPanels.length === 1) {
+    if (!bothOpen) {
       return {
         sessions: panelState.sessions ? 1 : 0,
         explorer: panelState.explorer ? 1 : 0,
       };
     }
     
-    // 多个面板展开时：第一个展开的面板获得更多空间（比例 3），其余的均分（比例 1）
-    const result = { sessions: 0, explorer: 0 };
-    openPanels.forEach((panel, index) => {
-      result[panel] = index === 0 ? 3 : 1;
-    });
-    return result;
-  }, [panelState]);
+    return {
+      sessions: panelRatio,
+      explorer: 1 - panelRatio,
+    };
+  }, [panelState, panelRatio]);
+
+  const showResizeHandle = panelState.sessions && panelState.explorer;
 
   // 按更新时间排序的会话列表
   const sortedSessions = useMemo(() => {
@@ -199,7 +253,7 @@ export function WorkspaceSidebar({
       </div>
 
       {/* 面板列表 */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <div ref={containerRef} className="flex-1 overflow-hidden flex flex-col min-h-0">
         {/* 会话列表面板 */}
         <CollapsiblePanel
           title={t("sidebar.sessionList", "会话列表")}
@@ -228,6 +282,19 @@ export function WorkspaceSidebar({
             )}
           </div>
         </CollapsiblePanel>
+
+        {/* 可拖拽分隔条 */}
+        {showResizeHandle && (
+          <div
+            className={cn(
+              "h-1 w-full cursor-row-resize shrink-0",
+              "bg-sidebar-border/40 hover:bg-primary/30 active:bg-primary/50",
+              "transition-colors duration-150",
+              isDragging && "bg-primary/50"
+            )}
+            onMouseDown={handleResizeStart}
+          />
+        )}
 
         {/* 资源管理器面板 */}
         <CollapsiblePanel

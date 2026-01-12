@@ -155,30 +155,30 @@ impl OpencodeService {
         Ok(())
     }
 
-    /// 启动本地 opencode serve 进程
-    ///
-    /// 通过设置 XDG 环境变量实现**完全配置隔离**：
-    /// - opencode 使用 xdg-basedir 库读取 XDG_CONFIG_HOME 等环境变量
-    /// - xdg-basedir 会自动在 XDG_CONFIG_HOME 下创建 /opencode 子目录
-    /// - 这样可以完全绕过用户的全局配置 ~/.config/opencode/
-    ///
-    /// 目录结构：
-    /// ```
-    /// <app_data_dir>/
-    /// ├── bin/                      # opencode 二进制
-    /// ├── opencode/                 # opencode 配置和数据（xdg-basedir 自动创建）
-    /// │   └── opencode.json         # 配置文件
-    /// └── cache/                    # 缓存目录
-    ///     └── opencode/             # opencode 缓存
-    /// ```
+    fn find_available_port() -> Result<u16, OpencodeError> {
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .map_err(|e| OpencodeError::ServiceStartError(format!("无法绑定端口: {}", e)))?;
+        let port = listener.local_addr()
+            .map_err(|e| OpencodeError::ServiceStartError(format!("无法获取端口: {}", e)))?
+            .port();
+        drop(listener);
+        Ok(port)
+    }
+
     async fn start_local_service(&self, port: u16) -> Result<(), OpencodeError> {
+        let actual_port = if port == 0 {
+            Self::find_available_port()?
+        } else {
+            port
+        };
         let binary_path = self
             .downloader
             .get_binary_path()
             .ok_or(OpencodeError::BinaryNotFound)?;
 
         self.update_status(ServiceStatus::Starting);
-        info!("启动 opencode serve，端口: {}", port);
+        info!("启动 opencode serve，端口: {}", actual_port);
 
         // 获取应用数据目录
         let app_data_dir = get_app_data_dir().ok_or(OpencodeError::ConfigError(
@@ -198,26 +198,22 @@ impl OpencodeService {
             warn!("创建 opencode 配置目录失败: {}", e);
         }
 
-        // 只有在配置文件不存在时才创建默认配置
-        // 使用 opencode.json，与 Config.update API 写入的文件名一致
-        // opencode 加载顺序：config.json -> opencode.json -> opencode.jsonc
-        // 后加载的文件会覆盖前面的配置，所以使用 opencode.json 可以确保一致性
         let config_file = opencode_config_dir.join("opencode.json");
-        if !config_file.exists() {
-            let config_json = self.build_opencode_config(port);
+        if config_file.exists() {
+            self.update_config_port(&config_file, actual_port);
+        } else {
+            let config_json = self.build_opencode_config(actual_port);
             if let Err(e) = std::fs::write(&config_file, &config_json) {
                 warn!("写入 opencode 配置文件失败: {}", e);
             } else {
-                info!("已创建默认 opencode 配置文件: {:?}", config_file);
+                info!("已创建 opencode 配置文件: {:?}", config_file);
             }
-        } else {
-            debug!("opencode 配置文件已存在，跳过创建: {:?}", config_file);
         }
 
         info!("opencode 配置目录: {:?}", opencode_config_dir);
 
         let mut cmd = std::process::Command::new(&binary_path);
-        cmd.args(["serve", "--port", &port.to_string()])
+        cmd.args(["serve", "--port", &actual_port.to_string()])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             // 设置工作目录为 opencode 配置目录
@@ -257,8 +253,8 @@ impl OpencodeService {
 
         // 验证服务是否正在运行
         if self.is_process_running() {
-            self.update_status(ServiceStatus::Running { port });
-            info!("OpenCode 服务启动成功，端口: {}", port);
+            self.update_status(ServiceStatus::Running { port: actual_port });
+            info!("OpenCode 服务启动成功，端口: {}", actual_port);
             Ok(())
         } else {
             self.update_status(ServiceStatus::Error {
@@ -270,11 +266,52 @@ impl OpencodeService {
         }
     }
 
+    fn update_config_port(&self, config_file: &std::path::Path, port: u16) {
+        let content = match std::fs::read_to_string(config_file) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("读取配置文件失败: {}", e);
+                return;
+            }
+        };
+
+        let mut config: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("解析配置文件失败: {}", e);
+                return;
+            }
+        };
+
+        if let Some(server) = config.get_mut("server") {
+            if let Some(obj) = server.as_object_mut() {
+                obj.insert("port".to_string(), serde_json::json!(port));
+            }
+        } else {
+            config["server"] = serde_json::json!({
+                "port": port,
+                "hostname": "127.0.0.1"
+            });
+        }
+
+        match serde_json::to_string_pretty(&config) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(config_file, json) {
+                    warn!("写入配置文件失败: {}", e);
+                } else {
+                    debug!("已更新配置文件端口: {}", port);
+                }
+            }
+            Err(e) => warn!("序列化配置失败: {}", e),
+        }
+    }
+
     /// 构建 Axon 专用的 opencode 配置文件内容
     ///
     /// 由于我们通过 XDG_CONFIG_HOME 实现了完全隔离，
     /// opencode 会在全新的配置目录中启动，不会加载任何全局配置。
     /// 这里只需要配置 Axon 需要的基本设置即可。
+    /// 注意：不设置 permission 字段，让 opencode 使用默认的交互式权限确认流程
     fn build_opencode_config(&self, port: u16) -> String {
         let config = serde_json::json!({
             // JSON Schema（帮助编辑器提供自动补全）
@@ -290,15 +327,9 @@ impl OpencodeService {
             "autoupdate": false,
             
             // 禁用分享功能（桌面应用不需要）
-            "share": "disabled",
+            "share": "disabled"
             
-            // 权限配置 - 桌面应用中可以更宽松
-            "permission": {
-                "edit": "allow",
-                "write": "allow",
-                "bash": "allow"
-            }
-            
+            // 注意：不设置 permission 字段，让 opencode 使用默认的交互式权限确认流程
             // MCP 服务器配置 - 初始为空，用户可通过 Axon UI 添加
             // "mcp": {}
         });

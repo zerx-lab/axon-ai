@@ -58,6 +58,18 @@ pub fn get_opencode_bin_path() -> Option<PathBuf> {
     })
 }
 
+/// 获取 OpenCode 配置目录
+/// 路径: <app_data_dir>/opencode
+pub fn get_opencode_config_dir() -> Option<PathBuf> {
+    get_app_data_dir().map(|p| p.join("opencode"))
+}
+
+/// 获取 OpenCode 配置文件路径
+/// 路径: <app_data_dir>/opencode/opencode.json
+pub fn get_opencode_config_path() -> Option<PathBuf> {
+    get_opencode_config_dir().map(|p| p.join("opencode.json"))
+}
+
 /// 确保目录存在
 pub fn ensure_dir_exists(path: &Path) -> Result<(), std::io::Error> {
     if !path.exists() {

@@ -4,7 +4,6 @@ import { ChatContainer } from "@/components/chat";
 import { WorkspaceSidebar } from "@/components/sidebar";
 import { FilePreviewPanel } from "@/components/editor";
 import { ActivityBar } from "@/components/activitybar";
-import { StatusBar } from "@/components/statusbar";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useActivityBar } from "@/stores/activityBar";
@@ -463,8 +462,6 @@ function HomePage() {
         {activityBarPosition === "right" && <ActivityBar />}
       </div>
 
-      {/* 底部状态栏 */}
-      <StatusBar />
     </div>
   );
 }

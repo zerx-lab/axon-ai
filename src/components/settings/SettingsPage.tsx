@@ -12,7 +12,7 @@
 import { lazy, Suspense } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Server, Globe, Palette, Info, Sparkles, Blocks, Loader2 } from "lucide-react";
+import { ArrowLeft, Server, Globe, Palette, Info, Sparkles, Blocks, Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ import type { SettingsTab } from "@/routes/settings";
 const ServiceSettings = lazy(() => import("./ServiceSettings").then(m => ({ default: m.ServiceSettings })));
 const ProviderSettings = lazy(() => import("./ProviderSettings").then(m => ({ default: m.ProviderSettings })));
 const McpSettings = lazy(() => import("./McpSettings").then(m => ({ default: m.McpSettings })));
+const PermissionSettings = lazy(() => import("./PermissionSettings").then(m => ({ default: m.PermissionSettings })));
 const LanguageSettings = lazy(() => import("./LanguageSettings").then(m => ({ default: m.LanguageSettings })));
 const AppearanceSettings = lazy(() => import("./AppearanceSettings").then(m => ({ default: m.AppearanceSettings })));
 const AboutSettings = lazy(() => import("./AboutSettings").then(m => ({ default: m.AboutSettings })));
@@ -68,6 +69,7 @@ export function SettingsPage() {
     { id: "service", label: t("settings.service"), icon: Server },
     { id: "provider", label: t("settings.provider"), icon: Sparkles },
     { id: "mcp", label: t("settings.mcp"), icon: Blocks },
+    { id: "permission", label: t("settings.permission"), icon: Shield },
     { id: "language", label: t("settings.language"), icon: Globe },
     { id: "appearance", label: t("settings.appearance"), icon: Palette },
     { id: "about", label: t("settings.about"), icon: Info },
@@ -82,6 +84,8 @@ export function SettingsPage() {
           return <ProviderSettings />;
         case "mcp":
           return <McpSettings />;
+        case "permission":
+          return <PermissionSettings />;
         case "language":
           return <LanguageSettings />;
         case "appearance":

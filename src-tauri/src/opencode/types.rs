@@ -85,7 +85,8 @@ impl Default for ServiceConfig {
     fn default() -> Self {
         Self {
             mode: ServiceMode::Local,
-            port: 9120,
+            // 端口为 0 表示启动时自动分配可用随机端口
+            port: 0,
             auto_start: true,
         }
     }

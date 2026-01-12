@@ -410,3 +410,74 @@ export interface TodoUpdatedEvent {
   todos: TodoItem[];
 }
 
+// ============== Question 问答类型 ==============
+
+/** Question 选项 */
+export interface QuestionOption {
+  /** 选项标签（1-5 词，简洁） */
+  label: string;
+  /** 选项说明 */
+  description: string;
+}
+
+/** Question 问题信息 */
+export interface QuestionInfo {
+  /** 完整的问题文本 */
+  question: string;
+  /** 简短标签（最多 12 字符） */
+  header: string;
+  /** 可选选项列表 */
+  options: QuestionOption[];
+  /** 是否允许多选 */
+  multiple?: boolean;
+}
+
+/** Question 用户答案（选中的 label 数组） */
+export type QuestionAnswer = string[];
+
+/** Question 请求 */
+export interface QuestionRequest {
+  /** 请求 ID */
+  id: string;
+  /** 会话 ID */
+  sessionID: string;
+  /** 问题列表 */
+  questions: QuestionInfo[];
+  /** 关联的工具调用（可选） */
+  tool?: {
+    messageID: string;
+    callID: string;
+  };
+  /** 请求来源的工作目录（从 SSE 全局事件中提取） */
+  directory?: string;
+}
+
+/** Question 回复 */
+export interface QuestionReply {
+  /** 用户答案（按问题顺序，每个答案是选中的 label 数组） */
+  answers: QuestionAnswer[];
+}
+
+/** Question 事件 */
+export interface QuestionAskedEvent {
+  type: "question.asked";
+  data: QuestionRequest;
+}
+
+export interface QuestionRepliedEvent {
+  type: "question.replied";
+  data: {
+    sessionID: string;
+    requestID: string;
+    answers: QuestionAnswer[];
+  };
+}
+
+export interface QuestionRejectedEvent {
+  type: "question.rejected";
+  data: {
+    sessionID: string;
+    requestID: string;
+  };
+}
+
