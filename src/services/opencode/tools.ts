@@ -59,10 +59,16 @@ export async function getToolsSimple(): Promise<{ id: string; description?: stri
   
   try {
     const ids = await getToolIds();
-    return ids.map(id => ({
+    console.log('[getToolsSimple] 从API获取到的工具ID列表:', ids);
+    console.log('[getToolsSimple] 工具数量:', ids.length);
+    
+    const tools = ids.map(id => ({
       id,
       description: getToolDescription(id),
     }));
+    
+    console.log('[getToolsSimple] 处理后的工具列表:', tools);
+    return tools;
   } catch (error) {
     console.error("Failed to fetch tools:", error);
     return [];
@@ -87,6 +93,7 @@ function getToolDescription(id: string): string {
     lsp: "LSP 语言服务",
     batch: "批量操作",
     invalid: "错误处理",
+    question: "交互式提问",
   };
   
   return descriptions[id] || "未知工具";

@@ -350,7 +350,6 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   lsp: "LSP",
   skill: "技能",
   batch: "批量操作",
-  question: "提问",
 };
 
 /** 获取工具显示名称 */

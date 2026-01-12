@@ -71,6 +71,8 @@ export function StatusBar() {
     setIsToolsLoading(true);
     try {
       const result = await getToolsSimple();
+      console.log('[StatusBar] loadTools 获取到的工具列表:', result);
+      console.log('[StatusBar] loadTools 工具数量:', result.length);
       setTools(result);
     } catch (error) {
       console.error("加载工具列表失败:", error);
@@ -451,7 +453,7 @@ export function StatusBar() {
           </ScrollArea>
 
           <div className="px-3 py-2 border-t border-border/50 text-[10px] text-muted-foreground">
-            {t("statusBar.totalTools", `共 ${tools.length} 个工具`)}
+            {t("statusBar.totalTools", { count: tools.length })}
           </div>
         </PopoverContent>
       </Popover>
