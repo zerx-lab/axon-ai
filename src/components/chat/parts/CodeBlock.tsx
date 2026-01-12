@@ -6,10 +6,12 @@
  * 2. 使用轻量级 Light 版本的高亮器
  * 3. 仅注册常用语言，按需加载其他语言
  * 4. 首屏显示简洁的代码块，后台加载高亮器
+ * 5. 支持亮色/暗色主题切换
  */
 
 import { useState, useEffect, memo, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/stores/theme";
 
 // 懒加载语法高亮器
 const SyntaxHighlighter = lazy(() => 
@@ -18,11 +20,26 @@ const SyntaxHighlighter = lazy(() =>
   }))
 );
 
-// 懒加载主题
-const loadTheme = () => 
-  import("react-syntax-highlighter/dist/esm/styles/prism/one-dark").then(
-    mod => mod.default
-  );
+const themeCache = {
+  dark: null as Record<string, React.CSSProperties> | null,
+  light: null as Record<string, React.CSSProperties> | null,
+};
+
+const loadDarkTheme = async () => {
+  if (!themeCache.dark) {
+    const mod = await import("react-syntax-highlighter/dist/esm/styles/prism/one-dark");
+    themeCache.dark = mod.default;
+  }
+  return themeCache.dark;
+};
+
+const loadLightTheme = async () => {
+  if (!themeCache.light) {
+    const mod = await import("react-syntax-highlighter/dist/esm/styles/prism/one-light");
+    themeCache.light = mod.default;
+  }
+  return themeCache.light;
+};
 
 // 懒加载语言支持（仅加载常用语言）
 const languageLoaders: Record<string, () => Promise<unknown>> = {
@@ -73,10 +90,17 @@ interface CodeBlockProps {
   className?: string;
 }
 
+interface CodeBlockFallbackProps {
+  code: string;
+  language?: string;
+  isDark?: boolean;
+}
+
 /**
  * 代码块简单占位符（首屏立即显示）
+ * 支持亮色/暗色主题
  */
-function CodeBlockFallback({ code, language }: { code: string; language?: string }) {
+function CodeBlockFallback({ code, language, isDark = true }: CodeBlockFallbackProps) {
   return (
     <div className="relative group my-2">
       {language && (
@@ -86,10 +110,13 @@ function CodeBlockFallback({ code, language }: { code: string; language?: string
       )}
       <pre 
         className={cn(
-          "rounded-md bg-[#282c34] p-4 overflow-x-auto",
+          "rounded-md p-4 overflow-x-auto",
           "text-[0.8125rem] leading-relaxed",
           "font-[ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace]",
-          "text-gray-300"
+          // 根据主题动态切换背景色和文字色
+          isDark 
+            ? "bg-[#282c34] text-gray-300" 
+            : "bg-[#fafafa] text-gray-800 border border-border/50"
         )}
       >
         <code>{code}</code>
@@ -100,21 +127,27 @@ function CodeBlockFallback({ code, language }: { code: string; language?: string
 
 /**
  * 高亮代码块（懒加载后显示）
+ * 支持亮色/暗色主题动态切换
  */
 const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
   code,
   language,
 }: CodeBlockProps) {
-  const [theme, setTheme] = useState<Record<string, React.CSSProperties> | null>(null);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  
+  const [darkTheme, setDarkTheme] = useState<Record<string, React.CSSProperties> | null>(themeCache.dark);
+  const [lightTheme, setLightTheme] = useState<Record<string, React.CSSProperties> | null>(themeCache.light);
   const [languageLoaded, setLanguageLoaded] = useState(false);
 
   // 解析语言
   const normalizedLang = language?.toLowerCase() || "text";
   const resolvedLang = languageAliases[normalizedLang] || normalizedLang;
 
-  // 加载主题
+  // 加载两个主题（使用缓存）
   useEffect(() => {
-    loadTheme().then(setTheme);
+    loadDarkTheme().then(setDarkTheme);
+    loadLightTheme().then(setLightTheme);
   }, []);
 
   // 加载语言支持
@@ -128,9 +161,12 @@ const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
     }
   }, [resolvedLang]);
 
+  // 根据当前主题选择对应的样式
+  const currentTheme = isDark ? darkTheme : lightTheme;
+
   // 主题或语言未加载时显示占位符
-  if (!theme || !languageLoaded) {
-    return <CodeBlockFallback code={code} language={language} />;
+  if (!currentTheme || !languageLoaded) {
+    return <CodeBlockFallback code={code} language={language} isDark={isDark} />;
   }
 
   return (
@@ -140,9 +176,9 @@ const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
           {language}
         </div>
       )}
-      <Suspense fallback={<CodeBlockFallback code={code} language={language} />}>
+      <Suspense fallback={<CodeBlockFallback code={code} language={language} isDark={isDark} />}>
         <SyntaxHighlighter
-          style={theme}
+          style={currentTheme}
           language={resolvedLang}
           PreTag="div"
           customStyle={{
@@ -150,6 +186,8 @@ const HighlightedCodeBlock = memo(function HighlightedCodeBlock({
             borderRadius: "0.375rem",
             fontSize: "0.8125rem",
             lineHeight: "1.5",
+            // 亮色主题添加边框
+            ...(isDark ? {} : { border: "1px solid hsl(var(--border) / 0.5)" }),
           }}
           codeTagProps={{
             style: {
@@ -173,6 +211,8 @@ export const CodeBlock = memo(function CodeBlock({
   language,
   className,
 }: CodeBlockProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const [shouldHighlight, setShouldHighlight] = useState(false);
 
   // 延迟加载高亮器，优先保证首屏渲染
@@ -194,7 +234,7 @@ export const CodeBlock = memo(function CodeBlock({
       {shouldHighlight ? (
         <HighlightedCodeBlock code={code} language={language} />
       ) : (
-        <CodeBlockFallback code={code} language={language} />
+        <CodeBlockFallback code={code} language={language} isDark={isDark} />
       )}
     </div>
   );

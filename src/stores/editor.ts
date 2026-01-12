@@ -14,17 +14,14 @@ import type { OpenedTab } from "./layout";
 
 // 打开的文件标签
 export interface EditorTab {
-  // 文件路径（唯一标识）
   path: string;
-  // 文件名（用于显示）
   name: string;
-  // 文件内容
   content: string;
-  // 是否正在加载
+  originalContent: string;
+  isDirty: boolean;
+  isSaving: boolean;
   isLoading: boolean;
-  // 加载错误信息
   error: string | null;
-  // 文件语言类型（用于语法高亮）
   language: string;
 }
 
@@ -38,29 +35,22 @@ interface EditorState {
 }
 
 interface EditorActions {
-  // 打开文件（添加或激活标签页）
   openFile: (path: string, name: string) => void;
-  // 设置文件内容
   setFileContent: (path: string, content: string) => void;
-  // 设置文件加载状态
+  updateContent: (path: string, content: string) => void;
+  setFileSaving: (path: string, isSaving: boolean) => void;
+  markAsSaved: (path: string, content: string) => void;
   setFileLoading: (path: string, isLoading: boolean) => void;
-  // 设置文件错误
   setFileError: (path: string, error: string | null) => void;
-  // 关闭标签页
+  reloadFile: (path: string) => void;
+  reloadFileIfOpen: (path: string) => void;
   closeTab: (path: string) => void;
-  // 关闭所有标签页
   closeAllTabs: () => void;
-  // 关闭其他标签页
   closeOtherTabs: (path: string) => void;
-  // 激活标签页
   setActiveTab: (path: string) => void;
-  // 切换编辑器面板可见性
   toggleVisible: () => void;
-  // 设置编辑器面板可见性
   setVisible: (visible: boolean) => void;
-  // 从布局恢复状态（用于初始化）
   restoreFromLayout: (tabs: OpenedTab[], activeTabPath: string | null, isVisible: boolean) => void;
-  // 获取当前标签页用于持久化
   getTabsForPersistence: () => OpenedTab[];
 }
 
@@ -68,6 +58,48 @@ type EditorStore = EditorState & EditorActions;
 
 // 根据文件扩展名获取语言类型
 function getLanguageFromPath(path: string): string {
+  const fileName = path.split(/[/\\]/).pop()?.toLowerCase() || "";
+  
+  const fileNameMap: Record<string, string> = {
+    dockerfile: "dockerfile",
+    makefile: "makefile",
+    gnumakefile: "makefile",
+    cmakelists: "cmake",
+    rakefile: "ruby",
+    gemfile: "ruby",
+    vagrantfile: "ruby",
+    guardfile: "ruby",
+    podfile: "ruby",
+    fastfile: "ruby",
+    appfile: "ruby",
+    brewfile: "ruby",
+    license: "plaintext",
+    readme: "markdown",
+    changelog: "markdown",
+    authors: "plaintext",
+    contributors: "plaintext",
+    ".gitignore": "ini",
+    ".gitattributes": "ini",
+    ".editorconfig": "ini",
+    ".env": "shell",
+    ".env.local": "shell",
+    ".env.development": "shell",
+    ".env.production": "shell",
+    ".eslintrc": "json",
+    ".prettierrc": "json",
+    ".babelrc": "json",
+    ".npmrc": "ini",
+    ".yarnrc": "yaml",
+    "tsconfig.json": "json",
+    "package.json": "json",
+    "composer.json": "json",
+    "cargo.toml": "toml",
+  };
+  
+  if (fileNameMap[fileName]) {
+    return fileNameMap[fileName];
+  }
+  
   const ext = path.split(".").pop()?.toLowerCase() || "";
   const languageMap: Record<string, string> = {
     // JavaScript/TypeScript
@@ -141,14 +173,15 @@ export const useEditor = create<EditorStore>()((set, get) => ({
     const existingTab = tabs.find((t) => t.path === path);
 
     if (existingTab) {
-      // 文件已打开，只激活它
       set({ activeTabPath: path, isVisible: true });
     } else {
-      // 创建新标签页
       const newTab: EditorTab = {
         path,
         name: name || getFileNameFromPath(path),
         content: "",
+        originalContent: "",
+        isDirty: false,
+        isSaving: false,
         isLoading: true,
         error: null,
         language: getLanguageFromPath(path),
@@ -161,18 +194,44 @@ export const useEditor = create<EditorStore>()((set, get) => ({
     }
   },
 
-  // 设置文件内容
   setFileContent: (path: string, content: string) => {
     set((state) => ({
       tabs: state.tabs.map((tab) =>
         tab.path === path
-          ? { ...tab, content, isLoading: false, error: null }
+          ? { ...tab, content, originalContent: content, isDirty: false, isLoading: false, error: null }
           : tab
       ),
     }));
   },
 
-  // 设置文件加载状态
+  updateContent: (path: string, content: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path === path
+          ? { ...tab, content, isDirty: content !== tab.originalContent }
+          : tab
+      ),
+    }));
+  },
+
+  setFileSaving: (path: string, isSaving: boolean) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path === path ? { ...tab, isSaving } : tab
+      ),
+    }));
+  },
+
+  markAsSaved: (path: string, content: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path === path
+          ? { ...tab, originalContent: content, isDirty: false, isSaving: false }
+          : tab
+      ),
+    }));
+  },
+
   setFileLoading: (path: string, isLoading: boolean) => {
     set((state) => ({
       tabs: state.tabs.map((tab) =>
@@ -190,7 +249,31 @@ export const useEditor = create<EditorStore>()((set, get) => ({
     }));
   },
 
-  // 关闭标签页
+  reloadFile: (path: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path === path
+          ? { ...tab, isLoading: true, error: null, content: "", originalContent: "" }
+          : tab
+      ),
+    }));
+  },
+
+  reloadFileIfOpen: (path: string) => {
+    const { tabs } = get();
+    const normalizedPath = path.replace(/\\/g, "/");
+    const tab = tabs.find((t) => t.path.replace(/\\/g, "/") === normalizedPath);
+    if (tab && !tab.isDirty) {
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.path.replace(/\\/g, "/") === normalizedPath
+            ? { ...t, isLoading: true, error: null, content: "", originalContent: "" }
+            : t
+        ),
+      }));
+    }
+  },
+
   closeTab: (path: string) => {
     const { tabs, activeTabPath } = get();
     const newTabs = tabs.filter((t) => t.path !== path);
@@ -255,12 +338,14 @@ export const useEditor = create<EditorStore>()((set, get) => ({
   restoreFromLayout: (tabs: OpenedTab[], activeTabPath: string | null, isVisible: boolean) => {
     console.log("[Editor] 从布局恢复:", { tabs, activeTabPath, isVisible });
     
-    // 将 OpenedTab 转换为 EditorTab（添加运行时字段）
     const restoredTabs: EditorTab[] = tabs.map((t) => ({
       path: t.path,
       name: t.name,
       language: t.language || getLanguageFromPath(t.path),
       content: "",
+      originalContent: "",
+      isDirty: false,
+      isSaving: false,
       isLoading: true,
       error: null,
     }));

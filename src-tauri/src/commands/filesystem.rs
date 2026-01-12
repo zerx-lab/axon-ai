@@ -186,6 +186,46 @@ pub async fn read_file_content(path: String) -> Result<String, String> {
     }
 }
 
+/// 写入文件内容
+/// 将内容写入指定文件路径
+#[tauri::command]
+pub async fn write_file_content(path: String, content: String) -> Result<(), String> {
+    debug!("写入文件内容: {}", path);
+
+    let file_path = Path::new(&path);
+
+    // 确保父目录存在
+    if let Some(parent) = file_path.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                error!("创建父目录失败: {:?}, 错误: {}", parent, e);
+                format!("创建父目录失败: {}", e)
+            })?;
+        }
+    }
+
+    // 写入文件
+    match std::fs::write(file_path, &content) {
+        Ok(()) => {
+            debug!("成功写入文件，大小: {} 字节", content.len());
+            Ok(())
+        }
+        Err(e) => {
+            error!("写入文件失败: {:?}, 错误: {}", file_path, e);
+            
+            #[cfg(target_os = "windows")]
+            {
+                use std::io::ErrorKind;
+                if e.kind() == ErrorKind::PermissionDenied {
+                    return Err("写入文件失败: 文件可能被其他程序占用，请关闭占用程序后重试".to_string());
+                }
+            }
+            
+            Err(format!("写入文件失败: {}", e))
+        }
+    }
+}
+
 /// 打开目录选择对话框
 /// 返回用户选择的目录路径，如果用户取消则返回 None
 #[tauri::command]

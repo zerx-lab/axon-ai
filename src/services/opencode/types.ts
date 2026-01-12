@@ -98,3 +98,36 @@ export function getEndpointUrl(config: OpencodeServiceConfig): string {
   }
   return `http://127.0.0.1:${config.port}`;
 }
+
+/**
+ * 版本信息
+ */
+export interface VersionInfo {
+  installed: string | null;
+  latest: string | null;
+  updateAvailable: boolean;
+}
+
+/**
+ * 应用全局设置
+ */
+export interface AppSettings {
+  autoUpdate: boolean;
+  customOpencodePath: string | null;
+  installedVersion: string | null;
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  autoUpdate: false,
+  customOpencodePath: null,
+  installedVersion: null,
+};
+
+/**
+ * 下载进度信息（来自 Tauri 事件）
+ */
+export interface DownloadProgress {
+  downloaded: number;
+  total: number | null;
+  percentage: number;
+}

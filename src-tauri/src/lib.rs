@@ -5,6 +5,7 @@
 
 mod commands;
 mod opencode;
+mod settings;
 mod state;
 mod utils;
 
@@ -64,6 +65,15 @@ pub fn run() {
             stop_service,
             restart_service,
             get_service_endpoint,
+            // 版本管理命令
+            get_version_info,
+            check_for_update,
+            update_opencode,
+            // 应用设置命令
+            get_app_settings,
+            set_app_settings,
+            set_auto_update,
+            set_custom_opencode_path,
             // 窗口命令
             window_minimize,
             window_maximize,
@@ -75,6 +85,7 @@ pub fn run() {
             select_directory,
             read_directory,
             read_file_content,
+            write_file_content,
             // Diff 计算命令
             compute_diff,
             compute_unified_diff,

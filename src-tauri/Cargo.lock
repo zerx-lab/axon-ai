@@ -261,6 +261,7 @@ dependencies = [
  "futures-util",
  "parking_lot",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "similar",

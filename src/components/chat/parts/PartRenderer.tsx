@@ -53,9 +53,10 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { useShallow } from "zustand/react/shallow";
 import { usePermissionStore } from "@/stores/permission";
 import { useOpencode } from "@/hooks/useOpencode";
-// 懒加载 DiffViewer（减少首屏体积）
+
 const DiffViewer = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffViewer })));
 const DiffStatsDisplay = lazy(() => import("@/components/diff").then(m => ({ default: m.DiffStatsDisplay })));
+const CodeBlock = lazy(() => import("./CodeBlock"));
 
 // ============== Part 渲染器 ==============
 
@@ -501,7 +502,6 @@ function ToolCompletedContent({ tool, state, messageInfo }: ToolCompletedContent
   }
 }
 
-// Bash 工具内容
 function BashToolContent({ state }: { state: ToolStateCompleted }) {
   const [showOutput, setShowOutput] = useState(false);
   const command = state.input.command as string;
@@ -513,15 +513,22 @@ function BashToolContent({ state }: { state: ToolStateCompleted }) {
       {description && (
         <div className="text-sm text-muted-foreground">{description}</div>
       )}
-      <div className="font-mono text-sm bg-muted/50 rounded px-2 py-1 overflow-x-auto">
-        <span className="text-green-600 dark:text-green-400">$</span> {command}
-      </div>
+      <Suspense
+        fallback={
+          <div className="font-mono text-sm bg-muted/50 rounded px-2 py-1 overflow-x-auto">
+            <span className="text-green-600 dark:text-green-400">$</span> {command}
+          </div>
+        }
+      >
+        <CodeBlock code={`$ ${command}`} language="bash" />
+      </Suspense>
       {output && (
         <CollapsibleOutput
           output={output}
           showOutput={showOutput}
           setShowOutput={setShowOutput}
           label="输出"
+          language="bash"
         />
       )}
     </div>
@@ -580,7 +587,19 @@ function extractMultiEditDiff(metadata: MultiEditMetadata): FileDiffData | null 
   };
 }
 
-// 文件工具内容
+function getLanguageFromPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  const languageMap: Record<string, string> = {
+    js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
+    html: "html", css: "css", scss: "scss", json: "json", xml: "xml",
+    yaml: "yaml", yml: "yaml", toml: "toml", md: "markdown",
+    rs: "rust", go: "go", py: "python", rb: "ruby", java: "java",
+    c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
+    sh: "bash", bash: "bash", zsh: "bash", sql: "sql",
+  };
+  return languageMap[ext] || "text";
+}
+
 function FileToolContent({ 
   tool, 
   state, 
@@ -595,10 +614,11 @@ function FileToolContent({
   const filePath = state.input.filePath as string;
   const cwd = messageInfo.path?.cwd || "";
   
-  // 去掉工作目录前缀
   const displayPath = filePath?.startsWith(cwd) 
     ? filePath.slice(cwd.length + 1) 
     : filePath;
+  
+  const fileLanguage = filePath ? getLanguageFromPath(filePath) : "text";
   
   // 获取 filediff 数据
   // - edit 工具: 直接从 metadata.filediff 获取
@@ -688,14 +708,13 @@ function FileToolContent({
         </Suspense>
       )}
       
-      {/* 其他工具使用原来的折叠输出 */}
       {!hasFileDiff && content && (
         <CollapsibleOutput
           output={content}
           showOutput={showContent}
           setShowOutput={setShowContent}
           label={tool === "read" ? "预览" : tool === "write" ? "内容" : "差异"}
-          isCode
+          language={fileLanguage}
         />
       )}
     </div>
@@ -863,6 +882,7 @@ interface CollapsibleOutputProps {
   setShowOutput: (v: boolean) => void;
   label?: string;
   isCode?: boolean;
+  language?: string;
 }
 
 function CollapsibleOutput({
@@ -871,19 +891,37 @@ function CollapsibleOutput({
   setShowOutput,
   label = "输出",
   isCode = false,
+  language,
 }: CollapsibleOutputProps) {
   const lines = output.split("\n").length;
   const shouldCollapse = lines > 5;
   
-  if (!shouldCollapse) {
+  const renderContent = (content: string) => {
+    if (language) {
+      return (
+        <Suspense
+          fallback={
+            <pre className="text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words font-mono">
+              {content}
+            </pre>
+          }
+        >
+          <CodeBlock code={content} language={language} />
+        </Suspense>
+      );
+    }
     return (
       <pre className={cn(
         "text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words",
         isCode && "font-mono"
       )}>
-        {output}
+        {content}
       </pre>
     );
+  };
+  
+  if (!shouldCollapse) {
+    return renderContent(output);
   }
   
   return (
@@ -907,12 +945,9 @@ function CollapsibleOutput({
         )}
       </Button>
       {showOutput && (
-        <pre className={cn(
-          "text-xs bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-96 overflow-y-auto",
-          isCode && "font-mono"
-        )}>
-          {output}
-        </pre>
+        <div className="max-h-96 overflow-y-auto">
+          {renderContent(output)}
+        </div>
       )}
     </div>
   );

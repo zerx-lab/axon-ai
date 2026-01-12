@@ -13,7 +13,147 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 /// Default fallback version when API is rate-limited
-const FALLBACK_VERSION: &str = "v1.1.8";
+const FALLBACK_VERSION: &str = "v1.1.13";
+
+fn extract_binary_sync(archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, OpencodeError> {
+    let binary_name = get_binary_name();
+    let binary_path = dest_dir.join(binary_name);
+
+    if cfg!(windows) {
+        extract_zip_sync(archive_path, dest_dir, binary_name)?;
+    } else {
+        extract_tar_gz_sync(archive_path, dest_dir, binary_name)?;
+    }
+
+    if !binary_path.exists() {
+        return Err(OpencodeError::ExtractError(
+            "Binary not found in archive".to_string(),
+        ));
+    }
+
+    Ok(binary_path)
+}
+
+fn extract_zip_sync(
+    archive_path: &Path,
+    dest_dir: &Path,
+    binary_name: &str,
+) -> Result<(), OpencodeError> {
+    let file = std::fs::File::open(archive_path)?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
+
+        let file_name = file.name().to_string();
+        if file_name.ends_with(binary_name) {
+            let dest_path = dest_dir.join(binary_name);
+
+            if dest_path.exists() {
+                let max_retries = 10;
+                let mut deleted = false;
+                for attempt in 1..=max_retries {
+                    match std::fs::remove_file(&dest_path) {
+                        Ok(_) => {
+                            debug!("Removed old binary on attempt {}", attempt);
+                            deleted = true;
+                            break;
+                        }
+                        Err(e) => {
+                            if attempt < max_retries {
+                                debug!(
+                                    "Retry {}/{}: waiting for file release: {}",
+                                    attempt, max_retries, e
+                                );
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                            } else {
+                                warn!(
+                                    "Failed to remove old binary after {} attempts: {}",
+                                    max_retries, e
+                                );
+                                return Err(OpencodeError::IoError(e));
+                            }
+                        }
+                    }
+                }
+                if !deleted {
+                    return Err(OpencodeError::ExtractError(
+                        "Cannot remove old binary, file is locked".to_string(),
+                    ));
+                }
+            }
+
+            let mut dest_file = std::fs::File::create(&dest_path)?;
+            std::io::copy(&mut file, &mut dest_file)?;
+            debug!("Extracted {} to {:?}", binary_name, dest_path);
+            return Ok(());
+        }
+    }
+
+    Err(OpencodeError::ExtractError(format!(
+        "Binary '{}' not found in archive",
+        binary_name
+    )))
+}
+
+#[cfg(not(windows))]
+fn extract_tar_gz_sync(
+    archive_path: &Path,
+    dest_dir: &Path,
+    binary_name: &str,
+) -> Result<(), OpencodeError> {
+    use std::process::Command;
+
+    let status = Command::new("tar")
+        .args([
+            "-xzf",
+            archive_path.to_str().unwrap(),
+            "-C",
+            dest_dir.to_str().unwrap(),
+        ])
+        .status()?;
+
+    if !status.success() {
+        return Err(OpencodeError::ExtractError(
+            "tar extraction failed".to_string(),
+        ));
+    }
+
+    for entry in std::fs::read_dir(dest_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() && path.file_name().map(|n| n == binary_name).unwrap_or(false) {
+            return Ok(());
+        }
+        if path.is_dir() {
+            let bin_in_subdir = path.join(binary_name);
+            if bin_in_subdir.exists() {
+                std::fs::rename(&bin_in_subdir, dest_dir.join(binary_name))?;
+                let _ = std::fs::remove_dir_all(&path);
+                return Ok(());
+            }
+        }
+    }
+
+    Err(OpencodeError::ExtractError(format!(
+        "Binary '{}' not found after extraction",
+        binary_name
+    )))
+}
+
+#[cfg(windows)]
+fn extract_tar_gz_sync(
+    _archive_path: &Path,
+    _dest_dir: &Path,
+    _binary_name: &str,
+) -> Result<(), OpencodeError> {
+    Err(OpencodeError::ExtractError(
+        "tar.gz extraction not supported on Windows".to_string(),
+    ))
+}
 
 /// Downloader for opencode binary
 pub struct OpencodeDownloader {
@@ -43,12 +183,82 @@ impl OpencodeDownloader {
             .unwrap_or(false)
     }
 
-    /// Get installed binary path
     pub fn get_binary_path(&self) -> Option<PathBuf> {
-        let path = get_opencode_bin_path()?;
+        let path = match get_opencode_bin_path() {
+            Some(p) => p,
+            None => {
+                debug!("get_opencode_bin_path returned None");
+                return None;
+            }
+        };
+        
         if path.exists() {
+            debug!("Binary exists at: {:?}", path);
             Some(path)
         } else {
+            debug!("Binary not found at: {:?}", path);
+            None
+        }
+    }
+
+    /// Get binary path with optional custom path override
+    pub fn get_binary_path_with_custom(&self, custom_path: Option<&str>) -> Option<PathBuf> {
+        if let Some(path_str) = custom_path {
+            if !path_str.is_empty() {
+                let path = PathBuf::from(path_str);
+                if path.exists() {
+                    return Some(path);
+                }
+            }
+        }
+        self.get_binary_path()
+    }
+
+    pub fn get_installed_version(&self, custom_path: Option<&str>) -> Option<String> {
+        let binary_path = match self.get_binary_path_with_custom(custom_path) {
+            Some(p) => {
+                debug!("Binary path found: {:?}", p);
+                p
+            }
+            None => {
+                debug!("Binary path not found, custom_path: {:?}", custom_path);
+                return None;
+            }
+        };
+
+        let output = match std::process::Command::new(&binary_path)
+            .arg("--version")
+            .output()
+        {
+            Ok(o) => o,
+            Err(e) => {
+                warn!("Failed to run opencode --version: {}", e);
+                return None;
+            }
+        };
+
+        if output.status.success() {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            let version = version_str
+                .trim()
+                .split_whitespace()
+                .find(|s| {
+                    let s = s.trim_start_matches('v');
+                    s.split('.').take(3).all(|part| part.chars().all(|c| c.is_ascii_digit()))
+                        && s.contains('.')
+                })
+                .map(|s| {
+                    if s.starts_with('v') {
+                        s.to_string()
+                    } else {
+                        format!("v{}", s)
+                    }
+                });
+            
+            debug!("Detected installed version: {:?}", version);
+            version
+        } else {
+            warn!("opencode --version failed: {}", String::from_utf8_lossy(&output.stderr));
             None
         }
     }
@@ -120,8 +330,14 @@ impl OpencodeDownloader {
         let archive_path = bin_dir.join(format!("opencode.{}", get_archive_extension()));
         self.download_file(&url, &archive_path, progress_tx).await?;
 
-        // Extract binary
-        let binary_path = self.extract_binary(&archive_path, &bin_dir)?;
+        // Extract binary in blocking task to avoid blocking async runtime
+        let archive_path_clone = archive_path.clone();
+        let bin_dir_clone = bin_dir.clone();
+        let binary_path = tokio::task::spawn_blocking(move || {
+            extract_binary_sync(&archive_path_clone, &bin_dir_clone)
+        })
+        .await
+        .map_err(|e| OpencodeError::ExtractError(format!("Task join error: {}", e)))??;
 
         // Clean up archive
         if let Err(e) = std::fs::remove_file(&archive_path) {
@@ -181,125 +397,6 @@ impl OpencodeDownloader {
         }
 
         Ok(())
-    }
-
-    /// Extract binary from archive
-    fn extract_binary(
-        &self,
-        archive_path: &Path,
-        dest_dir: &Path,
-    ) -> Result<PathBuf, OpencodeError> {
-        let binary_name = get_binary_name();
-        let binary_path = dest_dir.join(binary_name);
-
-        if cfg!(windows) {
-            self.extract_zip(archive_path, dest_dir, binary_name)?;
-        } else {
-            self.extract_tar_gz(archive_path, dest_dir, binary_name)?;
-        }
-
-        if !binary_path.exists() {
-            return Err(OpencodeError::ExtractError(
-                "Binary not found in archive".to_string(),
-            ));
-        }
-
-        Ok(binary_path)
-    }
-
-    /// Extract from zip archive (Windows)
-    fn extract_zip(
-        &self,
-        archive_path: &Path,
-        dest_dir: &Path,
-        binary_name: &str,
-    ) -> Result<(), OpencodeError> {
-        let file = std::fs::File::open(archive_path)?;
-        let mut archive =
-            zip::ZipArchive::new(file).map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
-
-        for i in 0..archive.len() {
-            let mut file = archive
-                .by_index(i)
-                .map_err(|e| OpencodeError::ExtractError(e.to_string()))?;
-
-            let file_name = file.name().to_string();
-            if file_name.ends_with(binary_name) {
-                let dest_path = dest_dir.join(binary_name);
-                let mut dest_file = std::fs::File::create(&dest_path)?;
-                std::io::copy(&mut file, &mut dest_file)?;
-                debug!("Extracted {} to {:?}", binary_name, dest_path);
-                return Ok(());
-            }
-        }
-
-        Err(OpencodeError::ExtractError(format!(
-            "Binary '{}' not found in archive",
-            binary_name
-        )))
-    }
-
-    /// Extract from tar.gz archive (Unix)
-    #[cfg(not(windows))]
-    fn extract_tar_gz(
-        &self,
-        archive_path: &Path,
-        dest_dir: &Path,
-        binary_name: &str,
-    ) -> Result<(), OpencodeError> {
-        use std::process::Command;
-
-        let status = Command::new("tar")
-            .args([
-                "-xzf",
-                archive_path.to_str().unwrap(),
-                "-C",
-                dest_dir.to_str().unwrap(),
-            ])
-            .status()?;
-
-        if !status.success() {
-            return Err(OpencodeError::ExtractError(
-                "tar extraction failed".to_string(),
-            ));
-        }
-
-        // Find and move the binary to the expected location
-        for entry in std::fs::read_dir(dest_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() && path.file_name().map(|n| n == binary_name).unwrap_or(false) {
-                return Ok(());
-            }
-            // Check in subdirectories
-            if path.is_dir() {
-                let bin_in_subdir = path.join(binary_name);
-                if bin_in_subdir.exists() {
-                    std::fs::rename(&bin_in_subdir, dest_dir.join(binary_name))?;
-                    // Clean up extracted directory
-                    let _ = std::fs::remove_dir_all(&path);
-                    return Ok(());
-                }
-            }
-        }
-
-        Err(OpencodeError::ExtractError(format!(
-            "Binary '{}' not found after extraction",
-            binary_name
-        )))
-    }
-
-    #[cfg(windows)]
-    fn extract_tar_gz(
-        &self,
-        _archive_path: &Path,
-        _dest_dir: &Path,
-        _binary_name: &str,
-    ) -> Result<(), OpencodeError> {
-        // Windows uses zip, this should never be called
-        Err(OpencodeError::ExtractError(
-            "tar.gz extraction not supported on Windows".to_string(),
-        ))
     }
 }
 

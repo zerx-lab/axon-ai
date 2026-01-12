@@ -210,7 +210,21 @@
       "backendReady": "Ready",
       "backendStopped": "Stopped",
       "backendError": "Error: {{message}}",
-      "backendNotInitialized": "Not Initialized"
+      "backendNotInitialized": "Not Initialized",
+      "versionTitle": "Version & Updates",
+      "versionDescription": "Manage OpenCode version and auto-update settings",
+      "installedVersion": "Installed: {{version}}",
+      "latestVersion": "Latest: {{version}}",
+      "notInstalled": "Not installed",
+      "checkUpdate": "Check for Update",
+      "updateAvailable": "New version {{version}} available",
+      "upToDate": "You're up to date",
+      "updateNow": "Update Now",
+      "updateSuccess": "Update successful",
+      "updateFailed": "Update failed",
+      "autoUpdate": "Auto Update",
+      "autoUpdateDescription": "Automatically check and update OpenCode to the latest version on startup",
+      "downloading": "Downloading..."
     },
     "appearanceSettings": {
       "title": "Appearance Settings",

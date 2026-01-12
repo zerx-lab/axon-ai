@@ -90,3 +90,47 @@ impl Default for ServiceConfig {
         }
     }
 }
+
+/// 版本信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionInfo {
+    /// 已安装版本（如果已安装）
+    pub installed: Option<String>,
+    /// 最新可用版本
+    pub latest: Option<String>,
+    /// 是否有更新可用
+    pub update_available: bool,
+}
+
+impl Default for VersionInfo {
+    fn default() -> Self {
+        Self {
+            installed: None,
+            latest: None,
+            update_available: false,
+        }
+    }
+}
+
+/// 应用全局设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    /// 是否自动更新 opencode
+    pub auto_update: bool,
+    /// 自定义 opencode 路径（如果为空则使用默认路径）
+    pub custom_opencode_path: Option<String>,
+    /// 已安装的 opencode 版本（用于版本记录）
+    pub installed_version: Option<String>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            auto_update: false,
+            custom_opencode_path: None,
+            installed_version: None,
+        }
+    }
+}

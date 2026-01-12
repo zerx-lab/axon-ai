@@ -3,9 +3,10 @@
  * 用于配置本地/远程服务模式
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   Server,
   Cloud,
@@ -15,14 +16,28 @@ import {
   RefreshCw,
   Play,
   Square,
+  Download,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOpencode } from "@/hooks";
-import type { ServiceMode } from "@/services/opencode/types";
+import { opencode as tauriOpencode, settings as tauriSettings } from "@/services/tauri";
+import type { ServiceMode, VersionInfo, AppSettings, DownloadProgress } from "@/services/opencode/types";
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes || bytes <= 0 || !Number.isFinite(bytes)) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const safeIndex = Math.min(i, sizes.length - 1);
+  return `${(bytes / Math.pow(k, safeIndex)).toFixed(1)} ${sizes[safeIndex]}`;
+}
 
 export function ServiceSettings() {
   const { t } = useTranslation();
@@ -45,6 +60,55 @@ export function ServiceSettings() {
     state.config.mode.type === "remote" ? state.config.mode.url : ""
   );
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 版本和设置状态
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
+  // 加载版本信息和设置
+  const loadVersionAndSettings = useCallback(async () => {
+    try {
+      const [version, settings] = await Promise.all([
+        tauriOpencode.getVersionInfo(),
+        tauriSettings.get(),
+      ]);
+      setVersionInfo(version);
+      setAppSettings(settings);
+    } catch (error) {
+      console.error("Failed to load version info:", error);
+    }
+  }, []);
+
+  // 初始加载
+  useEffect(() => {
+    loadVersionAndSettings();
+  }, [loadVersionAndSettings]);
+
+  // 监听下载进度事件
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let isMounted = true;
+    
+    const setupListener = async () => {
+      unlisten = await listen<DownloadProgress>("service:download-progress", (event) => {
+        if (isMounted) {
+          setDownloadProgress(event.payload);
+        }
+      });
+    };
+    
+    setupListener();
+    
+    return () => {
+      isMounted = false;
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
 
   // 同步状态
   useEffect(() => {
@@ -163,6 +227,51 @@ export function ServiceSettings() {
 
   const connectionStatus = getConnectionStatus();
   const backendStatus = getBackendStatus();
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const info = await tauriOpencode.checkForUpdate();
+      setVersionInfo(info);
+      if (info.updateAvailable) {
+        toast.info(t("settings.serviceSettings.updateAvailable", { version: info.latest }));
+      } else {
+        toast.success(t("settings.serviceSettings.upToDate"));
+      }
+    } catch (error) {
+      console.error("Check update failed:", error);
+      toast.error(t("errors.unknownError"));
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    setIsUpdating(true);
+    setDownloadProgress(null);
+    try {
+      await tauriOpencode.updateOpencode();
+      await loadVersionAndSettings();
+      toast.success(t("settings.serviceSettings.updateSuccess"));
+    } catch (error) {
+      console.error("Update failed:", error);
+      toast.error(t("settings.serviceSettings.updateFailed"));
+    } finally {
+      setIsUpdating(false);
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleAutoUpdateChange = async (enabled: boolean) => {
+    try {
+      await tauriSettings.setAutoUpdate(enabled);
+      setAppSettings((prev) => prev ? { ...prev, autoUpdate: enabled } : null);
+      toast.success(t("notifications.settingsSaved"));
+    } catch (error) {
+      console.error("Failed to save auto update setting:", error);
+      toast.error(t("errors.unknownError"));
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -345,6 +454,101 @@ export function ServiceSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* 版本和更新设置（仅在本地模式下显示） */}
+      {selectedMode === "local" && (
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-medium">{t("settings.serviceSettings.versionTitle")}</CardTitle>
+            <CardDescription className="text-sm">{t("settings.serviceSettings.versionDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* 版本信息 */}
+            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-surface-1 p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background border border-border/60">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {versionInfo?.installed
+                      ? t("settings.serviceSettings.installedVersion", { version: versionInfo.installed })
+                      : t("settings.serviceSettings.notInstalled")}
+                  </p>
+                  {versionInfo?.latest && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t("settings.serviceSettings.latestVersion", { version: versionInfo.latest })}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheckUpdate}
+                  disabled={isCheckingUpdate || isUpdating}
+                  className="rounded-lg"
+                >
+                  {isCheckingUpdate ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  {t("settings.serviceSettings.checkUpdate")}
+                </Button>
+                {versionInfo?.updateAvailable && (
+                  <Button
+                    size="sm"
+                    onClick={handleUpdate}
+                    disabled={isUpdating}
+                    className="rounded-lg"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    {t("settings.serviceSettings.updateNow")}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* 下载进度条 */}
+            {isUpdating && downloadProgress && (
+              <div className="rounded-xl border border-border/60 bg-surface-1 p-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {t("settings.serviceSettings.downloading")}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {formatBytes(downloadProgress.downloaded)}{downloadProgress.total ? ` / ${formatBytes(downloadProgress.total)}` : ""}
+                  </span>
+                </div>
+                <Progress value={downloadProgress.percentage} className="h-2" />
+                <div className="text-right text-xs text-muted-foreground">
+                  {Math.round(downloadProgress.percentage)}%
+                </div>
+              </div>
+            )}
+
+            {/* 自动更新设置 */}
+            <div className="flex items-center justify-between rounded-xl border border-border/60 p-4 bg-surface-1">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("settings.serviceSettings.autoUpdate")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.serviceSettings.autoUpdateDescription")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings?.autoUpdate ?? false}
+                onCheckedChange={handleAutoUpdateChange}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

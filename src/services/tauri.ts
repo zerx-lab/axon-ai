@@ -25,6 +25,18 @@ export interface ServiceConfig {
   autoStart: boolean;
 }
 
+export interface VersionInfo {
+  installed: string | null;
+  latest: string | null;
+  updateAvailable: boolean;
+}
+
+export interface AppSettings {
+  autoUpdate: boolean;
+  customOpencodePath: string | null;
+  installedVersion: string | null;
+}
+
 // OpenCode service commands
 export const opencode = {
   getStatus: () => invoke<ServiceStatus>("get_service_status"),
@@ -36,6 +48,17 @@ export const opencode = {
   stop: () => invoke("stop_service"),
   restart: () => invoke("restart_service"),
   getEndpoint: () => invoke<string | null>("get_service_endpoint"),
+  getVersionInfo: () => invoke<VersionInfo>("get_version_info"),
+  checkForUpdate: () => invoke<VersionInfo>("check_for_update"),
+  updateOpencode: () => invoke("update_opencode"),
+};
+
+// App settings commands
+export const settings = {
+  get: () => invoke<AppSettings>("get_app_settings"),
+  set: (settings: AppSettings) => invoke("set_app_settings", { settings }),
+  setAutoUpdate: (enabled: boolean) => invoke("set_auto_update", { enabled }),
+  setCustomOpencodePath: (path: string | null) => invoke("set_custom_opencode_path", { path }),
 };
 
 // Window control commands

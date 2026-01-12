@@ -7,11 +7,12 @@
  * 2. react-syntax-highlighter 是最大的依赖，懒加载它
  */
 
-import { memo, lazy, Suspense } from "react";
+import { memo, lazy, Suspense, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/stores/theme";
 
 // 懒加载代码块组件（包含 react-syntax-highlighter）
 const CodeBlock = lazy(() => import("./CodeBlock"));
@@ -36,150 +37,179 @@ function InlineCode({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
 }
 
 /**
- * 代码块渲染适配器
+ * 代码块 Fallback 组件
+ * 支持亮色/暗色主题
  */
-function CodeRenderer({
-  className,
-  children,
-  ...props
-}: React.HTMLAttributes<HTMLElement>) {
-  // 检查是否是代码块（有语言标识）
-  const match = /language-(\w+)/.exec(className || "");
-  const codeContent = String(children).replace(/\n$/, "");
-
-  // 判断是否是内联代码（没有语言标识且不包含换行符）
-  const isInline = !match && !codeContent.includes("\n");
-
-  if (isInline) {
-    return <InlineCode {...props}>{children}</InlineCode>;
-  }
-
-  // 代码块使用懒加载的 CodeBlock 组件
-  const language = match ? match[1] : "text";
-
+function CodeBlockFallback({ code, isDark }: { code: string; isDark: boolean }) {
   return (
-    <Suspense
-      fallback={
-        <pre className="rounded-md bg-[#282c34] p-4 overflow-x-auto text-gray-300 text-sm my-2">
-          <code>{codeContent}</code>
-        </pre>
-      }
+    <pre 
+      className={cn(
+        "rounded-md p-4 overflow-x-auto text-sm my-2",
+        isDark 
+          ? "bg-[#282c34] text-gray-300" 
+          : "bg-[#fafafa] text-gray-800 border border-border/50"
+      )}
     >
-      <CodeBlock code={codeContent} language={language} />
-    </Suspense>
+      <code>{code}</code>
+    </pre>
   );
 }
 
 /**
- * 自定义 Markdown 组件映射
+ * 创建代码块渲染适配器
+ * 接收 isDark 参数以支持主题切换
  */
-const markdownComponents: Components = {
-  // 代码块渲染
-  code: CodeRenderer as Components["code"],
+function createCodeRenderer(isDark: boolean) {
+  return function CodeRenderer({
+    className,
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLElement>) {
+    // 检查是否是代码块（有语言标识）
+    const match = /language-(\w+)/.exec(className || "");
+    const codeContent = String(children).replace(/\n$/, "");
 
-  // 预格式化文本
-  pre({ children }) {
-    // 直接返回 children，因为代码块渲染在 code 组件中处理
-    return <>{children}</>;
-  },
+    // 判断是否是内联代码（没有语言标识且不包含换行符）
+    const isInline = !match && !codeContent.includes("\n");
 
-  // 链接 - 在新窗口打开
-  a({ href, children, ...props }) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary hover:underline"
-        {...props}
-      >
-        {children}
-      </a>
-    );
-  },
-
-  // 表格样式增强
-  table({ children }) {
-    return (
-      <div className="overflow-x-auto my-2">
-        <table className="min-w-full border-collapse border border-border">
-          {children}
-        </table>
-      </div>
-    );
-  },
-
-  th({ children }) {
-    return (
-      <th className="border border-border bg-muted px-3 py-2 text-left font-medium">
-        {children}
-      </th>
-    );
-  },
-
-  td({ children }) {
-    return (
-      <td className="border border-border px-3 py-2">
-        {children}
-      </td>
-    );
-  },
-
-  // 任务列表项
-  li({ children, className, ...props }) {
-    // 检查是否是任务列表项（GFM task list）
-    const isTaskListItem = className?.includes("task-list-item");
-
-    if (isTaskListItem) {
-      return (
-        <li className="flex items-start gap-2 list-none" {...props}>
-          {children}
-        </li>
-      );
+    if (isInline) {
+      return <InlineCode {...props}>{children}</InlineCode>;
     }
 
-    return <li {...props}>{children}</li>;
-  },
+    // 代码块使用懒加载的 CodeBlock 组件
+    const language = match ? match[1] : "text";
 
-  // 复选框样式
-  input({ type, checked, ...props }) {
-    if (type === "checkbox") {
+    return (
+      <Suspense fallback={<CodeBlockFallback code={codeContent} isDark={isDark} />}>
+        <CodeBlock code={codeContent} language={language} />
+      </Suspense>
+    );
+  };
+}
+
+/**
+ * 创建 Markdown 组件映射
+ * 接收 isDark 参数以支持主题切换
+ */
+function createMarkdownComponents(isDark: boolean): Components {
+  return {
+    // 代码块渲染
+    code: createCodeRenderer(isDark) as Components["code"],
+
+    // 预格式化文本
+    pre({ children }) {
+      // 直接返回 children，因为代码块渲染在 code 组件中处理
+      return <>{children}</>;
+    },
+
+    // 链接 - 在新窗口打开
+    a({ href, children, ...props }) {
       return (
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled
-          className="mt-1 h-4 w-4 rounded border-border"
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
           {...props}
-        />
+        >
+          {children}
+        </a>
       );
-    }
-    return <input type={type} {...props} />;
-  },
+    },
 
-  // 引用块样式
-  blockquote({ children }) {
-    return (
-      <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground">
-        {children}
-      </blockquote>
-    );
-  },
+    // 表格样式增强
+    table({ children }) {
+      return (
+        <div className="overflow-x-auto my-2">
+          <table className="min-w-full border-collapse border border-border">
+            {children}
+          </table>
+        </div>
+      );
+    },
 
-  // 水平分割线
-  hr() {
-    return <hr className="my-4 border-border" />;
-  },
-};
+    th({ children }) {
+      return (
+        <th className="border border-border bg-muted px-3 py-2 text-left font-medium">
+          {children}
+        </th>
+      );
+    },
+
+    td({ children }) {
+      return (
+        <td className="border border-border px-3 py-2">
+          {children}
+        </td>
+      );
+    },
+
+    // 任务列表项
+    li({ children, className, ...props }) {
+      // 检查是否是任务列表项（GFM task list）
+      const isTaskListItem = className?.includes("task-list-item");
+
+      if (isTaskListItem) {
+        return (
+          <li className="flex items-start gap-2 list-none" {...props}>
+            {children}
+          </li>
+        );
+      }
+
+      return <li {...props}>{children}</li>;
+    },
+
+    // 复选框样式
+    input({ type, checked, ...props }) {
+      if (type === "checkbox") {
+        return (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled
+            className="mt-1 h-4 w-4 rounded border-border"
+            {...props}
+          />
+        );
+      }
+      return <input type={type} {...props} />;
+    },
+
+    // 引用块样式
+    blockquote({ children }) {
+      return (
+        <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground">
+          {children}
+        </blockquote>
+      );
+    },
+
+    // 水平分割线
+    hr() {
+      return <hr className="my-4 border-border" />;
+    },
+  };
+}
 
 /**
  * Markdown 渲染器
  * 支持 GFM（表格、删除线、任务列表等）和代码高亮
+ * 支持亮色/暗色主题实时切换
  */
 export const MarkdownRenderer = memo(function MarkdownRenderer({
   content,
   className,
 }: MarkdownRendererProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
+  // 根据主题创建 components 映射，主题变化时重新创建
+  const markdownComponents = useMemo(
+    () => createMarkdownComponents(isDark),
+    [isDark]
+  );
+
   return (
     <div
       className={cn(

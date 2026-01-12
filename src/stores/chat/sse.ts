@@ -22,6 +22,7 @@ import type {
 import { mapApiSession } from "./utils";
 import { usePermissionStore, shouldAutoAccept } from "@/stores/permission";
 import { useTodoStore } from "@/stores/todo";
+import { useEditor } from "@/stores/editor";
 
 // ============== 类型定义 ==============
 
@@ -174,6 +175,19 @@ export function useSSEHandler({
           }
           
           scheduleFlush();
+          
+          if (part.type === "tool") {
+            const FILE_EDIT_TOOLS = ["write", "edit", "multiedit", "patch"];
+            if (FILE_EDIT_TOOLS.includes(part.tool) && part.state?.status === "completed") {
+              const input = part.state.input as { path?: string; file_path?: string; filePath?: string };
+              const filePath = input.path || input.file_path || input.filePath;
+              if (filePath) {
+                setTimeout(() => {
+                  useEditor.getState().reloadFileIfOpen(filePath);
+                }, 100);
+              }
+            }
+          }
           break;
         }
 

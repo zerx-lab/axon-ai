@@ -33,6 +33,7 @@ parking_lot = "0.12.5"
 zip = "7.0.0"
 tauri-plugin-dialog = "2.4.2"
 similar = { version = "2.7.0", features = ["unicode"] }
+semver = "1.0.27"
 
 # Dev 构建优化 - 加快编译速度
 [profile.dev]

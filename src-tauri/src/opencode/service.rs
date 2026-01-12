@@ -5,38 +5,40 @@
 
 use crate::opencode::downloader::OpencodeDownloader;
 use crate::opencode::types::{
-    DownloadProgress, OpencodeError, ServiceConfig, ServiceMode, ServiceStatus,
+    DownloadProgress, OpencodeError, ServiceConfig, ServiceMode, ServiceStatus, VersionInfo,
 };
+use crate::settings::SettingsManager;
 use crate::utils::paths::{ensure_dir_exists, get_app_data_dir};
 use parking_lot::RwLock;
 use std::process::Child;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Event names for frontend communication
 pub const EVENT_SERVICE_STATUS: &str = "service:status";
 /// Event for download progress updates
 pub const EVENT_DOWNLOAD_PROGRESS: &str = "service:download-progress";
 
-/// Manages the opencode service lifecycle
 pub struct OpencodeService {
     config: RwLock<ServiceConfig>,
     status: RwLock<ServiceStatus>,
     process: RwLock<Option<Child>>,
     downloader: OpencodeDownloader,
     app_handle: RwLock<Option<AppHandle>>,
+    settings: Option<Arc<SettingsManager>>,
 }
 
 impl OpencodeService {
-    pub fn new() -> Arc<Self> {
+    pub fn with_settings(settings: Arc<SettingsManager>) -> Arc<Self> {
         Arc::new(Self {
             config: RwLock::new(ServiceConfig::default()),
             status: RwLock::new(ServiceStatus::Uninitialized),
             process: RwLock::new(None),
             downloader: OpencodeDownloader::new(),
             app_handle: RwLock::new(None),
+            settings: Some(settings),
         })
     }
 
@@ -341,12 +343,53 @@ impl OpencodeService {
         let mut process = self.process.write();
         if let Some(ref mut child) = *process {
             info!("Stopping opencode service...");
-            if let Err(e) = child.kill() {
-                error!("Failed to kill process: {}", e);
+            
+            #[cfg(target_os = "windows")]
+            {
+                let pid = child.id();
+                info!("Killing opencode process tree (PID: {})...", pid);
+                let output = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .output();
+                match output {
+                    Ok(o) => {
+                        if !o.status.success() {
+                            debug!("taskkill output: {}", String::from_utf8_lossy(&o.stderr));
+                        }
+                    }
+                    Err(e) => warn!("taskkill failed: {}", e),
+                }
+                
+                for _ in 0..10 {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            info!("Process exited with status: {:?}", status);
+                            break;
+                        }
+                        Ok(None) => {
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                        }
+                        Err(e) => {
+                            warn!("try_wait error: {}", e);
+                            break;
+                        }
+                    }
+                }
             }
-            let _ = child.wait();
+            
+            #[cfg(not(target_os = "windows"))]
+            {
+                if let Err(e) = child.kill() {
+                    warn!("Kill returned error (may already be dead): {}", e);
+                }
+                match child.wait() {
+                    Ok(status) => info!("Process exited with status: {:?}", status),
+                    Err(e) => warn!("Wait returned error: {}", e),
+                }
+            }
         }
         *process = None;
+        
         self.update_status(ServiceStatus::Stopped);
         info!("OpenCode service stopped");
         Ok(())
@@ -372,6 +415,108 @@ impl OpencodeService {
             _ => None,
         }
     }
+
+    fn get_custom_path(&self) -> Option<String> {
+        self.settings.as_ref().and_then(|s| s.get_custom_opencode_path())
+    }
+
+    pub async fn get_version_info(&self) -> Result<VersionInfo, OpencodeError> {
+        let custom_path = self.get_custom_path();
+        let installed = self.downloader.get_installed_version(custom_path.as_deref())
+            .or_else(|| {
+                self.settings.as_ref().and_then(|s| s.get_installed_version())
+            });
+
+        let latest = match self.downloader.fetch_latest_version().await {
+            Ok(v) => Some(v),
+            Err(e) => {
+                warn!("Failed to fetch latest version: {}", e);
+                None
+            }
+        };
+
+        // 使用语义化版本比较，只有当 latest > installed 时才提示更新
+        let update_available = match (&installed, &latest) {
+            (Some(inst), Some(lat)) => {
+                let inst_clean = inst.trim_start_matches('v');
+                let lat_clean = lat.trim_start_matches('v');
+                
+                // 尝试解析为 semver，如果失败则回退到字符串比较
+                match (semver::Version::parse(inst_clean), semver::Version::parse(lat_clean)) {
+                    (Ok(inst_ver), Ok(lat_ver)) => lat_ver > inst_ver,
+                    _ => {
+                        // 如果无法解析为 semver，回退到字符串不等比较
+                        // 但这种情况下可能会误判，记录警告
+                        warn!("Cannot parse versions as semver, falling back to string comparison: installed={}, latest={}", inst, lat);
+                        inst_clean != lat_clean
+                    }
+                }
+            }
+            _ => false,
+        };
+
+        Ok(VersionInfo {
+            installed,
+            latest,
+            update_available,
+        })
+    }
+
+    pub async fn check_for_update(&self) -> Result<VersionInfo, OpencodeError> {
+        self.get_version_info().await
+    }
+
+    pub async fn update_opencode(self: &Arc<Self>) -> Result<(), OpencodeError> {
+        info!("Starting update process...");
+        
+        let was_running = matches!(self.get_status(), ServiceStatus::Running { .. });
+        
+        self.stop().await?;
+        
+        #[cfg(target_os = "windows")]
+        {
+            info!("Waiting for Windows to release file handles...");
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+
+        let (progress_tx, mut progress_rx) = mpsc::channel::<DownloadProgress>(32);
+        let self_clone = Arc::clone(self);
+
+        tokio::spawn(async move {
+            while let Some(progress) = progress_rx.recv().await {
+                self_clone.emit_download_progress(&progress);
+                self_clone.update_status(ServiceStatus::Downloading {
+                    progress: progress.percentage,
+                });
+            }
+        });
+
+        self.downloader.download(None, Some(progress_tx)).await?;
+
+        if let Some(settings) = &self.settings {
+            if let Ok(info) = self.get_version_info().await {
+                if let Some(version) = info.installed {
+                    let _ = settings.set_installed_version(Some(version));
+                }
+            }
+        }
+
+        self.update_status(ServiceStatus::Ready);
+        info!("OpenCode update completed successfully");
+
+        if was_running {
+            info!("Restarting service after update...");
+            if let Err(e) = self.start().await {
+                warn!("Failed to restart service after update: {}", e);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for OpencodeService {
@@ -382,6 +527,7 @@ impl Default for OpencodeService {
             process: RwLock::new(None),
             downloader: OpencodeDownloader::new(),
             app_handle: RwLock::new(None),
+            settings: None,
         }
     }
 }

@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +38,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { MonacoViewer } from "./MonacoViewer";
 
 // ============== 文件图标辅助函数 ==============
 
@@ -136,24 +137,31 @@ function EditorTabItem({
           {/* 文件图标 */}
           {getFileIcon(tab.name)}
 
-          {/* 文件名 */}
-          <span className="truncate text-xs max-w-[120px]">{tab.name}</span>
+          {/* 文件名 + 修改指示 */}
+          <span className="truncate text-xs max-w-[120px]">
+            {tab.name}
+            {tab.isDirty && <span className="ml-0.5 text-[8px] text-muted-foreground">●</span>}
+          </span>
 
-          {/* 关闭按钮 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-4 w-4 shrink-0 rounded-sm p-0",
-              "opacity-0 group-hover:opacity-100",
-              "hover:bg-accent hover:text-foreground",
-              "transition-opacity duration-100",
-              isActive && "opacity-60"
-            )}
-            onClick={handleCloseClick}
-          >
-            <X className="h-3 w-3" />
-          </Button>
+          {/* 保存中状态 */}
+          {tab.isSaving ? (
+            <RefreshCw className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-4 w-4 shrink-0 rounded-sm p-0",
+                "opacity-0 group-hover:opacity-100",
+                "hover:bg-accent hover:text-foreground",
+                "transition-opacity duration-100",
+                isActive && "opacity-60"
+              )}
+              onClick={handleCloseClick}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -177,9 +185,11 @@ function EditorTabItem({
 interface FileContentViewerProps {
   tab: EditorTab;
   onRetry: () => void;
+  onContentChange: (content: string) => void;
+  onSave: () => void;
 }
 
-function FileContentViewer({ tab, onRetry }: FileContentViewerProps) {
+function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileContentViewerProps) {
   const { t } = useTranslation();
 
   // 加载中
@@ -214,13 +224,15 @@ function FileContentViewer({ tab, onRetry }: FileContentViewerProps) {
     );
   }
 
-  // 显示内容（简单的代码预览，后续可以替换为 Monaco Editor）
   return (
-    <ScrollArea className="flex-1 h-full">
-      <pre className="p-4 text-sm font-mono leading-relaxed text-foreground/90 whitespace-pre-wrap break-all">
-        <code>{tab.content}</code>
-      </pre>
-    </ScrollArea>
+    <div className="flex-1 h-full overflow-hidden">
+      <MonacoViewer 
+        value={tab.content} 
+        language={tab.language} 
+        onChange={onContentChange}
+        onSave={onSave}
+      />
+    </div>
   );
 }
 
@@ -237,6 +249,9 @@ export function FilePreviewPanel() {
     closeAllTabs,
     setFileContent,
     setFileError,
+    updateContent,
+    setFileSaving,
+    markAsSaved,
   } = useEditor();
 
   // 当前活动的标签
@@ -288,7 +303,74 @@ export function FilePreviewPanel() {
     }
   }, [activeTab, loadFileContent]);
 
-  // 空状态
+  const saveRetryCountRef = useRef<Map<string, number>>(new Map());
+  const MAX_SAVE_RETRIES = 3;
+
+  const saveFile = useCallback(async (path: string, content: string) => {
+    const retryCount = saveRetryCountRef.current.get(path) || 0;
+    
+    if (retryCount >= MAX_SAVE_RETRIES) {
+      console.error(`保存文件失败，已达到最大重试次数 (${MAX_SAVE_RETRIES}):`, path);
+      const fileName = path.split(/[/\\]/).pop() || path;
+      toast.error(t("editor.saveFailedMaxRetries", { name: fileName, count: MAX_SAVE_RETRIES }));
+      saveRetryCountRef.current.delete(path);
+      return;
+    }
+
+    setFileSaving(path, true);
+    try {
+      await invoke("write_file_content", { path, content });
+      markAsSaved(path, content);
+      saveRetryCountRef.current.delete(path);
+    } catch (error) {
+      console.error("保存文件失败:", error);
+      setFileSaving(path, false);
+      saveRetryCountRef.current.set(path, retryCount + 1);
+      
+      const fileName = path.split(/[/\\]/).pop() || path;
+      toast.error(t("editor.saveFailed", { name: fileName, error: String(error) }));
+    }
+  }, [setFileSaving, markAsSaved, t]);
+
+  const handleContentChange = useCallback((newContent: string) => {
+    if (activeTab) {
+      updateContent(activeTab.path, newContent);
+    }
+  }, [activeTab, updateContent]);
+
+  const handleSave = useCallback(() => {
+    if (activeTab && activeTab.isDirty) {
+      saveFile(activeTab.path, activeTab.content);
+    }
+  }, [activeTab, saveFile]);
+
+  const pendingSavesRef = useRef<Map<string, { content: string; timeoutId: ReturnType<typeof setTimeout> }>>(new Map());
+  
+  useEffect(() => {
+    if (activeTab?.isDirty && !activeTab.isSaving) {
+      const path = activeTab.path;
+      const content = activeTab.content;
+      
+      const existing = pendingSavesRef.current.get(path);
+      if (existing) {
+        clearTimeout(existing.timeoutId);
+      }
+      
+      const timeoutId = setTimeout(() => {
+        saveFile(path, content);
+        pendingSavesRef.current.delete(path);
+      }, 1000);
+      
+      pendingSavesRef.current.set(path, { content, timeoutId });
+    }
+    
+    return () => {
+      pendingSavesRef.current.forEach(({ timeoutId }) => {
+        clearTimeout(timeoutId);
+      });
+    };
+  }, [activeTab?.isDirty, activeTab?.content, activeTab?.path, activeTab?.isSaving, saveFile]);
+
   if (tabs.length === 0) {
     return (
       <div className="flex flex-1 h-full flex-col items-center justify-center text-muted-foreground">
@@ -320,10 +402,10 @@ export function FilePreviewPanel() {
 
       {/* 文件路径提示 */}
       {activeTab && (
-        <div className="flex h-[24px] shrink-0 items-center px-3 bg-muted/10 border-b border-border/40">
+        <div className="flex h-[24px] shrink-0 items-center px-3 bg-muted/10 border-b border-border/40 justify-between">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-xs text-muted-foreground truncate">
+              <span className="text-xs text-muted-foreground truncate flex-1 mr-2">
                 {activeTab.path}
               </span>
             </TooltipTrigger>
@@ -331,12 +413,37 @@ export function FilePreviewPanel() {
               {activeTab.path}
             </TooltipContent>
           </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 shrink-0"
+                onClick={handleRetry}
+                disabled={activeTab.isLoading}
+              >
+                <RefreshCw className={cn(
+                  "h-3 w-3",
+                  activeTab.isLoading && "animate-spin"
+                )} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t("editor.refresh", "刷新文件")}
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
 
       {/* 文件内容区域 */}
       {activeTab ? (
-        <FileContentViewer tab={activeTab} onRetry={handleRetry} />
+        <FileContentViewer 
+          tab={activeTab} 
+          onRetry={handleRetry}
+          onContentChange={handleContentChange}
+          onSave={handleSave}
+        />
       ) : (
         <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           {t("editor.selectTab", "选择一个标签页")}

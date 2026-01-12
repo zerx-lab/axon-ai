@@ -1,6 +1,6 @@
 //! OpenCode service commands
 
-use crate::opencode::{ServiceConfig, ServiceMode, ServiceStatus};
+use crate::opencode::{ServiceConfig, ServiceMode, ServiceStatus, VersionInfo};
 use crate::state::AppState;
 use tauri::State;
 
@@ -60,4 +60,19 @@ pub async fn restart_service(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub fn get_service_endpoint(state: State<'_, AppState>) -> Option<String> {
     state.opencode.get_endpoint()
+}
+
+#[tauri::command]
+pub async fn get_version_info(state: State<'_, AppState>) -> Result<VersionInfo, String> {
+    state.opencode.get_version_info().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn check_for_update(state: State<'_, AppState>) -> Result<VersionInfo, String> {
+    state.opencode.check_for_update().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_opencode(state: State<'_, AppState>) -> Result<(), String> {
+    state.opencode.update_opencode().await.map_err(|e| e.to_string())
 }
