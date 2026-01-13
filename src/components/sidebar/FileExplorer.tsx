@@ -82,6 +82,7 @@ interface FileExplorerContextValue {
   onNewFile: (parentPath: string) => void;
   getParentDir: (path: string) => string;
   rootPath: string;
+  activeFilePath: string | null | undefined;
 }
 
 const FileExplorerContext = createContext<FileExplorerContextValue | null>(null);
@@ -103,6 +104,8 @@ interface FileExplorerProps {
   showHidden?: boolean;
   /** 点击文件回调，参数为文件路径和文件名 */
   onFileClick?: (path: string, name: string) => void;
+  /** 当前激活的文件路径（用于高亮显示） */
+  activeFilePath?: string | null;
   /** 类名 */
   className?: string;
 }
@@ -181,7 +184,7 @@ function FileTreeItem({
   onFileClick,
 }: FileTreeItemProps) {
   const { t } = useTranslation();
-  const { clipboard, renaming, onDelete, onStartRename, onConfirmRename, onCancelRename, onCopy, onPaste, onMove, onNewFile, getParentDir, rootPath } = useFileExplorerContext();
+  const { clipboard, renaming, onDelete, onStartRename, onConfirmRename, onCancelRename, onCopy, onPaste, onMove, onNewFile, getParentDir, rootPath, activeFilePath } = useFileExplorerContext();
   const [isDragOver, setIsDragOver] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +279,8 @@ function FileTreeItem({
   const pasteTargetDir = node.is_directory ? node.path : getParentDir(node.path);
   const newFileTargetDir = node.is_directory ? node.path : getParentDir(node.path);
 
+  const isActive = !node.is_directory && node.path === activeFilePath;
+
   return (
     <>
       <ContextMenu>
@@ -286,7 +291,8 @@ function FileTreeItem({
               "hover:bg-sidebar-accent/60",
               "transition-colors duration-100",
               isDragOver && "bg-accent ring-1 ring-accent-foreground/20",
-              isRenaming && "bg-sidebar-accent"
+              isRenaming && "bg-sidebar-accent",
+              isActive && "bg-sidebar-accent/80 text-foreground"
             )}
             style={{ paddingLeft }}
             onClick={handleClick}
@@ -406,6 +412,7 @@ export function FileExplorer({
   rootName,
   showHidden = false,
   onFileClick,
+  activeFilePath,
   className,
 }: FileExplorerProps) {
   const { t } = useTranslation();
@@ -622,7 +629,8 @@ export function FileExplorer({
     onNewFile: handleNewFile,
     getParentDir,
     rootPath,
-  }), [clipboard, renaming, handleDelete, handleStartRename, handleConfirmRename, handleCancelRename, handleCopy, handlePaste, handleMove, handleNewFile, getParentDir, rootPath]);
+    activeFilePath,
+  }), [clipboard, renaming, handleDelete, handleStartRename, handleConfirmRename, handleCancelRename, handleCopy, handlePaste, handleMove, handleNewFile, getParentDir, rootPath, activeFilePath]);
 
   const buildTree = useCallback(
     (node: FileTreeNode): FileTreeNode => {

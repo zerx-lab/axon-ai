@@ -444,6 +444,39 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 读取文件内容为 Base64
+/// 用于读取图片等二进制文件
+#[tauri::command]
+pub async fn read_file_binary(path: String) -> Result<String, String> {
+    debug!("读取二进制文件: {}", path);
+
+    let file_path = Path::new(&path);
+
+    if !file_path.exists() {
+        error!("文件不存在: {:?}", file_path);
+        return Err(format!("文件不存在: {}", path));
+    }
+
+    if !file_path.is_file() {
+        error!("路径不是文件: {:?}", file_path);
+        return Err(format!("路径不是文件: {}", path));
+    }
+
+    // 读取文件为字节
+    match std::fs::read(file_path) {
+        Ok(bytes) => {
+            use base64::Engine;
+            let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            debug!("成功读取二进制文件，原始大小: {} 字节", bytes.len());
+            Ok(encoded)
+        }
+        Err(e) => {
+            error!("读取文件失败: {:?}, 错误: {}", file_path, e);
+            Err(format!("读取文件失败: {}", e))
+        }
+    }
+}
+
 /// 打开目录选择对话框
 /// 返回用户选择的目录路径，如果用户取消则返回 None
 #[tauri::command]

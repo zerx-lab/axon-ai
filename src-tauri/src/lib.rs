@@ -86,6 +86,7 @@ pub fn run() {
             select_directory,
             read_directory,
             read_file_content,
+            read_file_binary,
             write_file_content,
             delete_path,
             rename_path,

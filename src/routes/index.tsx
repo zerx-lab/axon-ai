@@ -57,6 +57,7 @@ function HomePage() {
     activeTabPath,
     restoreFromLayout,
     getTabsForPersistence,
+    closeTab,
   } = useEditor();
 
   // 布局状态
@@ -242,18 +243,24 @@ function HomePage() {
     }
   }, [currentProject, clearAllSessions]);
 
-  // 监听 Ctrl+N 快捷键创建新会话
+  // 监听 Ctrl+N 和 Ctrl+W 快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === "n") {
         e.preventDefault();
         handleNewSession();
       }
+      if (e.ctrlKey && e.key === "w") {
+        e.preventDefault();
+        if (activeTabPath) {
+          closeTab(activeTabPath);
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewSession]);
+  }, [handleNewSession, activeTabPath, closeTab]);
 
   // 处理文件点击 - 打开文件预览
   const handleFileClick = useCallback(
@@ -332,6 +339,7 @@ function HomePage() {
                     onRefresh={handleRefreshSessions}
                     isRefreshing={isRefreshing}
                     onFileClick={handleFileClick}
+                    activeFilePath={activeTabPath}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -461,6 +469,7 @@ function HomePage() {
                     onRefresh={handleRefreshSessions}
                     isRefreshing={isRefreshing}
                     onFileClick={handleFileClick}
+                    activeFilePath={activeTabPath}
                   />
                 </ResizablePanel>
               </>

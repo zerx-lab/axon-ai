@@ -59,6 +59,8 @@ interface WorkspaceSidebarProps {
   isRefreshing?: boolean;
   /** 点击文件回调 */
   onFileClick?: (path: string, name: string) => void;
+  /** 当前打开的文件路径 */
+  activeFilePath?: string | null;
 }
 
 // 面板展开状态的 localStorage 键名
@@ -132,6 +134,7 @@ export function WorkspaceSidebar({
   onRefresh,
   isRefreshing = false,
   onFileClick,
+  activeFilePath,
 }: WorkspaceSidebarProps) {
   const { t } = useTranslation();
   const [panelState, setPanelState] = useState(loadPanelState);
@@ -328,6 +331,7 @@ export function WorkspaceSidebar({
               rootName={currentProject.name}
               showHidden={false}
               onFileClick={onFileClick}
+              activeFilePath={activeFilePath}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-10 px-4 text-center">

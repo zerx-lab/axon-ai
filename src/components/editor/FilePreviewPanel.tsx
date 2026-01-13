@@ -37,8 +37,10 @@ import {
   FileType,
   RefreshCw,
   AlertCircle,
+  FileX,
 } from "lucide-react";
 import { MonacoViewer } from "./MonacoViewer";
+import { ImageViewer } from "./ImageViewer";
 
 // ============== 文件图标辅助函数 ==============
 
@@ -89,6 +91,27 @@ function getFileIcon(fileName: string, className?: string): React.ReactNode {
     default:
       return <File className={cn(iconClass, "text-muted-foreground")} />;
   }
+}
+
+// ============== 文件类型检测 ==============
+
+type FileCategory = "text" | "image" | "unsupported";
+
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp"]);
+const UNSUPPORTED_EXTENSIONS = new Set([
+  "pdf", "exe", "dll", "bin", "so", "dylib",
+  "zip", "tar", "gz", "rar", "7z",
+  "mp3", "mp4", "avi", "mov", "mkv", "wav", "flac",
+  "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "ttf", "otf", "woff", "woff2",
+  "sqlite", "db",
+]);
+
+function getFileCategory(fileName: string): FileCategory {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (UNSUPPORTED_EXTENSIONS.has(ext)) return "unsupported";
+  return "text";
 }
 
 // ============== 标签页组件 ==============
@@ -191,8 +214,8 @@ interface FileContentViewerProps {
 
 function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileContentViewerProps) {
   const { t } = useTranslation();
+  const fileCategory = getFileCategory(tab.name);
 
-  // 加载中
   if (tab.isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -201,7 +224,6 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
-  // 错误状态
   if (tab.error) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -215,8 +237,34 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
-  // 空内容
-  if (!tab.content) {
+  if (fileCategory === "unsupported") {
+    const ext = tab.name.split(".").pop()?.toUpperCase() || "UNKNOWN";
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
+        <FileX className="h-12 w-12 opacity-50" />
+        <span className="text-sm font-medium">
+          {t("editor.unsupportedFile", "不支持预览此文件类型")}
+        </span>
+        <span className="text-xs opacity-70">{ext} {t("editor.fileType", "文件")}</span>
+      </div>
+    );
+  }
+
+  if (fileCategory === "image") {
+    return (
+      <div className="flex-1 h-full overflow-hidden">
+        <ImageViewer
+          path={tab.path}
+          data={tab.content || ""}
+          isLoading={tab.isLoading}
+          error={tab.error ?? undefined}
+          onRetry={onRetry}
+        />
+      </div>
+    );
+  }
+
+  if (tab.content === undefined) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         {t("editor.emptyFile", "文件为空")}
@@ -266,15 +314,28 @@ export function FilePreviewPanel() {
   // 加载文件内容
   const loadFileContent = useCallback(
     async (path: string) => {
-      // 防止重复加载
       if (loadingPathsRef.current.has(path)) {
         return;
       }
       loadingPathsRef.current.add(path);
 
+      const fileName = path.split(/[/\\]/).pop() || "";
+      const fileCategory = getFileCategory(fileName);
+
+      if (fileCategory === "unsupported") {
+        setFileContent(path, "");
+        loadingPathsRef.current.delete(path);
+        return;
+      }
+
       try {
-        const content = await invoke<string>("read_file_content", { path });
-        setFileContent(path, content);
+        if (fileCategory === "image") {
+          const content = await invoke<string>("read_file_binary", { path });
+          setFileContent(path, content);
+        } else {
+          const content = await invoke<string>("read_file_content", { path });
+          setFileContent(path, content);
+        }
       } catch (error) {
         setFileError(path, String(error));
       } finally {
