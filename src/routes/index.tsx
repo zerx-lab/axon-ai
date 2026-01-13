@@ -91,6 +91,8 @@ function HomePage() {
     isLoadingModels,
     currentVariants,
     selectedVariant,
+    agents,
+    currentAgent,
     sendMessage,
     stopGeneration,
     createNewSession,
@@ -100,6 +102,7 @@ function HomePage() {
     selectModel,
     selectVariant,
     cycleVariant,
+    selectAgent,
     clearError,
     refreshSessions,
   } = useChat();
@@ -417,6 +420,9 @@ function HomePage() {
                         selectedVariant={selectedVariant}
                         onSelectVariant={selectVariant}
                         onCycleVariant={cycleVariant}
+                        agents={agents}
+                        currentAgent={currentAgent}
+                        onSelectAgent={selectAgent}
                         sessions={sessions}
                         activeSessionId={activeSession?.id ?? null}
                         onSelectSession={selectSession}
@@ -455,6 +461,9 @@ function HomePage() {
                     selectedVariant={selectedVariant}
                     onSelectVariant={selectVariant}
                     onCycleVariant={cycleVariant}
+                    agents={agents}
+                    currentAgent={currentAgent}
+                    onSelectAgent={selectAgent}
                     sessions={sessions}
                     activeSessionId={activeSession?.id ?? null}
                     onSelectSession={selectSession}
