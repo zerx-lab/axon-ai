@@ -107,15 +107,24 @@ function HomePage() {
   // 项目状态
   const { projects, getProjectByDirectory } = useProjectContext();
 
-  // 获取当前项目 - 基于活动会话的目录
-  const currentProject = useMemo(() => {
-    if (!activeSession?.directory) {
-      // 如果没有活动会话，返回第一个项目（通常是默认项目）
-      return projects.length > 0 ? projects[0] : null;
+  const lastActiveSessionDirectoryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeSession?.directory) {
+      lastActiveSessionDirectoryRef.current = activeSession.directory;
     }
-    // 根据活动会话的目录找到对应的项目
-    const project = getProjectByDirectory(activeSession.directory);
-    return project || (projects.length > 0 ? projects[0] : null);
+  }, [activeSession?.directory]);
+
+  // 获取当前项目 - 优先使用活动会话目录；在删除最后一个会话到新会话创建的间隙，保持上一次目录避免抖动
+  const currentProject = useMemo(() => {
+    const preferredDirectory =
+      activeSession?.directory ?? lastActiveSessionDirectoryRef.current;
+
+    if (preferredDirectory) {
+      const project = getProjectByDirectory(preferredDirectory);
+      return project || (projects.length > 0 ? projects[0] : null);
+    }
+
+    return projects.length > 0 ? projects[0] : null;
   }, [activeSession?.directory, getProjectByDirectory, projects]);
 
   // 加载项目布局
@@ -173,7 +182,10 @@ function HomePage() {
       updateOpenedTabs(getTabsForPersistence());
       
       if (tabs.length === 0) {
-        saveLayout();
+        // 延迟保存，确保 activeTabPath 和 editorVisible 的 effect 先执行完成
+        requestAnimationFrame(() => {
+          saveLayout();
+        });
       }
     }
   }, [tabs, layoutInitialized, updateOpenedTabs, getTabsForPersistence, saveLayout]);

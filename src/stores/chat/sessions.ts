@@ -251,8 +251,6 @@ export function useDeleteSession(
   return useCallback(async (sessionId: string) => {
     if (!client) return;
     
-    // 使用对象来存储删除后需要执行的操作信息
-    // 避免在 setState 回调中执行异步操作，同时解决 TypeScript 闭包推断问题
     const deleteContext: {
       nextSession: { id: string; directory?: string } | null;
       shouldCreateNew: boolean;
@@ -263,21 +261,25 @@ export function useDeleteSession(
       sessionDirectory: undefined,
     };
     
-    // 先通过函数式更新获取要删除会话的 directory，同时计算删除后的状态
     setSessions((prevSessions) => {
       const sessionToDelete = prevSessions.find((s) => s.id === sessionId);
       deleteContext.sessionDirectory = sessionToDelete?.directory;
       
       const filteredSessions = prevSessions.filter((s) => s.id !== sessionId);
       
-      // 如果删除的是当前活动会话，计算下一个要选择的会话
-      if (sessionId === activeSessionId) {
-        if (filteredSessions.length > 0) {
+      if (sessionId === activeSessionId && deleteContext.sessionDirectory) {
+        // 优先在同一项目内寻找下一个会话
+        const sameProjectSessions = filteredSessions.filter(
+          (s) => s.directory === deleteContext.sessionDirectory
+        );
+        
+        if (sameProjectSessions.length > 0) {
           deleteContext.nextSession = {
-            id: filteredSessions[0].id,
-            directory: filteredSessions[0].directory,
+            id: sameProjectSessions[0].id,
+            directory: sameProjectSessions[0].directory,
           };
         } else {
+          // 同一项目没有其他会话，创建新会话
           deleteContext.shouldCreateNew = true;
         }
       }
@@ -286,18 +288,14 @@ export function useDeleteSession(
     });
     
     try {
-      // SDK v2 使用扁平化参数结构: { sessionID, directory? }
       await client.session.delete({ sessionID: sessionId, directory: deleteContext.sessionDirectory });
       
-      // 如果删除的是当前会话，选择下一个
       if (sessionId === activeSessionId) {
         if (deleteContext.nextSession) {
           setActiveSessionId(deleteContext.nextSession.id);
-          // 异步加载消息
           await loadMessages(deleteContext.nextSession.id, deleteContext.nextSession.directory);
         } else if (deleteContext.shouldCreateNew) {
-          // 创建新会话
-          await createNewSession();
+          await createNewSession(deleteContext.sessionDirectory);
         }
       }
     } catch (e) {
@@ -323,12 +321,15 @@ export interface ClearAllSessionsDeps extends SessionOperationsBaseDeps {
 /**
  * 清除当前项目所有会话 Hook
  * 仅删除指定目录下的会话
+ * 
+ * 注意：为避免项目切换抖动，不在删除过程中将 activeSessionId 设为 null，
+ * 而是在创建新会话时直接设置新的 activeSessionId。
  */
 export function useClearAllSessions(
   deps: ClearAllSessionsDeps,
   createNewSession: (directory?: string) => Promise<void>
 ) {
-  const { client, t, sessions, setSessions, setActiveSessionId, setMessages, setError } = deps;
+  const { client, t, sessions, setSessions, setMessages, setError } = deps;
   
   return useCallback(async (directory: string) => {
     if (!client) return;
@@ -344,9 +345,10 @@ export function useClearAllSessions(
     console.log(`[clearAllSessions] 准备删除 ${sessionsToDelete.length} 个会话`);
     
     // 先更新 UI 状态，移除所有当前目录的会话
+    // 注意：不设置 activeSessionId 为 null，避免触发项目切换抖动
+    // activeSessionId 会在 createNewSession 成功后自动更新为新会话 ID
     setSessions((prev) => prev.filter((s) => s.directory !== directory));
     setMessages([]);
-    setActiveSessionId(null);
     
     try {
       // 并行删除所有会话
@@ -358,12 +360,12 @@ export function useClearAllSessions(
       
       console.log("[clearAllSessions] 所有会话删除成功，创建新会话");
       
-      // 创建新会话
+      // 创建新会话（这会自动设置 activeSessionId）
       await createNewSession(directory);
     } catch (e) {
       console.error("清除所有会话失败:", e);
       const detail = e instanceof Error ? e.message : "";
       setError(detail ? t("errors.sendMessageFailedWithDetail", { detail }) : t("errors.deleteSessionFailed"));
     }
-  }, [client, sessions, setSessions, setActiveSessionId, setMessages, setError, createNewSession, t]);
+  }, [client, sessions, setSessions, setMessages, setError, createNewSession, t]);
 }
