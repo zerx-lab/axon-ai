@@ -110,6 +110,11 @@ export function ChatMessage({ message, isLast = false }: ChatMessageProps) {
           <span className="text-sm font-medium text-foreground">
             {isUser ? t("chat.user") : t("chat.assistant")}
           </span>
+          {message.info.agent && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-accent/60 text-muted-foreground capitalize">
+              {message.info.agent}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground/70">
             {formatTime(message.info.time.created)}
           </span>

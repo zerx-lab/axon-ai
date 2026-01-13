@@ -32,8 +32,8 @@ export interface MessageOperationsDeps {
   activeSession: Session | null;
   sessions: Session[];
   selectedModel: SelectedModel | null;
-  /** 当前选中的推理深度 variant */
   selectedVariant: string | undefined;
+  selectedAgent: string | null;
   isLoading: boolean;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
@@ -90,6 +90,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     sessions,
     selectedModel,
     selectedVariant,
+    selectedAgent,
     isLoading,
     setMessages,
     setSessions,
@@ -153,6 +154,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
         parts: PromptPart[];
         model: { providerID: string; modelID: string };
         variant?: string;
+        agent?: string;
       } = {
         sessionID: activeSessionId,
         directory: activeSession?.directory,
@@ -167,10 +169,15 @@ export function useSendMessage(deps: MessageOperationsDeps) {
         promptParams.variant = selectedVariant;
       }
       
+      if (selectedAgent) {
+        promptParams.agent = selectedAgent;
+      }
+      
       console.log("[sendMessage] 发送参数:", JSON.stringify(promptParams, null, 2));
       console.log("[sendMessage] activeSession:", activeSession);
       console.log("[sendMessage] selectedModel:", selectedModel);
       console.log("[sendMessage] selectedVariant:", selectedVariant);
+      console.log("[sendMessage] selectedAgent:", selectedAgent);
       
       const response = await client.session.promptAsync(promptParams);
       
@@ -249,7 +256,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
       isGeneratingRef.current = false;
     }
     // 注意：不在 finally 中关闭 isLoading，由 SSE 事件控制
-  }, [client, activeSessionId, selectedModel, selectedVariant, isLoading, activeSession, sessions, t, setMessages, setSessions, setIsLoading, setError, isGeneratingRef]);
+  }, [client, activeSessionId, selectedModel, selectedVariant, selectedAgent, isLoading, activeSession, sessions, t, setMessages, setSessions, setIsLoading, setError, isGeneratingRef]);
 }
 
 // ============== 停止生成 ==============

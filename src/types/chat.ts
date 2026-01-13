@@ -481,3 +481,53 @@ export interface QuestionRejectedEvent {
   };
 }
 
+// ============== Agent 类型 ==============
+
+/** Agent 权限规则集 */
+export interface AgentPermissionRuleset {
+  edit?: "ask" | "allow" | "deny";
+  bash?: Record<string, "ask" | "allow" | "deny">;
+  webfetch?: "ask" | "allow" | "deny";
+  doom_loop?: "ask" | "allow" | "deny";
+  external_directory?: "ask" | "allow" | "deny";
+}
+
+/**
+ * Agent 类型
+ * 代表一个 AI 代理配置
+ */
+export interface Agent {
+  /** 代理名称（唯一标识） */
+  name: string;
+  /** 代理描述 */
+  description?: string;
+  /** 代理模式：subagent（子代理）、primary（主代理）、all（所有） */
+  mode: "subagent" | "primary" | "all";
+  /** 是否为内置代理 */
+  native?: boolean;
+  /** 是否在 UI 中隐藏 */
+  hidden?: boolean;
+  /** 代理颜色（用于 UI 标识） */
+  color?: string;
+  /** 默认模型配置 */
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
+  /** 权限规则集 */
+  permission: AgentPermissionRuleset;
+  /** 系统提示词 */
+  prompt?: string;
+  /** 工具启用配置 */
+  tools?: Record<string, boolean>;
+  /** 其他选项 */
+  options?: Record<string, unknown>;
+  /** 温度参数 */
+  temperature?: number;
+  /** Top-P 参数 */
+  topP?: number;
+  /** 最大步骤数 */
+  maxSteps?: number;
+}
+
+

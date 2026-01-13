@@ -7,6 +7,7 @@
 import type {
   Message,
   Session,
+  Agent,
 } from "@/types/chat";
 import type { Attachment } from "@/hooks";
 
@@ -71,10 +72,13 @@ export interface UseChatReturn {
   isLoadingModels: boolean;
   
   // Variant 相关
-  /** 当前模型可用的 variants 列表 */
   currentVariants: string[];
-  /** 当前选中的 variant */
   selectedVariant: string | undefined;
+  
+  // Agent 相关
+  agents: Agent[];
+  currentAgent: Agent | null;
+  isLoadingAgents: boolean;
   
   // 会话操作
   createNewSession: (directory?: string) => Promise<void>;
@@ -91,10 +95,13 @@ export interface UseChatReturn {
   refreshProviders: () => Promise<void>;
   
   // Variant 操作
-  /** 设置当前模型的 variant */
   selectVariant: (variant: string | undefined) => void;
-  /** 循环切换 variant */
   cycleVariant: () => void;
+  
+  // Agent 操作
+  selectAgent: (agentName: string) => void;
+  cycleAgent: (direction?: 1 | -1) => void;
+  refreshAgents: () => Promise<void>;
   
   // 其他
   clearError: () => void;

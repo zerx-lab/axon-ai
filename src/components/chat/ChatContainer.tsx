@@ -11,7 +11,7 @@ import { QuickPrompts } from "./QuickPrompts";
 import { TodoListCompact } from "./TodoList";
 import { AutoAcceptToggle } from "./PermissionPrompt";
 import { FloatingPermissionPrompt } from "./FloatingPermissionPrompt";
-import type { Message, Session } from "@/types/chat";
+import type { Message, Session, Agent } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
 import type { Attachment } from "@/hooks";
 import { Sparkles, ArrowDown } from "lucide-react";
@@ -31,6 +31,9 @@ interface ChatContainerProps {
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
+  agents?: Agent[];
+  currentAgent?: Agent | null;
+  onSelectAgent?: (agentName: string) => void;
   sessions?: Session[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
@@ -50,6 +53,9 @@ export function ChatContainer({
   selectedVariant,
   onSelectVariant,
   onCycleVariant,
+  agents = [],
+  currentAgent,
+  onSelectAgent,
   sessions = [],
   activeSessionId = null,
   onSelectSession,
@@ -178,6 +184,9 @@ export function ChatContainer({
               selectedVariant={selectedVariant}
               onSelectVariant={onSelectVariant}
               onCycleVariant={onCycleVariant}
+              agents={agents}
+              currentAgent={currentAgent}
+              onSelectAgent={onSelectAgent}
               isEmptyState={true}
               sessions={sessions}
               activeSessionId={activeSessionId}
@@ -270,6 +279,9 @@ export function ChatContainer({
             selectedVariant={selectedVariant}
             onSelectVariant={onSelectVariant}
             onCycleVariant={onCycleVariant}
+            agents={agents}
+            currentAgent={currentAgent}
+            onSelectAgent={onSelectAgent}
             isEmptyState={false}
             sessions={sessions}
             activeSessionId={activeSessionId}

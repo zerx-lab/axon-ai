@@ -37,8 +37,9 @@ import {
 } from "@/components/ui/command";
 const SessionSearchDialog = lazy(() => import("./SessionSearchDialog").then(m => ({ default: m.SessionSearchDialog })));
 import { VariantSelector } from "./VariantSelector";
+import { AgentSelector } from "./AgentSelector";
 import type { Provider } from "@/stores/chat";
-import type { Session } from "@/types/chat";
+import type { Session, Agent } from "@/types/chat";
 import {
   useAttachments,
   type Attachment,
@@ -60,6 +61,9 @@ interface ChatInputCardProps {
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
+  agents?: Agent[];
+  currentAgent?: Agent | null;
+  onSelectAgent?: (agentName: string) => void;
   isEmptyState?: boolean;
   sessions?: Session[];
   activeSessionId?: string | null;
@@ -116,6 +120,9 @@ export function ChatInputCard({
   selectedVariant,
   onSelectVariant,
   onCycleVariant,
+  agents = [],
+  currentAgent = null,
+  onSelectAgent,
   isEmptyState = false,
   sessions = [],
   activeSessionId = null,
@@ -447,6 +454,16 @@ export function ChatInputCard({
           >
             <Clock className="h-4 w-4" />
           </Button>
+
+          {agents.length > 0 && onSelectAgent && (
+            <AgentSelector
+              agents={agents}
+              currentAgent={currentAgent}
+              onSelectAgent={onSelectAgent}
+              onAfterSelect={() => textareaRef.current?.focus()}
+              disabled={disabled}
+            />
+          )}
         </div>
 
         {/* 右侧：模型选择器 + 发送按钮 */}
