@@ -371,17 +371,23 @@ impl OpencodeService {
 
     /// Stop the service
     pub async fn stop(&self) -> Result<(), OpencodeError> {
-        let mut process = self.process.write();
-        if let Some(ref mut child) = *process {
-            info!("Stopping opencode service...");
-            
+        // 获取进程 PID 后立即释放锁，避免在异步等待时持有锁
+        let pid_to_kill = {
+            let process = self.process.read();
+            process.as_ref().map(|child| child.id())
+        };
+
+        if let Some(pid) = pid_to_kill {
+            info!("Stopping opencode service (PID: {})...", pid);
+
             #[cfg(target_os = "windows")]
             {
-                let pid = child.id();
                 info!("Killing opencode process tree (PID: {})...", pid);
-                let output = std::process::Command::new("taskkill")
+                // 使用 tokio::process::Command 进行异步执行
+                let output = tokio::process::Command::new("taskkill")
                     .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .output();
+                    .output()
+                    .await;
                 match output {
                     Ok(o) => {
                         if !o.status.success() {
@@ -390,37 +396,58 @@ impl OpencodeService {
                     }
                     Err(e) => warn!("taskkill failed: {}", e),
                 }
-                
-                for _ in 0..10 {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            info!("Process exited with status: {:?}", status);
-                            break;
+
+                // 使用异步等待，最多等待 3 秒（30 次 × 100ms）
+                for attempt in 1..=30 {
+                    let still_running = {
+                        let mut process = self.process.write();
+                        if let Some(ref mut child) = *process {
+                            match child.try_wait() {
+                                Ok(Some(status)) => {
+                                    info!("Process exited with status: {:?}", status);
+                                    false
+                                }
+                                Ok(None) => true, // 仍在运行
+                                Err(e) => {
+                                    warn!("try_wait error: {}", e);
+                                    false
+                                }
+                            }
+                        } else {
+                            false
                         }
-                        Ok(None) => {
-                            std::thread::sleep(std::time::Duration::from_millis(100));
-                        }
-                        Err(e) => {
-                            warn!("try_wait error: {}", e);
-                            break;
-                        }
+                    };
+
+                    if !still_running {
+                        break;
+                    }
+
+                    if attempt % 10 == 0 {
+                        debug!("Waiting for process to exit... (attempt {}/30)", attempt);
+                    }
+                    // 使用异步 sleep，不阻塞运行时
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let mut process = self.process.write();
+                if let Some(ref mut child) = *process {
+                    if let Err(e) = child.kill() {
+                        warn!("Kill returned error (may already be dead): {}", e);
+                    }
+                    match child.wait() {
+                        Ok(status) => info!("Process exited with status: {:?}", status),
+                        Err(e) => warn!("Wait returned error: {}", e),
                     }
                 }
             }
-            
-            #[cfg(not(target_os = "windows"))]
-            {
-                if let Err(e) = child.kill() {
-                    warn!("Kill returned error (may already be dead): {}", e);
-                }
-                match child.wait() {
-                    Ok(status) => info!("Process exited with status: {:?}", status),
-                    Err(e) => warn!("Wait returned error: {}", e),
-                }
-            }
         }
-        *process = None;
-        
+
+        // 清理进程引用
+        *self.process.write() = None;
+
         self.update_status(ServiceStatus::Stopped);
         info!("OpenCode service stopped");
         Ok(())
@@ -497,18 +524,64 @@ impl OpencodeService {
         self.get_version_info().await
     }
 
+    #[cfg(target_os = "windows")]
+    async fn wait_for_file_unlocked(path: &std::path::Path, max_attempts: u32, delay_ms: u64) -> bool {
+        use std::fs::OpenOptions;
+
+        for attempt in 1..=max_attempts {
+            match OpenOptions::new().write(true).open(path) {
+                Ok(_) => {
+                    info!("文件已解锁 (尝试 {}/{})", attempt, max_attempts);
+                    return true;
+                }
+                Err(e) => {
+                    if attempt % 10 == 0 {
+                        debug!("文件仍被锁定 (尝试 {}/{}): {}", attempt, max_attempts, e);
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                }
+            }
+        }
+        false
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    async fn wait_for_file_unlocked(
+        _path: &std::path::Path,
+        _max_attempts: u32,
+        _delay_ms: u64,
+    ) -> bool {
+        true
+    }
+
     pub async fn update_opencode(self: &Arc<Self>) -> Result<(), OpencodeError> {
         info!("Starting update process...");
-        
+
         let was_running = matches!(self.get_status(), ServiceStatus::Running { .. });
-        
+
         self.stop().await?;
-        
+
+        let binary_path = self.downloader.get_binary_path();
+
         #[cfg(target_os = "windows")]
-        {
-            info!("Waiting for Windows to release file handles...");
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        if let Some(ref path) = binary_path {
+            info!("等待 Windows 释放文件句柄...");
+
+            let unlocked = Self::wait_for_file_unlocked(path, 30, 500).await;
+
+            if !unlocked {
+                warn!("文件仍被锁定，继续等待...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+                if !Self::wait_for_file_unlocked(path, 10, 500).await {
+                    return Err(OpencodeError::ExtractError(
+                        "无法更新：文件被锁定。请关闭可能使用 opencode 的其他程序后重试。"
+                            .to_string(),
+                    ));
+                }
+            }
         }
+
         #[cfg(not(target_os = "windows"))]
         {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;

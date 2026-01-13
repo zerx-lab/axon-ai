@@ -53,7 +53,7 @@ fn extract_zip_sync(
             let dest_path = dest_dir.join(binary_name);
 
             if dest_path.exists() {
-                let max_retries = 10;
+                let max_retries = 20;
                 let mut deleted = false;
                 for attempt in 1..=max_retries {
                     match std::fs::remove_file(&dest_path) {
@@ -71,17 +71,22 @@ fn extract_zip_sync(
                                 std::thread::sleep(std::time::Duration::from_millis(500));
                             } else {
                                 warn!(
-                                    "Failed to remove old binary after {} attempts: {}",
-                                    max_retries, e
+                                    "Failed to remove old binary after {} attempts ({}s): {}",
+                                    max_retries,
+                                    max_retries as f32 * 0.5,
+                                    e
                                 );
-                                return Err(OpencodeError::IoError(e));
+                                return Err(OpencodeError::ExtractError(format!(
+                                    "无法替换旧版本文件，文件被占用。请确保 opencode 进程已完全退出后重试。错误: {}",
+                                    e
+                                )));
                             }
                         }
                     }
                 }
                 if !deleted {
                     return Err(OpencodeError::ExtractError(
-                        "Cannot remove old binary, file is locked".to_string(),
+                        "无法删除旧版本文件，文件被锁定".to_string(),
                     ));
                 }
             }
