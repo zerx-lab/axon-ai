@@ -87,6 +87,10 @@ pub fn run() {
             read_directory,
             read_file_content,
             write_file_content,
+            delete_path,
+            rename_path,
+            copy_path,
+            move_path,
             // Diff 计算命令
             compute_diff,
             compute_unified_diff,

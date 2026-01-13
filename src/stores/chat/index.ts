@@ -29,6 +29,7 @@ import {
   useRefreshSessions,
   useSelectSession,
   useDeleteSession,
+  useClearAllSessions,
 } from "./sessions";
 import { 
   useRefreshProviders, 
@@ -172,6 +173,19 @@ export function useChat() {
     },
     createNewSession
   );
+  
+  const clearAllSessions = useClearAllSessions(
+    {
+      client,
+      t,
+      sessions,
+      setSessions,
+      setActiveSessionId,
+      setMessages,
+      setError,
+    },
+    createNewSession
+  );
 
   // ============== Provider/模型操作 Hooks ==============
   
@@ -278,6 +292,7 @@ export function useChat() {
     createNewSession,
     selectSession,
     deleteSession,
+    clearAllSessions,
     
     // 消息操作
     sendMessage,

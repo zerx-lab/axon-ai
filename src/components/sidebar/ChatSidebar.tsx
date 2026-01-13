@@ -7,6 +7,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { Session } from "@/types/chat";
 import {
   Plus,
@@ -24,6 +31,8 @@ interface ChatSidebarProps {
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
   onDeleteSession: (sessionId: string) => void;
+  /** 清除全部会话回调 */
+  onClearAll?: () => void;
   onOpenProject?: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
@@ -37,6 +46,7 @@ export function ChatSidebar({
   onSelectSession,
   onNewSession,
   onDeleteSession,
+  onClearAll,
   onOpenProject,
   onRefresh,
   isRefreshing = false,
@@ -48,11 +58,9 @@ export function ChatSidebar({
   return (
     <div
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar",
-        // 启用 CSS 容器查询
+        "flex h-full flex-col border-r border-sidebar-border bg-sidebar select-none",
         "@container"
       )}
-      // 使用内联样式设置容器类型
       style={{ containerType: "inline-size" }}
     >
       {/* 头部 - 使用容器查询自动切换布局 */}
@@ -157,24 +165,38 @@ export function ChatSidebar({
 
       {/* 展开视图 - 宽度 >= 100px 时显示 */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden hidden @[100px]:block sidebar-scroll-area">
-        <div className="flex flex-col gap-1 p-2 pr-3">
-          {sessions.length === 0 ? (
-            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-              {t("sidebar.noChats")}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="flex flex-col gap-1 p-2 pr-3 min-h-full">
+              {sessions.length === 0 ? (
+                <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                  {t("sidebar.noChats")}
+                </div>
+              ) : (
+                sessions.map((session) => (
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    isActive={session.id === activeSessionId}
+                    onSelect={() => onSelectSession(session.id)}
+                    onDelete={() => onDeleteSession(session.id)}
+                    onClearAll={onClearAll}
+                    deleteLabel={t("sidebar.contextMenu.deleteSession")}
+                    clearAllLabel={t("sidebar.contextMenu.clearSessions", "清空会话")}
+                  />
+                ))
+              )}
             </div>
-          ) : (
-            sessions.map((session) => (
-              <SessionItem
-                key={session.id}
-                session={session}
-                isActive={session.id === activeSessionId}
-                onSelect={() => onSelectSession(session.id)}
-                onDelete={() => onDeleteSession(session.id)}
-                deleteTitle={t("sidebar.deleteChat")}
-              />
-            ))
+          </ContextMenuTrigger>
+          {onClearAll && sessions.length > 0 && (
+            <ContextMenuContent>
+              <ContextMenuItem onClick={onClearAll} className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                {t("sidebar.contextMenu.clearSessions", "清空会话")}
+              </ContextMenuItem>
+            </ContextMenuContent>
           )}
-        </div>
+        </ContextMenu>
       </div>
     </div>
   );
@@ -185,7 +207,9 @@ interface SessionItemProps {
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  deleteTitle: string;
+  onClearAll?: () => void;
+  deleteLabel: string;
+  clearAllLabel: string;
 }
 
 function SessionItem({
@@ -193,43 +217,64 @@ function SessionItem({
   isActive,
   onSelect,
   onDelete,
-  deleteTitle,
+  onClearAll,
+  deleteLabel,
+  clearAllLabel,
 }: SessionItemProps) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={cn(
-            "group flex items-center gap-2 rounded-md px-2 py-2 cursor-pointer transition-colors overflow-hidden",
-            isActive
-              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-          )}
-          onClick={onSelect}
-        >
-          <MessageSquare className="h-4 w-4 shrink-0" />
-          <span className="flex-1 truncate text-sm">{session.title}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-6 w-6 shrink-0 opacity-0 transition-opacity",
-              "group-hover:opacity-100",
-              isActive && "opacity-100"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title={deleteTitle}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={8}>
-        {session.title}
-      </TooltipContent>
-    </Tooltip>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                "group flex items-center gap-2 rounded-md px-2 py-2 cursor-pointer transition-colors overflow-hidden",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+              )}
+              onClick={onSelect}
+            >
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="flex-1 truncate text-sm">{session.title}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-6 w-6 shrink-0 opacity-0 transition-opacity",
+                  "group-hover:opacity-100",
+                  isActive && "opacity-100"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                title={deleteLabel}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            {session.title}
+          </TooltipContent>
+        </Tooltip>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={onDelete}>
+          <Trash2 className="h-4 w-4 mr-2" />
+          {deleteLabel}
+        </ContextMenuItem>
+        {onClearAll && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onClearAll} className="text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              {clearAllLabel}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

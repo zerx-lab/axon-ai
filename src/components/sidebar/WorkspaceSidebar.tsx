@@ -21,6 +21,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { CollapsiblePanel } from "./CollapsiblePanel";
@@ -50,6 +51,8 @@ interface WorkspaceSidebarProps {
   onNewSession: () => void;
   /** 删除会话 */
   onDeleteSession: (sessionId: string) => void;
+  /** 清除全部会话 */
+  onClearAll?: () => void;
   /** 刷新会话列表 */
   onRefresh?: () => void;
   /** 是否正在刷新 */
@@ -125,6 +128,7 @@ export function WorkspaceSidebar({
   onSelectSession,
   onNewSession,
   onDeleteSession,
+  onClearAll,
   onRefresh,
   isRefreshing = false,
   onFileClick,
@@ -263,24 +267,38 @@ export function WorkspaceSidebar({
           actions={sessionPanelActions}
           flexGrow={panelFlexGrow.sessions}
         >
-          <div className="flex flex-col">
-            {sortedSessions.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                {t("sidebar.noChats", "暂无对话")}
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="flex flex-col min-h-full">
+                {sortedSessions.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    {t("sidebar.noChats", "暂无对话")}
+                  </div>
+                ) : (
+                  sortedSessions.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => onSelectSession(session.id)}
+                      onDelete={() => onDeleteSession(session.id)}
+                      onClearAll={onClearAll}
+                      deleteTitle={t("sidebar.deleteChat", "删除对话")}
+                      clearAllTitle={t("sidebar.contextMenu.clearSessions", "清空会话")}
+                    />
+                  ))
+                )}
               </div>
-            ) : (
-              sortedSessions.map((session) => (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  isActive={session.id === activeSessionId}
-                  onSelect={() => onSelectSession(session.id)}
-                  onDelete={() => onDeleteSession(session.id)}
-                  deleteTitle={t("sidebar.deleteChat", "删除对话")}
-                />
-              ))
+            </ContextMenuTrigger>
+            {onClearAll && sessions.length > 0 && (
+              <ContextMenuContent>
+                <ContextMenuItem onClick={onClearAll} className="text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t("sidebar.contextMenu.clearSessions", "清空会话")}
+                </ContextMenuItem>
+              </ContextMenuContent>
             )}
-          </div>
+          </ContextMenu>
         </CollapsiblePanel>
 
         {/* 可拖拽分隔条 */}
@@ -332,7 +350,9 @@ interface SessionItemProps {
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onClearAll?: () => void;
   deleteTitle: string;
+  clearAllTitle: string;
 }
 
 function SessionItem({
@@ -340,7 +360,9 @@ function SessionItem({
   isActive,
   onSelect,
   onDelete,
+  onClearAll,
   deleteTitle,
+  clearAllTitle,
 }: SessionItemProps) {
   return (
     <ContextMenu>
@@ -382,10 +404,19 @@ function SessionItem({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={onDelete} className="text-destructive">
+        <ContextMenuItem onClick={onDelete}>
           <Trash2 className="h-4 w-4 mr-2" />
           {deleteTitle}
         </ContextMenuItem>
+        {onClearAll && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onClearAll} className="text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              {clearAllTitle}
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

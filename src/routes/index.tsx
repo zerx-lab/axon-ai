@@ -94,6 +94,7 @@ function HomePage() {
     createNewSession,
     selectSession,
     deleteSession,
+    clearAllSessions,
     selectModel,
     selectVariant,
     cycleVariant,
@@ -234,6 +235,13 @@ function HomePage() {
     }
   }, [currentProject, createNewSession]);
 
+  // 处理清除当前项目所有会话
+  const handleClearAllSessions = useCallback(async () => {
+    if (currentProject) {
+      await clearAllSessions(currentProject.directory);
+    }
+  }, [currentProject, clearAllSessions]);
+
   // 监听 Ctrl+N 快捷键创建新会话
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -320,6 +328,7 @@ function HomePage() {
                     onSelectSession={selectSession}
                     onNewSession={handleNewSession}
                     onDeleteSession={deleteSession}
+                    onClearAll={handleClearAllSessions}
                     onRefresh={handleRefreshSessions}
                     isRefreshing={isRefreshing}
                     onFileClick={handleFileClick}
@@ -448,6 +457,7 @@ function HomePage() {
                     onSelectSession={selectSession}
                     onNewSession={handleNewSession}
                     onDeleteSession={deleteSession}
+                    onClearAll={handleClearAllSessions}
                     onRefresh={handleRefreshSessions}
                     isRefreshing={isRefreshing}
                     onFileClick={handleFileClick}

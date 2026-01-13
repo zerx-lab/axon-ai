@@ -226,6 +226,224 @@ pub async fn write_file_content(path: String, content: String) -> Result<(), Str
     }
 }
 
+/// 删除文件或目录
+/// 如果是目录，递归删除所有内容
+#[tauri::command]
+pub async fn delete_path(path: String) -> Result<(), String> {
+    debug!("删除路径: {}", path);
+
+    let target_path = Path::new(&path);
+
+    if !target_path.exists() {
+        error!("路径不存在: {:?}", target_path);
+        return Err(format!("路径不存在: {}", path));
+    }
+
+    if target_path.is_dir() {
+        std::fs::remove_dir_all(target_path).map_err(|e| {
+            error!("删除目录失败: {:?}, 错误: {}", target_path, e);
+            format!("删除目录失败: {}", e)
+        })?;
+    } else {
+        std::fs::remove_file(target_path).map_err(|e| {
+            error!("删除文件失败: {:?}, 错误: {}", target_path, e);
+            format!("删除文件失败: {}", e)
+        })?;
+    }
+
+    debug!("删除成功: {:?}", target_path);
+    Ok(())
+}
+
+/// 重命名文件或目录
+#[tauri::command]
+pub async fn rename_path(old_path: String, new_name: String) -> Result<String, String> {
+    debug!("重命名: {} -> {}", old_path, new_name);
+
+    let source_path = Path::new(&old_path);
+
+    if !source_path.exists() {
+        error!("源路径不存在: {:?}", source_path);
+        return Err(format!("源路径不存在: {}", old_path));
+    }
+
+    // 获取父目录并构建新路径
+    let parent = source_path.parent().ok_or_else(|| {
+        error!("无法获取父目录: {:?}", source_path);
+        "无法获取父目录".to_string()
+    })?;
+
+    let new_path = parent.join(&new_name);
+
+    if new_path.exists() {
+        error!("目标路径已存在: {:?}", new_path);
+        return Err(format!("目标路径已存在: {}", new_name));
+    }
+
+    std::fs::rename(source_path, &new_path).map_err(|e| {
+        error!("重命名失败: {:?} -> {:?}, 错误: {}", source_path, new_path, e);
+        format!("重命名失败: {}", e)
+    })?;
+
+    let result = new_path.to_string_lossy().to_string();
+    debug!("重命名成功: {:?}", new_path);
+    Ok(result)
+}
+
+/// 复制文件或目录
+/// 返回新路径
+#[tauri::command]
+pub async fn copy_path(source: String, dest_dir: String) -> Result<String, String> {
+    debug!("复制: {} -> {}", source, dest_dir);
+
+    let source_path = Path::new(&source);
+    let dest_dir_path = Path::new(&dest_dir);
+
+    if !source_path.exists() {
+        error!("源路径不存在: {:?}", source_path);
+        return Err(format!("源路径不存在: {}", source));
+    }
+
+    if !dest_dir_path.is_dir() {
+        error!("目标必须是目录: {:?}", dest_dir_path);
+        return Err(format!("目标必须是目录: {}", dest_dir));
+    }
+
+    let file_name = source_path.file_name().ok_or_else(|| {
+        error!("无法获取文件名: {:?}", source_path);
+        "无法获取文件名".to_string()
+    })?;
+
+    let dest_path = dest_dir_path.join(file_name);
+
+    // 如果目标已存在，自动添加后缀
+    let final_dest = if dest_path.exists() {
+        generate_unique_path(&dest_path)
+    } else {
+        dest_path
+    };
+
+    if source_path.is_dir() {
+        copy_dir_recursive(source_path, &final_dest)?;
+    } else {
+        std::fs::copy(source_path, &final_dest).map_err(|e| {
+            error!("复制文件失败: {:?} -> {:?}, 错误: {}", source_path, final_dest, e);
+            format!("复制文件失败: {}", e)
+        })?;
+    }
+
+    let result = final_dest.to_string_lossy().to_string();
+    debug!("复制成功: {:?}", final_dest);
+    Ok(result)
+}
+
+/// 移动文件或目录
+/// 返回新路径
+#[tauri::command]
+pub async fn move_path(source: String, dest_dir: String) -> Result<String, String> {
+    debug!("移动: {} -> {}", source, dest_dir);
+
+    let source_path = Path::new(&source);
+    let dest_dir_path = Path::new(&dest_dir);
+
+    if !source_path.exists() {
+        error!("源路径不存在: {:?}", source_path);
+        return Err(format!("源路径不存在: {}", source));
+    }
+
+    if !dest_dir_path.is_dir() {
+        error!("目标必须是目录: {:?}", dest_dir_path);
+        return Err(format!("目标必须是目录: {}", dest_dir));
+    }
+
+    let file_name = source_path.file_name().ok_or_else(|| {
+        error!("无法获取文件名: {:?}", source_path);
+        "无法获取文件名".to_string()
+    })?;
+
+    let dest_path = dest_dir_path.join(file_name);
+
+    // 如果目标已存在，自动添加后缀
+    let final_dest = if dest_path.exists() {
+        generate_unique_path(&dest_path)
+    } else {
+        dest_path
+    };
+
+    // 尝试直接 rename（同一文件系统）
+    match std::fs::rename(source_path, &final_dest) {
+        Ok(()) => {
+            let result = final_dest.to_string_lossy().to_string();
+            debug!("移动成功（rename）: {:?}", final_dest);
+            Ok(result)
+        }
+        Err(_) => {
+            // 跨文件系统移动：先复制再删除
+            if source_path.is_dir() {
+                copy_dir_recursive(source_path, &final_dest)?;
+                std::fs::remove_dir_all(source_path).map_err(|e| {
+                    error!("删除源目录失败: {:?}, 错误: {}", source_path, e);
+                    format!("移动成功但删除源目录失败: {}", e)
+                })?;
+            } else {
+                std::fs::copy(source_path, &final_dest).map_err(|e| {
+                    error!("复制文件失败: {:?}, 错误: {}", source_path, e);
+                    format!("复制文件失败: {}", e)
+                })?;
+                std::fs::remove_file(source_path).map_err(|e| {
+                    error!("删除源文件失败: {:?}, 错误: {}", source_path, e);
+                    format!("移动成功但删除源文件失败: {}", e)
+                })?;
+            }
+            let result = final_dest.to_string_lossy().to_string();
+            debug!("移动成功（copy+delete）: {:?}", final_dest);
+            Ok(result)
+        }
+    }
+}
+
+/// 生成唯一路径（当目标已存在时）
+fn generate_unique_path(path: &Path) -> std::path::PathBuf {
+    let parent = path.parent().unwrap_or(Path::new(""));
+    let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let ext = path.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+
+    let mut counter = 1;
+    loop {
+        let new_name = format!("{} ({}){}", stem, counter, ext);
+        let new_path = parent.join(&new_name);
+        if !new_path.exists() {
+            return new_path;
+        }
+        counter += 1;
+    }
+}
+
+/// 递归复制目录
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst).map_err(|e| {
+        error!("创建目录失败: {:?}, 错误: {}", dst, e);
+        format!("创建目录失败: {}", e)
+    })?;
+
+    for entry in std::fs::read_dir(src).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path).map_err(|e| {
+                error!("复制文件失败: {:?} -> {:?}, 错误: {}", src_path, dst_path, e);
+                format!("复制文件失败: {}", e)
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
 /// 打开目录选择对话框
 /// 返回用户选择的目录路径，如果用户取消则返回 None
 #[tauri::command]

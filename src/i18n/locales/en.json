@@ -77,6 +77,22 @@
       "selectSession": "Select a session to view project files",
       "empty": "Directory is empty",
       "loadError": "Failed to load"
+    },
+    "contextMenu": {
+      "deleteSession": "Delete Session",
+      "clearAll": "Clear All Sessions",
+      "clearAllConfirm": "Are you sure you want to clear all sessions? This action cannot be undone."
+    },
+    "explorerContextMenu": {
+      "newFile": "New File",
+      "delete": "Delete",
+      "rename": "Rename",
+      "copy": "Copy",
+      "paste": "Paste",
+      "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "newName": "New name",
+      "renameTitle": "Rename",
+      "enterNewName": "Enter new name"
     }
   },
   "chat": {
@@ -191,6 +207,8 @@
       "localDescription": "Use local OpenCode service, suitable for offline use",
       "remote": "Remote Service",
       "remoteDescription": "Connect to remote OpenCode server",
+      "remoteNotSupported": "Currently only local service is supported",
+      "comingSoon": "Coming Soon",
       "remoteUrl": "Remote Service URL:",
       "remoteUrlPlaceholder": "Enter remote service URL",
       "remoteUrlHint": "e.g., http://localhost:8080",

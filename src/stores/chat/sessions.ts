@@ -307,3 +307,63 @@ export function useDeleteSession(
     }
   }, [client, activeSessionId, setSessions, setActiveSessionId, setError, loadMessages, createNewSession, t]);
 }
+
+// ============== 清除所有会话依赖项 ==============
+
+/** 清除所有会话依赖项 */
+export interface ClearAllSessionsDeps extends SessionOperationsBaseDeps {
+  sessions: Session[];
+  setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
+  setActiveSessionId: React.Dispatch<React.SetStateAction<string | null>>;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+}
+
+// ============== 清除所有会话 ==============
+
+/**
+ * 清除当前项目所有会话 Hook
+ * 仅删除指定目录下的会话
+ */
+export function useClearAllSessions(
+  deps: ClearAllSessionsDeps,
+  createNewSession: (directory?: string) => Promise<void>
+) {
+  const { client, t, sessions, setSessions, setActiveSessionId, setMessages, setError } = deps;
+  
+  return useCallback(async (directory: string) => {
+    if (!client) return;
+    
+    // 找出当前目录下的所有会话
+    const sessionsToDelete = sessions.filter((s) => s.directory === directory);
+    
+    if (sessionsToDelete.length === 0) {
+      console.log("[clearAllSessions] 当前目录没有会话需要删除");
+      return;
+    }
+    
+    console.log(`[clearAllSessions] 准备删除 ${sessionsToDelete.length} 个会话`);
+    
+    // 先更新 UI 状态，移除所有当前目录的会话
+    setSessions((prev) => prev.filter((s) => s.directory !== directory));
+    setMessages([]);
+    setActiveSessionId(null);
+    
+    try {
+      // 并行删除所有会话
+      await Promise.all(
+        sessionsToDelete.map((session) =>
+          client.session.delete({ sessionID: session.id, directory: session.directory })
+        )
+      );
+      
+      console.log("[clearAllSessions] 所有会话删除成功，创建新会话");
+      
+      // 创建新会话
+      await createNewSession(directory);
+    } catch (e) {
+      console.error("清除所有会话失败:", e);
+      const detail = e instanceof Error ? e.message : "";
+      setError(detail ? t("errors.sendMessageFailedWithDetail", { detail }) : t("errors.deleteSessionFailed"));
+    }
+  }, [client, sessions, setSessions, setActiveSessionId, setMessages, setError, createNewSession, t]);
+}

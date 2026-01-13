@@ -20,8 +20,6 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
@@ -55,9 +53,6 @@ export function ServiceSettings() {
   // 本地状态
   const [selectedMode, setSelectedMode] = useState<"local" | "remote">(
     state.config.mode.type
-  );
-  const [remoteUrl, setRemoteUrl] = useState(
-    state.config.mode.type === "remote" ? state.config.mode.url : ""
   );
   const [isSaving, setIsSaving] = useState(false);
   
@@ -113,9 +108,6 @@ export function ServiceSettings() {
   // 同步状态
   useEffect(() => {
     setSelectedMode(state.config.mode.type);
-    if (state.config.mode.type === "remote") {
-      setRemoteUrl(state.config.mode.url);
-    }
   }, [state.config.mode]);
 
   // 处理模式切换
@@ -127,28 +119,7 @@ export function ServiceSettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      let mode: ServiceMode;
-      
-      if (selectedMode === "remote") {
-        // 验证 URL
-        if (!remoteUrl.trim()) {
-          toast.error(t("errors.invalidUrl"));
-          return;
-        }
-        
-        // 简单 URL 验证
-        try {
-          new URL(remoteUrl);
-        } catch {
-          toast.error(t("errors.invalidUrl"));
-          return;
-        }
-        
-        mode = { type: "remote", url: remoteUrl.trim() };
-      } else {
-        mode = { type: "local" };
-      }
-
+      const mode: ServiceMode = { type: "local" };
       await setMode(mode);
       toast.success(t("notifications.settingsSaved"));
     } catch (error) {
@@ -312,47 +283,29 @@ export function ServiceSettings() {
               </div>
             </label>
 
-            {/* 远程服务 */}
-            <label
-              htmlFor="remote"
-              className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/50 p-3.5 transition-all duration-150 hover:bg-accent/40 hover:border-border/80 has-[[data-state=checked]]:border-primary/50 has-[[data-state=checked]]:bg-primary/5"
+            {/* 远程服务（暂不支持，禁用状态） */}
+            <div
+              className="flex items-start gap-3 rounded-lg border border-border/30 p-3.5 opacity-50 cursor-not-allowed bg-muted/20"
+              title={t("settings.serviceSettings.remoteNotSupported")}
             >
-              <RadioGroupItem value="remote" id="remote" className="mt-0.5" />
-              <div className="flex-1 space-y-2.5">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10">
-                      <Cloud className="h-3.5 w-3.5 text-blue-500" />
-                    </div>
-                    <span className="text-sm font-medium">
-                      {t("settings.serviceSettings.remote")}
-                    </span>
+              <RadioGroupItem value="remote" id="remote" className="mt-0.5" disabled />
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10">
+                    <Cloud className="h-3.5 w-3.5 text-blue-500/50" />
                   </div>
-                  <p className="text-[13px] text-muted-foreground/80 leading-relaxed pl-8">
-                    {t("settings.serviceSettings.remoteDescription")}
-                  </p>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("settings.serviceSettings.remote")}
+                  </span>
+                  <span className="text-xs bg-muted/50 text-muted-foreground/70 px-1.5 py-0.5 rounded">
+                    {t("settings.serviceSettings.comingSoon")}
+                  </span>
                 </div>
-                
-                {selectedMode === "remote" && (
-                  <div className="space-y-2.5 pt-2.5 border-t border-border/40 ml-8">
-                    <Label htmlFor="remoteUrl" className="text-[13px] font-medium">
-                      {t("settings.serviceSettings.remoteUrl")}
-                    </Label>
-                    <Input
-                      id="remoteUrl"
-                      type="url"
-                      placeholder={t("settings.serviceSettings.remoteUrlPlaceholder")}
-                      value={remoteUrl}
-                      onChange={(e) => setRemoteUrl(e.target.value)}
-                      className="max-w-md h-8 text-[13px] rounded-md"
-                    />
-                    <p className="text-xs text-muted-foreground/70">
-                      {t("settings.serviceSettings.remoteUrlHint")}
-                    </p>
-                  </div>
-                )}
+                <p className="text-[13px] text-muted-foreground/60 leading-relaxed pl-8">
+                  {t("settings.serviceSettings.remoteNotSupported")}
+                </p>
               </div>
-            </label>
+            </div>
           </RadioGroup>
 
           <div className="flex justify-end pt-1">

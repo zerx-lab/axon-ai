@@ -80,6 +80,7 @@ export interface UseChatReturn {
   createNewSession: (directory?: string) => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
+  clearAllSessions: (directory: string) => Promise<void>;
   
   // 消息操作
   sendMessage: (content: string, attachments?: Attachment[]) => Promise<void>;
