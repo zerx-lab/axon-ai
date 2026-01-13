@@ -86,6 +86,14 @@ pub fn run() {
             set_auto_update,
             set_custom_opencode_path,
             get_opencode_config_path,
+            // Provider 管理命令
+            add_user_provider,
+            update_user_provider,
+            remove_user_provider,
+            test_provider_connection,
+            remove_provider_auth,
+            get_provider_auth_status,
+            get_all_provider_auth_status,
             // 窗口命令
             window_minimize,
             window_maximize,
