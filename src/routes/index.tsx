@@ -70,6 +70,7 @@ function HomePage() {
     updateOpenedTabs,
     updateActiveTabPath,
     updateEditorVisible,
+    saveLayout,
   } = useLayout();
 
   // 用于防抖保存的定时器
@@ -152,8 +153,7 @@ function HomePage() {
     // 标记为已恢复
     restoredProjectRef.current = projectDir;
 
-    // 恢复编辑器状态
-    if (layout.opened_tabs.length > 0 || layout.active_tab_path) {
+    if (layout.opened_tabs.length > 0) {
       restoreFromLayout(
         layout.opened_tabs,
         layout.active_tab_path,
@@ -171,8 +171,12 @@ function HomePage() {
     if (tabsKey !== prevTabsRef.current) {
       prevTabsRef.current = tabsKey;
       updateOpenedTabs(getTabsForPersistence());
+      
+      if (tabs.length === 0) {
+        saveLayout();
+      }
     }
-  }, [tabs, layoutInitialized, updateOpenedTabs, getTabsForPersistence]);
+  }, [tabs, layoutInitialized, updateOpenedTabs, getTabsForPersistence, saveLayout]);
 
   // 同步活动标签页到布局
   useEffect(() => {

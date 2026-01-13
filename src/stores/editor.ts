@@ -338,6 +338,11 @@ export const useEditor = create<EditorStore>()((set, get) => ({
   restoreFromLayout: (tabs: OpenedTab[], activeTabPath: string | null, isVisible: boolean) => {
     console.log("[Editor] 从布局恢复:", { tabs, activeTabPath, isVisible });
     
+    if (tabs.length === 0) {
+      console.log("[Editor] 没有标签需要恢复，跳过");
+      return;
+    }
+    
     const restoredTabs: EditorTab[] = tabs.map((t) => ({
       path: t.path,
       name: t.name,
@@ -350,12 +355,16 @@ export const useEditor = create<EditorStore>()((set, get) => ({
       error: null,
     }));
 
-    console.log("[Editor] 恢复的标签页:", restoredTabs);
+    const validActiveTabPath = activeTabPath && restoredTabs.some(t => t.path === activeTabPath)
+      ? activeTabPath
+      : restoredTabs[0]?.path ?? null;
+
+    console.log("[Editor] 恢复的标签页:", restoredTabs.length, "活动标签:", validActiveTabPath);
 
     set({
       tabs: restoredTabs,
-      activeTabPath,
-      isVisible,
+      activeTabPath: validActiveTabPath,
+      isVisible: restoredTabs.length > 0 && isVisible,
     });
   },
 

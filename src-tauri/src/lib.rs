@@ -14,6 +14,7 @@ use state::AppState;
 use tauri::Listener;
 use tauri::Manager;
 use tauri::window::Color;
+use tauri_plugin_window_state::StateFlags;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -53,6 +54,16 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    StateFlags::SIZE
+                        | StateFlags::POSITION
+                        | StateFlags::MAXIMIZED
+                        | StateFlags::FULLSCREEN,
+                )
+                .build(),
+        )
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // OpenCode 服务命令
@@ -127,8 +138,7 @@ pub fn run() {
             .min_inner_size(800.0, 600.0)
             .decorations(false)
             .transparent(false)
-            .center()
-            .visible(false) // 初始隐藏窗口
+            .visible(false)
             .background_color(bg_color)
             .additional_browser_args(webview_args)
             .build()?;
