@@ -430,7 +430,18 @@
     "failed": "Connection failed",
     "needsAuth": "Needs authorization",
     "needsRegistration": "Needs registration",
-    "unknown": "Unknown status"
+    "unknown": "Unknown status",
+    "tools": "Tools",
+    "availableTools": "Available Tools",
+    "totalTools": "{{count}} tools in total",
+    "noTools": "No tools available",
+    "inherited": "Inherited",
+    "inheritedTooltip": "Using default permission",
+    "permissionHint": "Click to quickly change permission",
+    "permissionRestarting": "Restarting service to apply permission configuration...",
+    "permissionUpdated": "Permission updated",
+    "permissionRestartFailed": "Service restart failed, permission configuration will take effect on next startup",
+    "permissionSaveFailed": "Failed to save permission configuration"
   },
   "questionPrompt": {
     "otherCustom": "Other (custom input)",

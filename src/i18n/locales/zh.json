@@ -434,7 +434,14 @@
     "tools": "工具",
     "availableTools": "可用工具",
     "totalTools": "共 {{count}} 个工具",
-    "noTools": "暂无可用工具"
+    "noTools": "暂无可用工具",
+    "inherited": "继承",
+    "inheritedTooltip": "使用默认权限",
+    "permissionHint": "点击权限可快速修改",
+    "permissionRestarting": "正在重启服务以应用权限配置...",
+    "permissionUpdated": "权限已更新",
+    "permissionRestartFailed": "服务重启失败，权限配置将在下次启动时生效",
+    "permissionSaveFailed": "保存权限配置失败"
   },
   "questionPrompt": {
     "otherCustom": "其他（自定义输入）",
