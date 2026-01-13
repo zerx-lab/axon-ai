@@ -13,7 +13,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useOpencodeContext } from "@/providers/OpencodeProvider";
 import { useWorkspace } from "@/stores/workspace";
-import type { Message, Session } from "@/types/chat";
+import type { Message, Session, Agent } from "@/types/chat";
 
 // 导入拆分的模块
 import {
@@ -38,9 +38,11 @@ import {
   loadSavedVariants,
 } from "./providers";
 import { useLoadMessages, useSendMessage, useStopGeneration } from "./messages";
+import { useRefreshAgents, useAgentOperations, AGENT_STORAGE_KEY } from "./agents";
 
 // 重新导出类型
 export type { Model, Provider, SessionStatus, SelectedModel, UseChatReturn } from "./types";
+export type { Agent } from "@/types/chat";
 
 /**
  * 聊天状态管理 Hook
@@ -92,6 +94,17 @@ export function useChat() {
   // Variant 状态（从 localStorage 恢复）
   const [selectedVariants, setSelectedVariants] = useState<SelectedVariants>(() => loadSavedVariants());
   
+  // Agent 状态
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(AGENT_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  
   // ============== Refs ==============
   
   // 使用 ref 追踪最新的 selectedModel，避免 useCallback 闭包问题
@@ -108,6 +121,9 @@ export function useChat() {
   // 保存当前活动会话 ID 的 ref（用于事件处理闭包）
   const activeSessionIdRef = useRef<string | null>(null);
   activeSessionIdRef.current = activeSessionId;
+  
+  const selectedAgentRef = useRef<string | null>(null);
+  selectedAgentRef.current = selectedAgent;
   
   // ============== 派生状态 ==============
   
@@ -207,6 +223,23 @@ export function useChat() {
     setSelectedVariants
   );
 
+  // ============== Agent 操作 Hooks ==============
+  
+  const refreshAgents = useRefreshAgents(
+    client,
+    selectedAgentRef,
+    setAgents,
+    setSelectedAgent,
+    setIsLoadingAgents
+  );
+  
+  const agentOps = useAgentOperations(
+    agents,
+    selectedAgent,
+    setSelectedAgent,
+    selectModel
+  );
+
   // ============== 消息发送/停止 Hooks ==============
   
   const sendMessage = useSendMessage({
@@ -217,6 +250,7 @@ export function useChat() {
     sessions,
     selectedModel,
     selectedVariant: variantOps.selectedVariant(),
+    selectedAgent,
     isLoading,
     setMessages,
     setSessions,
@@ -239,9 +273,9 @@ export function useChat() {
   // 连接成功后加载数据
   useEffect(() => {
     if (isConnected && client) {
-      // 加载会话列表和 providers
       refreshSessions();
       refreshProviders();
+      refreshAgents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, client]);
@@ -288,6 +322,11 @@ export function useChat() {
     currentVariants: variantOps.currentVariants(),
     selectedVariant: variantOps.selectedVariant(),
     
+    // Agent 相关
+    agents,
+    currentAgent: agentOps.currentAgent(),
+    isLoadingAgents,
+    
     // 会话操作
     createNewSession,
     selectSession,
@@ -305,6 +344,11 @@ export function useChat() {
     // Variant 操作
     selectVariant: variantOps.selectVariant,
     cycleVariant: variantOps.cycleVariant,
+    
+    // Agent 操作
+    selectAgent: agentOps.selectAgent,
+    cycleAgent: agentOps.cycleAgent,
+    refreshAgents,
     
     // 其他
     clearError,

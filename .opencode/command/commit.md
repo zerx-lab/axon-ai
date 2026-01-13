@@ -1,6 +1,6 @@
 ---
 description: git commit and push
-model: google/gemini-2.5-flash
+model: opencode/minimax-m2.1-free
 subtask: true
 ---
 
