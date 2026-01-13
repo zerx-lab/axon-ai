@@ -124,6 +124,9 @@ pub struct AppSettings {
     pub custom_opencode_path: Option<String>,
     /// 已安装的 opencode 版本（用于版本记录）
     pub installed_version: Option<String>,
+    /// 用户添加的服务商配置
+    #[serde(default)]
+    pub providers: Vec<UserProviderConfig>,
 }
 
 impl Default for AppSettings {
@@ -132,6 +135,49 @@ impl Default for AppSettings {
             auto_update: false,
             custom_opencode_path: None,
             installed_version: None,
+            providers: Vec::new(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProviderConfig {
+    pub id: String,
+    pub registry_id: String,
+    pub name: String,
+    pub auth: ProviderAuth,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_config: Option<CustomConfig>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ProviderAuth {
+    Api { key: String },
+    OAuth { connected: bool, method: u32 },
+    Subscription { provider: String, connected: bool },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enterprise_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_cache_key: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<std::collections::HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: Option<serde_json::Map<String, serde_json::Value>>,
 }

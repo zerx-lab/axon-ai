@@ -4,16 +4,60 @@ use crate::opencode::platform::{
     build_download_url, get_archive_extension, get_binary_name, get_latest_release_api_url,
 };
 use crate::opencode::types::{DownloadProgress, OpencodeError};
-use crate::utils::paths::{get_bin_dir, get_opencode_bin_path};
+use crate::utils::paths::{get_app_data_dir, get_bin_dir, get_opencode_bin_path};
 use futures_util::StreamExt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-/// Default fallback version when API is rate-limited
-const FALLBACK_VERSION: &str = "v1.1.13";
+/// 版本缓存有效期：12小时（秒）
+const VERSION_CACHE_TTL_SECS: u64 = 12 * 60 * 60;
+
+/// 版本缓存结构
+#[derive(Debug, Serialize, Deserialize)]
+struct VersionCache {
+    version: String,
+    timestamp: u64,
+}
+
+impl VersionCache {
+    fn is_expired(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        now.saturating_sub(self.timestamp) > VERSION_CACHE_TTL_SECS
+    }
+}
+
+fn get_version_cache_path() -> Option<PathBuf> {
+    get_app_data_dir().map(|p| p.join("version_cache.json"))
+}
+
+fn read_version_cache() -> Option<VersionCache> {
+    let path = get_version_cache_path()?;
+    let content = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn write_version_cache(version: &str) {
+    let Some(path) = get_version_cache_path() else {
+        return;
+    };
+    let cache = VersionCache {
+        version: version.to_string(),
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    };
+    if let Ok(content) = serde_json::to_string(&cache) {
+        let _ = std::fs::write(&path, content);
+    }
+}
 
 fn extract_binary_sync(archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, OpencodeError> {
     let binary_name = get_binary_name();
@@ -269,16 +313,25 @@ impl OpencodeDownloader {
     }
 
     /// Fetch the latest release version from GitHub
-    /// Falls back to a known version if rate-limited
+    /// Uses cached version if not expired (12 hours TTL)
     pub async fn fetch_latest_version(&self) -> Result<String, OpencodeError> {
+        // 检查缓存是否有效
+        if let Some(cache) = read_version_cache() {
+            if !cache.is_expired() {
+                debug!("Using cached version: {} (not expired)", cache.version);
+                return Ok(cache.version);
+            }
+            debug!("Version cache expired, fetching from GitHub");
+        }
+
         let url = get_latest_release_api_url();
         debug!("Fetching latest release from: {}", url);
 
         let response = match self.client.get(url).send().await {
             Ok(resp) => resp,
             Err(e) => {
-                warn!("Failed to fetch latest version, using fallback: {}", e);
-                return Ok(FALLBACK_VERSION.to_string());
+                warn!("Failed to fetch latest version: {}", e);
+                return self.get_fallback_version();
             }
         };
 
@@ -286,11 +339,8 @@ impl OpencodeDownloader {
         if !response.status().is_success() {
             let status = response.status();
             if status.as_u16() == 403 || status.as_u16() == 429 {
-                warn!(
-                    "GitHub API rate limited ({}), using fallback version: {}",
-                    status, FALLBACK_VERSION
-                );
-                return Ok(FALLBACK_VERSION.to_string());
+                warn!("GitHub API rate limited ({})", status);
+                return self.get_fallback_version();
             }
             return Err(OpencodeError::DownloadError(format!(
                 "GitHub API returned status: {}",
@@ -299,12 +349,33 @@ impl OpencodeDownloader {
         }
 
         let release: GithubRelease = response.json().await.map_err(|e| {
-            warn!("Failed to parse release info, using fallback: {}", e);
+            warn!("Failed to parse release info: {}", e);
             OpencodeError::DownloadError(e.to_string())
         })?;
 
+        // 更新缓存
+        write_version_cache(&release.tag_name);
         info!("Latest opencode version: {}", release.tag_name);
         Ok(release.tag_name)
+    }
+
+    /// 获取 fallback 版本：优先使用缓存，其次已安装版本
+    fn get_fallback_version(&self) -> Result<String, OpencodeError> {
+        // 优先使用缓存（即使过期也比没有强）
+        if let Some(cache) = read_version_cache() {
+            info!("Using cached version as fallback: {}", cache.version);
+            return Ok(cache.version);
+        }
+        
+        // 其次使用已安装版本
+        if let Some(installed) = self.get_installed_version(None) {
+            info!("Using installed version as fallback: {}", installed);
+            return Ok(installed);
+        }
+        
+        Err(OpencodeError::DownloadError(
+            "无法获取版本信息：GitHub API 限流且无本地缓存".to_string()
+        ))
     }
 
     /// Download opencode binary with progress reporting
