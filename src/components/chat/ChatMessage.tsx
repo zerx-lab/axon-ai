@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { User, Bot, Loader2, AlertCircle, StopCircle } from "lucide-react";
 import { PartRenderer, MarkdownRenderer } from "./parts";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { FileText } from "lucide-react";
 import type { 
   Message, 
   Part,
   TextPart,
+  FilePart,
   AssistantMessageInfo,
 } from "@/types/chat";
 
@@ -138,18 +140,56 @@ interface UserMessageContentProps {
 }
 
 function UserMessageContent({ parts }: UserMessageContentProps) {
-  // 用户消息主要是文本，直接提取显示
   const textParts = parts.filter((p): p is TextPart => p.type === "text");
+  const fileParts = parts.filter((p): p is FilePart => p.type === "file");
   
-  if (textParts.length === 0) {
+  if (textParts.length === 0 && fileParts.length === 0) {
     return <div className="text-sm text-muted-foreground">（无内容）</div>;
   }
 
   return (
     <div className="space-y-2">
+      {fileParts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {fileParts.map((part) => (
+            <UserFilePartView key={part.id} part={part} />
+          ))}
+        </div>
+      )}
       {textParts.map((part) => (
         <MarkdownRenderer key={part.id} content={part.text} />
       ))}
+    </div>
+  );
+}
+
+function UserFilePartView({ part }: { part: FilePart }) {
+  const isImage = part.mime.startsWith("image/");
+  const isPdf = part.mime === "application/pdf";
+  
+  if (isImage) {
+    return (
+      <img
+        src={part.url}
+        alt={part.filename || "附件图片"}
+        className="max-w-xs max-h-48 rounded-md border border-border object-contain"
+      />
+    );
+  }
+  
+  if (isPdf) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30">
+        <FileText className="h-4 w-4 text-red-500 shrink-0" />
+        <span className="text-sm">{part.filename || "PDF 文件"}</span>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30">
+      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="text-sm">{part.filename || "附件"}</span>
     </div>
   );
 }

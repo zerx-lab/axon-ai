@@ -13,26 +13,24 @@ import { AutoAcceptToggle } from "./PermissionPrompt";
 import { FloatingPermissionPrompt } from "./FloatingPermissionPrompt";
 import type { Message, Session } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
+import type { Attachment } from "@/hooks";
 import { Sparkles, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatContainerProps {
   messages: Message[];
-  onSend: (message: string) => void;
+  onSend: (message: string, attachments?: Attachment[]) => void;
   onStop?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
-  // 模型选择相关
   providers?: Provider[];
   selectedModel?: { providerId: string; modelId: string } | null;
   onSelectModel?: (providerId: string, modelId: string) => void;
   isLoadingModels?: boolean;
-  // Variant（推理深度）相关
   currentVariants?: string[];
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
-  // 会话历史搜索相关
   sessions?: Session[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;

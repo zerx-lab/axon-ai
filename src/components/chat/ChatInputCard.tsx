@@ -5,7 +5,7 @@
  * 性能优化：SessionSearchDialog 懒加载
  */
 
-import { useState, useRef, useCallback, useEffect, lazy, Suspense, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense, type KeyboardEvent, type ClipboardEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import {
   ChevronDown,
   Cpu,
   Check,
+  X,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -33,35 +35,35 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-// 懒加载 SessionSearchDialog
 const SessionSearchDialog = lazy(() => import("./SessionSearchDialog").then(m => ({ default: m.SessionSearchDialog })));
 import { VariantSelector } from "./VariantSelector";
 import type { Provider } from "@/stores/chat";
 import type { Session } from "@/types/chat";
+import {
+  useAttachments,
+  type Attachment,
+  SUPPORTED_ATTACHMENT_TYPES,
+  isSupportedAttachmentType,
+} from "@/hooks";
 
 interface ChatInputCardProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, attachments?: Attachment[]) => void;
   onStop?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  // 模型选择相关
   providers?: Provider[];
   selectedModel?: { providerId: string; modelId: string } | null;
   onSelectModel?: (providerId: string, modelId: string) => void;
   isLoadingModels?: boolean;
-  // Variant（推理深度）相关
   currentVariants?: string[];
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
-  // 是否为空状态（新会话）
   isEmptyState?: boolean;
-  // 会话历史搜索相关
   sessions?: Session[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
-  // 外部填充输入框的值（用于快捷提示等）
   fillValue?: string;
   onFillValueConsumed?: () => void;
 }
@@ -130,18 +132,27 @@ export function ChatInputCard({
   const [value, setValue] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 创建模型过滤函数
+  const {
+    attachments,
+    addAttachmentFromFile,
+    addAttachmentFromBlob,
+    removeAttachment,
+    clearAttachments,
+    isMaxAttachments,
+    hasAttachments,
+  } = useAttachments();
+
   const filterFn = createModelFilter(providers);
 
-  // 构建当前选择的值
   const currentValue =
     selectedModel && selectedModel.providerId && selectedModel.modelId
       ? `${selectedModel.providerId}/${selectedModel.modelId}`
       : "";
 
-  // 获取当前选中模型的显示名称
   const getModelDisplayName = () => {
     if (!selectedModel || !selectedModel.providerId || !selectedModel.modelId) {
       return t("chat.selectModel");
@@ -161,10 +172,7 @@ export function ChatInputCard({
     return selectedModel.modelId;
   };
 
-  // 聚焦输入框
   const focusInput = useCallback(() => {
-    // 使用双重 requestAnimationFrame 确保在 React 状态更新和 DOM 渲染完成后聚焦
-    // 单次 rAF 可能在 React 批量更新完成前执行，导致聚焦失败
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -172,7 +180,6 @@ export function ChatInputCard({
     });
   }, []);
 
-  // 调整输入框高度
   const handleInput = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -181,20 +188,15 @@ export function ChatInputCard({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   }, []);
 
-  // 组件挂载时自动聚焦输入框
-  // 这解决了从空状态切换到会话状态时（发送第一条消息）输入框失焦的问题
   useEffect(() => {
     focusInput();
   }, [focusInput]);
 
-  // 处理外部填充值（如快捷提示）
   useEffect(() => {
     if (fillValue !== undefined && fillValue !== "") {
       setValue(fillValue);
       onFillValueConsumed?.();
-      // 填充后聚焦输入框并调整高度
       focusInput();
-      // 延迟调整高度，确保值已经更新
       requestAnimationFrame(() => {
         handleInput();
       });
@@ -203,18 +205,91 @@ export function ChatInputCard({
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || isLoading || disabled) return;
+    const hasContent = trimmed || hasAttachments;
+    if (!hasContent || isLoading || disabled) return;
 
-    onSend(trimmed);
+    onSend(trimmed, attachments.length > 0 ? attachments : undefined);
     setValue("");
+    clearAttachments();
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
-    // 发送后聚焦输入框
     focusInput();
-  }, [value, isLoading, disabled, onSend, focusInput]);
+  }, [value, isLoading, disabled, onSend, focusInput, attachments, hasAttachments, clearAttachments]);
+
+  const handlePaste = useCallback(
+    async (e: ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (isSupportedAttachmentType(item.type)) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (blob) {
+            await addAttachmentFromBlob(blob);
+          }
+          return;
+        }
+      }
+    },
+    [addAttachmentFromBlob]
+  );
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const hasFiles = e.dataTransfer?.types.includes("Files");
+    if (hasFiles) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      const files = e.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+
+      for (const file of files) {
+        if (isSupportedAttachmentType(file.type)) {
+          await addAttachmentFromFile(file);
+        }
+      }
+    },
+    [addAttachmentFromFile]
+  );
+
+  const handleFileSelect = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+
+      for (const file of files) {
+        await addAttachmentFromFile(file);
+      }
+      e.target.value = "";
+    },
+    [addAttachmentFromFile]
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -256,19 +331,75 @@ export function ChatInputCard({
     [onSelectSession, focusInput]
   );
 
-  // 是否显示模型选择器
   const showModelSelector =
     providers.length > 0 && onSelectModel && !isLoadingModels;
+
+  const acceptTypes = SUPPORTED_ATTACHMENT_TYPES.join(",");
 
   return (
     <div
       className={cn(
         "border border-border/60 rounded-2xl bg-card shadow-sm",
         "transition-all duration-200",
-        "focus-within:shadow-md focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10"
+        "focus-within:shadow-md focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10",
+        isDragging && "border-primary/50 bg-primary/5"
       )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      {/* 输入区域 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={acceptTypes}
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {hasAttachments && (
+        <div className="flex flex-wrap gap-2 p-3 pb-0">
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className={cn(
+                "relative group",
+                "rounded-lg overflow-hidden",
+                "border border-border/60 bg-muted/30",
+                "flex items-center gap-2"
+              )}
+            >
+              {attachment.type === "image" ? (
+                <img
+                  src={attachment.dataUrl}
+                  alt={attachment.filename}
+                  className="h-16 w-16 object-cover"
+                />
+              ) : (
+                <div className="h-16 w-16 flex items-center justify-center bg-muted">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeAttachment(attachment.id)}
+                className={cn(
+                  "absolute -top-1.5 -right-1.5",
+                  "h-5 w-5 rounded-full",
+                  "bg-destructive text-destructive-foreground",
+                  "flex items-center justify-center",
+                  "opacity-0 group-hover:opacity-100",
+                  "transition-opacity duration-150",
+                  "shadow-sm"
+                )}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="p-4 pb-2">
         <Textarea
           ref={textareaRef}
@@ -276,6 +407,7 @@ export function ChatInputCard({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
+          onPaste={handlePaste}
           placeholder={inputPlaceholder}
           disabled={disabled}
           rows={1}
@@ -289,22 +421,19 @@ export function ChatInputCard({
         />
       </div>
 
-      {/* 底部工具栏 */}
       <div className="flex items-center justify-between px-3 pb-3">
-        {/* 左侧按钮组 */}
         <div className="flex items-center gap-0.5">
-          {/* 附件按钮 */}
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80"
-            disabled={disabled}
+            disabled={disabled || isMaxAttachments}
             title={t("chat.attachFile")}
+            onClick={handleFileSelect}
           >
             <Plus className="h-4 w-4" />
           </Button>
 
-          {/* 历史按钮 */}
           <Button
             variant="ghost"
             size="icon"
@@ -418,7 +547,6 @@ export function ChatInputCard({
             </div>
           )}
 
-          {/* 发送/停止按钮 - 精致设计 */}
           {isLoading ? (
             <Button
               variant="destructive"
@@ -431,7 +559,7 @@ export function ChatInputCard({
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={!value.trim() || disabled}
+              disabled={(!value.trim() && !hasAttachments) || disabled}
               size="icon"
               className={cn(
                 "h-9 w-9 rounded-xl shrink-0 shadow-sm",

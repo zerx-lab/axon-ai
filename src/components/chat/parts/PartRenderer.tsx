@@ -37,6 +37,7 @@ import {
 import type {
   Part,
   TextPart,
+  FilePart,
   ToolPart,
   ReasoningPart,
   StepStartPart,
@@ -76,6 +77,8 @@ export function PartRenderer({ part, messageInfo, isLast }: PartRendererProps) {
   switch (part.type) {
     case "text":
       return <TextPartView part={part} />;
+    case "file":
+      return <FilePartView part={part} />;
     case "reasoning":
       return <ReasoningPartView part={part} />;
     case "tool":
@@ -99,6 +102,54 @@ function TextPartView({ part }: TextPartViewProps) {
   if (!part.text || part.ignored) return null;
   
   return <MarkdownRenderer content={part.text} />;
+}
+
+// ============== File Part ==============
+
+interface FilePartViewProps {
+  part: FilePart;
+}
+
+/**
+ * 文件附件渲染组件
+ * 支持图片预览和 PDF 文件显示
+ */
+function FilePartView({ part }: FilePartViewProps) {
+  const isImage = part.mime.startsWith("image/");
+  const isPdf = part.mime === "application/pdf";
+  
+  if (isImage) {
+    return (
+      <div className="my-2">
+        <img
+          src={part.url}
+          alt={part.filename || "附件图片"}
+          className="max-w-xs max-h-64 rounded-md border border-border object-contain"
+        />
+        {part.filename && (
+          <div className="text-xs text-muted-foreground mt-1">{part.filename}</div>
+        )}
+      </div>
+    );
+  }
+  
+  if (isPdf) {
+    return (
+      <div className="my-2 flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 w-fit">
+        <FileText className="h-5 w-5 text-red-500 shrink-0" />
+        <span className="text-sm">{part.filename || "PDF 文件"}</span>
+      </div>
+    );
+  }
+  
+  // 其他文件类型
+  return (
+    <div className="my-2 flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 w-fit">
+      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+      <span className="text-sm">{part.filename || "附件"}</span>
+      <span className="text-xs text-muted-foreground">({part.mime})</span>
+    </div>
+  );
 }
 
 // ============== Reasoning Part ==============

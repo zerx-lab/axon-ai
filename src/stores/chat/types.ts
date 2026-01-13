@@ -8,6 +8,7 @@ import type {
   Message,
   Session,
 } from "@/types/chat";
+import type { Attachment } from "@/hooks";
 
 // ============== 常量 ==============
 
@@ -81,7 +82,7 @@ export interface UseChatReturn {
   deleteSession: (sessionId: string) => Promise<void>;
   
   // 消息操作
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, attachments?: Attachment[]) => Promise<void>;
   stopGeneration: () => Promise<void>;
   
   // 模型操作

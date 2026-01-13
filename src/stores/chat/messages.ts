@@ -13,6 +13,7 @@ import type {
 import type { OpencodeClient } from "@/services/opencode/types";
 import type { Message, Session } from "@/types/chat";
 import type { SelectedModel } from "./types";
+import type { Attachment } from "@/hooks";
 import {
   mapApiMessage,
   extractErrorDetail,
@@ -97,7 +98,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     isGeneratingRef,
   } = deps;
   
-  return useCallback(async (content: string) => {
+  return useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!client || !activeSessionId) {
       setError(t("errors.serviceNotConnected"));
       return;
@@ -114,11 +115,9 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     isGeneratingRef.current = true;
     setError(null);
     
-    // 先添加用户消息到界面（临时消息）
     const tempUserMessage = createTempUserMessage(activeSessionId, content, selectedModel);
     setMessages((prev) => [...prev, tempUserMessage]);
     
-    // 添加一个占位的助手消息（表示正在加载）
     const tempAssistantMessage = createTempAssistantMessage(
       activeSessionId,
       tempUserMessage.info.id,
@@ -127,30 +126,47 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     setMessages((prev) => [...prev, tempAssistantMessage]);
     
     try {
-      // 使用 session.promptAsync() 发送消息（异步，响应通过 SSE 事件流式返回）
-      // SDK v2 使用扁平化参数结构: { sessionID, directory, parts, model, variant, ... }
+      type PromptPart = 
+        | { type: "text"; text: string }
+        | { type: "file"; mime: string; url: string; filename?: string };
+      
+      const parts: PromptPart[] = [];
+      
+      if (content.trim()) {
+        parts.push({ type: "text" as const, text: content });
+      }
+      
+      if (attachments && attachments.length > 0) {
+        for (const attachment of attachments) {
+          parts.push({
+            type: "file" as const,
+            mime: attachment.mime,
+            url: attachment.dataUrl,
+            filename: attachment.filename,
+          });
+        }
+      }
+      
       const promptParams: {
         sessionID: string;
         directory?: string;
-        parts: Array<{ type: "text"; text: string }>;
+        parts: PromptPart[];
         model: { providerID: string; modelID: string };
         variant?: string;
       } = {
         sessionID: activeSessionId,
         directory: activeSession?.directory,
-        parts: [{ type: "text" as const, text: content }],
+        parts,
         model: {
           providerID: selectedModel.providerId,
           modelID: selectedModel.modelId,
         },
       };
       
-      // 添加推理深度 variant（如果选择了）
       if (selectedVariant) {
         promptParams.variant = selectedVariant;
       }
       
-      // 调试日志：打印发送的参数
       console.log("[sendMessage] 发送参数:", JSON.stringify(promptParams, null, 2));
       console.log("[sendMessage] activeSession:", activeSession);
       console.log("[sendMessage] selectedModel:", selectedModel);
