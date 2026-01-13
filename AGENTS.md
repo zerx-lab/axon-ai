@@ -1,323 +1,284 @@
 # AGENTS.md - AI Coding Agent Guidelines for axon_desktop
 
+**Generated:** 2026-01-13 | **Commit:** 9576b45 | **Branch:** master
+
 ## 语言规范 (Language Requirements)
 
-**必须遵守以下语言规范**:
+**必须遵守**:
 - 所有回复必须使用**中文**
 - 所有代码注释必须使用**中文**
-- 变量名、函数名等标识符保持英文（遵循编程规范）
+- 变量名、函数名等标识符保持英文
 - Git commit message 可使用中文或英文
 
 ---
 
 ## Project Overview
 
-**axon_desktop** is an AI client desktop application (similar to LLM Studio) built with:
-- **Frontend**: React 19 + TypeScript 5 + Vite 7
-- **Backend**: Rust + Tauri 2
-- **Package Manager**: Bun
-- **opencode**: 项目根目录下存在opencode源码,可用于功能调研与对接参考
+**axon_desktop** - 跨平台 AI 编程助手桌面应用，集成 OpenCode 服务。
 
-The backend handles async detection/download of opencode binary on startup and invokes `opencode serve` for AI operations.
-
----
-
-## Build / Dev / Test Commands
-
-### Frontend (Bun)
-```bash
-bun install              # Install dependencies
-bun run build            # TypeScript check + Vite build (use this to verify)
-bun run preview          # Preview production build
-```
-
-### Tauri (Full Application)
-```bash
-bun run tauri build      # Build production application
-```
-
-### Rust/Backend (run from src-tauri/)
-```bash
-cargo check              # Check for errors
-cargo build              # Build backend
-cargo build --release    # Release build
-cargo test               # Run all tests
-cargo test <test_name>   # Run single test
-cargo test -- --nocapture # Tests with output
-cargo fmt                # Format code
-cargo clippy             # Lint code
-```
-
-### TypeScript Check
-```bash
-npx tsc --noEmit         # Type check only
-```
-
-**IMPORTANT**: Do NOT run `bun run dev` or `bun run tauri dev` - use `bun run build` for verification.
+| 层 | 技术栈 |
+|---|--------|
+| Frontend | React 19, TypeScript 5.8, Vite 7, TailwindCSS 4 |
+| Backend | Rust, Tauri 2, Tokio |
+| State | Zustand, TanStack Query |
+| Router | TanStack Router |
+| Package | Bun |
 
 ---
 
-## Dependency Management (CRITICAL)
-
-**NEVER directly edit dependency files** (`package.json`, `Cargo.toml`, `bun.lock`, `Cargo.lock`).
-
-### Adding Frontend Dependencies
-```bash
-bun add <package>           # Add production dependency
-bun add -d <package>        # Add dev dependency
-bun remove <package>        # Remove dependency
-```
-
-### Adding Backend Dependencies (run from src-tauri/)
-```bash
-cargo add <crate>           # Add dependency
-cargo add <crate> -F feat   # Add with features
-cargo add --dev <crate>     # Add dev dependency
-cargo remove <crate>        # Remove dependency
-```
-
-**Examples**:
-```bash
-# Frontend
-bun add zustand             # Add state management
-bun add -d vitest           # Add test framework
-
-# Backend (in src-tauri/)
-cargo add tokio -F full     # Add tokio with full features
-cargo add reqwest -F json   # Add reqwest with json feature
-```
-
----
-
-## Project Structure
+## 项目结构
 
 ```
 axon_desktop/
-├── src/                    # Frontend (React/TypeScript)
-│   ├── main.tsx           # React entry point
-│   ├── App.tsx            # Main component
-│   └── assets/            # Static assets
-├── src-tauri/             # Backend (Rust/Tauri)
+├── src/                      # 前端 React
+│   ├── components/
+│   │   ├── chat/             # 聊天核心（ChatInputCard, ChatMessage）
+│   │   ├── settings/         # 设置页（Provider, MCP, Permission）
+│   │   ├── ui/               # shadcn/ui 基础组件
+│   │   ├── diff/             # Diff 可视化
+│   │   ├── editor/           # Monaco 代码预览
+│   │   └── titlebar/         # 窗口标题栏
+│   ├── stores/               # Zustand 状态
+│   │   └── chat/             # 聊天组合式 Store
+│   ├── services/
+│   │   └── opencode/         # OpenCode SDK 封装
+│   ├── providers/            # Context Providers
+│   ├── routes/               # TanStack Router 页面
+│   ├── hooks/                # 自定义 Hooks
+│   └── i18n/                 # 国际化
+├── src-tauri/                # 后端 Rust（详见 src-tauri/AGENTS.md）
 │   ├── src/
-│   │   ├── main.rs        # Rust entry point
-│   │   └── lib.rs         # Tauri commands
-│   ├── Cargo.toml         # Rust dependencies
-│   └── tauri.conf.json    # Tauri config
-├── package.json           # Node dependencies
-└── tsconfig.json          # TypeScript config
+│   │   ├── commands/         # Tauri Commands
+│   │   ├── opencode/         # 二进制管理
+│   │   ├── settings/         # 配置管理
+│   │   └── state/            # 全局状态
+│   └── Cargo.toml
+├── opencode/                 # 参考源码（独立项目）
+└── public/                   # 静态资源
 ```
 
 ---
 
-## Code Style Guidelines
+## WHERE TO LOOK
+
+| 任务 | 位置 | 说明 |
+|------|------|------|
+| 添加 Tauri Command | `src-tauri/src/commands/` | 在 `mod.rs` 注册，`lib.rs` 导出 |
+| 新增页面 | `src/routes/` | TanStack Router 文件路由 |
+| 添加 UI 组件 | `src/components/ui/` | 基于 shadcn/ui |
+| 修改聊天逻辑 | `src/stores/chat/` | 组合式 Hooks 模式 |
+| OpenCode 集成 | `src/services/opencode/` | SDK 封装层 |
+| 后端业务 | `src-tauri/src/opencode/` | 二进制下载、进程管理 |
+
+---
+
+## Commands
+
+### Frontend (Bun)
+```bash
+bun install              # 安装依赖
+bun run build            # TypeScript 检查 + Vite 构建（验证用）
+bun run preview          # 预览生产构建
+```
+
+### Tauri
+```bash
+bun run tauri build      # 构建生产应用
+```
+
+### Rust/Backend (在 src-tauri/ 目录)
+```bash
+cargo check              # 检查错误
+cargo build              # 构建后端
+cargo test               # 运行测试
+cargo fmt                # 格式化
+cargo clippy             # Lint
+```
+
+**重要**: 禁止运行 `bun run dev` 或 `bun run tauri dev`，使用 `bun run build` 验证。
+
+---
+
+## 依赖管理 (CRITICAL)
+
+**禁止直接编辑** `package.json`, `Cargo.toml`, `bun.lock`, `Cargo.lock`。
+
+```bash
+# Frontend
+bun add <package>           # 添加生产依赖
+bun add -d <package>        # 添加开发依赖
+
+# Backend (在 src-tauri/)
+cargo add <crate>           # 添加依赖
+cargo add <crate> -F feat   # 添加带 feature
+```
+
+---
+
+## 代码规范
 
 ### TypeScript / React
 
-**Imports Order**:
-1. React imports → 2. Third-party (@tauri-apps) → 3. Local modules → 4. CSS (last)
+**Import 顺序**: React → 第三方 (@tauri-apps) → 本地模块 → CSS
 
+**命名**:
+- 组件: `PascalCase` (文件名同)
+- 函数/变量: `camelCase`
+- 常量: `UPPER_SNAKE_CASE`
+
+**TypeScript**: strict 模式，禁止 `any`，显式返回类型。
+
+### Zustand 状态管理
+
+**模式 A - 简单 UI 状态**:
 ```typescript
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import MyComponent from "./MyComponent";
-import "./styles.css";
+// src/stores/theme.ts
+interface ThemeState {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+export const useThemeStore = create<ThemeState>((set) => ({...}));
 ```
 
-**Naming Conventions**:
-- Components: `PascalCase` (e.g., `AppHeader`)
-- Functions/Variables: `camelCase` (e.g., `userName`)
-- Constants: `UPPER_SNAKE_CASE`
-- Files: `PascalCase.tsx` for components
+**模式 B - 复杂业务（如 Chat）**:
+- 拆分为多个 Hooks (`useSessions`, `useMessages`, `useSSEHandler`)
+- 在 `index.ts` 中组合导出
+- 适用于 SSE 流式数据、SDK 集成
 
-**TypeScript Rules** (strict mode enabled):
-- No unused locals/parameters
-- Explicit return types for public functions
-- No implicit `any`
-
-**React Patterns**:
-- Functional components with hooks
-- Use `React.StrictMode`
-- Form submissions: `e.preventDefault()`
+**持久化**: 使用 `persist` 中间件，key 以 `axon-` 为前缀。
 
 ### Rust / Tauri
 
-**Naming Conventions**:
-- Functions: `snake_case`
-- Types/Structs: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
-
-**Tauri Commands**:
-```rust
-#[tauri::command]
-fn command_name(param: &str) -> Result<String, String> {
-    Ok(format!("Result: {}", param))
-}
-```
-
-**Error Handling**:
-- Use `Result<T, E>` for fallible operations
-- Use `?` operator for propagation
-- Return meaningful error messages
-
-**Required Attributes**:
-- `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` in main.rs
-- `#[cfg_attr(mobile, tauri::mobile_entry_point)]` for mobile support
+详见 `src-tauri/AGENTS.md`。
 
 ---
 
-## Frontend-Backend Communication
+## UI 设计系统 (Zed 风格极简主义)
+
+### 核心哲学
+
+1. **极简主义** - 只保留必要元素，留白优先
+2. **优雅克制** - 微妙视觉反馈，动画 150-300ms
+3. **一致性** - 统一圆角、间距、交互
+
+### 视觉规范
+
+| 属性 | 值 |
+|------|-----|
+| 圆角 | 1-4px (`rounded-sm` 到 `rounded-xl`) |
+| 间距基准 | 4px |
+| 边框 | `border-border/60` (低透明度) |
+| 默认文字 | `text-muted-foreground/70` |
+| 悬浮背景 | `bg-accent` |
+| 动画时长 | 150ms (快), 200ms (标准), 300ms (强调) |
+| 缓动函数 | `ease-out` |
+
+### 组件规范
+
+| 组件 | 规范 |
+|------|------|
+| Activity Bar | 宽 40px，图标 18px，激活指示器 2px 主题色竖线 |
+| Dialog | 水平居中，垂直距顶 15%，从上滑入动画 |
+| Sidebar | `bg-sidebar`，边框 `/50` 透明度 |
+| Button ghost | 无背景，hover `bg-accent` |
+
+### 禁止事项
+
+- ❌ 渐变背景
+- ❌ 大圆角 (>8px)
+- ❌ 缩放/弹跳动画
+- ❌ Dialog 垂直居中
+- ❌ 过长动画 (>300ms)
+- ❌ 多重阴影叠加
+
+### 代码示例
+
+```tsx
+// ✅ 正确
+<button className={cn(
+  "flex items-center justify-center w-9 h-9",
+  "text-muted-foreground/70 hover:text-foreground",
+  "hover:bg-accent transition-colors duration-150",
+  isActive && "text-foreground"
+)}>
+  <Icon className="w-[18px] h-[18px]" />
+</button>
+
+// ❌ 错误
+<button className="bg-gradient-to-r rounded-xl shadow-2xl hover:scale-105">
+```
+
+---
+
+## 前后端通信
 
 ```typescript
-// Frontend: Call Rust command
+// 前端调用
+import { invoke } from "@tauri-apps/api/core";
 const result = await invoke("command_name", { param: value });
 ```
 
 ```rust
-// Backend: Register command
+// 后端定义
+#[tauri::command]
+fn command_name(param: &str) -> Result<String, String> {
+    Ok(format!("Result: {}", param))
+}
+
+// 注册 (lib.rs)
 .invoke_handler(tauri::generate_handler![command_name])
 ```
 
 ---
 
-## Key Dependencies
+## 架构关键点
 
-**Frontend**: react ^19.1.0, @tauri-apps/api ^2, typescript ~5.8.3, vite ^7.0.4
-**Backend**: tauri 2, serde 1 (derive), serde_json 1
+### OpenCode 集成
+
+- **后端**: `src-tauri/src/opencode/` 管理二进制下载、校验、进程生命周期
+- **前端**: `src/services/opencode/` 通过 `@opencode-ai/sdk` 通信
+- **启动流程**: 后端启动 `opencode serve` → 前端 OpencodeProvider 等待就绪 → 发送 `app-ready` 事件
+
+### 窗口管理
+
+- 初始隐藏 (`visible: false`)
+- 前端就绪后发送 `app-ready` 事件
+- 后端监听事件显示窗口（3秒超时保护）
+
+### 复杂度热点
+
+| 文件 | 行数 | 原因 |
+|------|------|------|
+| `McpSettings.tsx` | 1111 | 多模态框、复杂表单 |
+| `PermissionSettings.tsx` | 848 | 权限 UI 逻辑 |
+| `ProviderSettings.tsx` | 743 | 多 LLM 后端配置 |
+| `opencode/service.ts` | 663 | SDK 封装 |
+| `ChatInputCard.tsx` | 598 | 附件、命令补全 |
 
 ---
 
-## Important Notes
+## 反模式 (Anti-Patterns)
 
-- Dev server port: `1420`
-- App identifier: `com.zero.axon_desktop`
-- CSP currently disabled (configure for production)
-
-## Future Features
-
-- opencode binary download/management on startup
-- `opencode serve` process management
-- State synchronization between frontend and Rust backend
+| 禁止 | 原因 |
+|------|------|
+| 手动编辑 lock 文件 | 使用包管理器命令 |
+| `as any`, `@ts-ignore` | 类型安全 |
+| 空 catch 块 `catch(e) {}` | 必须处理错误 |
+| 未授权 commit | 显式请求才 commit |
+| `bun run dev` 验证 | 使用 `bun run build` |
 
 ---
 
-## UI 设计系统
+## 重要说明
 
-本项目采用 **Zed 风格极简主义设计**，所有 UI 组件必须遵循以下统一规范。
+- **Dev server port**: 1420
+- **App identifier**: `com.zero.axon_desktop`
+- **CSP**: 当前禁用，生产需配置
+- **opencode 源码**: 根目录 `opencode/` 可用于功能调研
 
-### 核心设计哲学
+---
 
-1. **极简主义 (Minimalism)**
-   - 只保留必要元素，去除视觉噪音
-   - 留白即设计，空间感优先
-   - 功能导向，形式服务于内容
+## 子目录指南
 
-2. **优雅克制 (Elegant Restraint)**
-   - 使用微妙的视觉反馈，不喧宾夺主
-   - 动画简短流畅（150-300ms），避免花哨效果
-   - 颜色使用克制，避免过度装饰
-
-3. **一致性 (Consistency)**
-   - 统一的圆角系统（2-4px 小圆角）
-   - 统一的间距节奏（4px 基准）
-   - 统一的交互反馈模式
-
-### 视觉规范
-
-#### 圆角系统
-```css
---radius-sm: 1px;
---radius-md: 2px;   /* 默认 */
---radius-lg: 3px;
---radius-xl: 4px;
-```
-
-#### 颜色使用
-- **默认状态**: `text-muted-foreground/70` - 柔和不突兀
-- **悬浮状态**: `text-foreground` + `bg-accent` - 清晰反馈
-- **激活状态**: `text-foreground` + 主题色指示器
-- **边框透明度**: 使用 50-60% 透明度，更加细腻
-
-#### 图标规范
-- 尺寸统一：小图标 16px，标准图标 18px，大图标 20px
-- 默认使用 `muted-foreground` 颜色
-- 悬浮/激活时过渡到 `foreground`
-
-#### 动画规范
-- 过渡时长：150ms（快速）、200ms（标准）、300ms（强调）
-- 缓动函数：`ease-out` 为主
-- 禁止使用：缩放动画（zoom-in/zoom-out）、弹跳效果
-
-### 组件规范
-
-#### Activity Bar（活动栏）
-- 宽度：40px（紧凑）
-- 图标大小：18px
-- 激活指示器：2px 宽主题色竖线
-- 微交互：设置图标悬浮时 45° 旋转
-
-#### Dialog（对话框）
-- 位置：水平居中，垂直距顶部 15%（不垂直居中）
-- 动画：从上向下滑入 + 淡入，关闭时反向
-- 样式：`rounded-lg`、`shadow-lg`、`border border-border/60`
-- 禁止：缩放动画、垂直居中
-
-#### Sidebar（侧边栏）
-- 背景：`bg-sidebar`（略深于主背景）
-- 边框：`border-sidebar-border/50`
-- 滚动条：默认隐藏，悬浮显示，宽度 4-6px
-
-#### Button（按钮）
-- ghost 变体：无背景，悬浮时 `bg-accent`
-- 图标按钮：正方形，常用尺寸 28-36px
-- 焦点状态：1px ring，偏移 1px
-
-### 交互规范
-
-#### Tooltip
-- 延迟显示：300ms
-- 字体大小：`text-xs`
-- 位置：根据触发元素位置自动调整
-
-#### 右键菜单
-- 最小宽度：160px
-- 菜单项：`text-xs`，图标 14px
-
-#### 悬浮效果
-- 背景变化：`hover:bg-accent`
-- 颜色过渡：`transition-colors duration-150`
-- 避免多重效果叠加
-
-### 代码示例
-
-```tsx
-// ✅ 正确：极简按钮样式
-<button
-  className={cn(
-    "flex items-center justify-center",
-    "w-9 h-9",
-    "text-muted-foreground/70 hover:text-foreground",
-    "hover:bg-accent",
-    "transition-colors duration-150",
-    isActive && "text-foreground"
-  )}
->
-  <Icon className="w-[18px] h-[18px]" />
-</button>
-
-// ❌ 错误：过度装饰
-<button
-  className="bg-gradient-to-r from-blue-500 to-purple-500 
-             rounded-xl shadow-2xl hover:scale-105 
-             transition-all duration-500"
->
-```
-
-### 禁止事项
-
-- ❌ 渐变背景（gradients）
-- ❌ 大圆角（>8px）
-- ❌ 过长动画（>300ms）
-- ❌ 缩放/弹跳动画
-- ❌ 多重阴影叠加
-- ❌ 过度使用颜色
-
+- `src-tauri/AGENTS.md` - Rust 后端专用规范
+- `opencode/AGENTS.md` - OpenCode 参考项目规范

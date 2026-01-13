@@ -362,29 +362,32 @@ export function ChatInputCard({
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className={cn(
-                "relative group",
-                "rounded-lg overflow-hidden",
-                "border border-border/60 bg-muted/30",
-                "flex items-center gap-2"
-              )}
+              className="relative group"
             >
-              {attachment.type === "image" ? (
-                <img
-                  src={attachment.dataUrl}
-                  alt={attachment.filename}
-                  className="h-16 w-16 object-cover"
-                />
-              ) : (
-                <div className="h-16 w-16 flex items-center justify-center bg-muted">
-                  <FileText className="h-6 w-6 text-muted-foreground" />
-                </div>
-              )}
+              <div
+                className={cn(
+                  "rounded-lg overflow-hidden",
+                  "border border-border/60 bg-muted/30",
+                  "flex items-center gap-2"
+                )}
+              >
+                {attachment.type === "image" ? (
+                  <img
+                    src={attachment.dataUrl}
+                    alt={attachment.filename}
+                    className="h-16 w-16 object-cover"
+                  />
+                ) : (
+                  <div className="h-16 w-16 flex items-center justify-center bg-muted">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => removeAttachment(attachment.id)}
                 className={cn(
-                  "absolute -top-1.5 -right-1.5",
+                  "absolute -top-1.5 -right-1.5 z-10",
                   "h-5 w-5 rounded-full",
                   "bg-destructive text-destructive-foreground",
                   "flex items-center justify-center",

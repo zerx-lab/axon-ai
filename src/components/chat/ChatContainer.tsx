@@ -98,7 +98,6 @@ export function ChatContainer({
     }
   }, [isNearBottom]);
 
-  // 滚动到底部
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
       isProgrammaticScrollRef.current = true;
@@ -110,6 +109,24 @@ export function ChatContainer({
       setShowScrollButton(false);
     }
   }, []);
+
+  const handleSend = useCallback(
+    (message: string, attachments?: Attachment[]) => {
+      onSend(message, attachments);
+      shouldAutoScrollRef.current = true;
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          isProgrammaticScrollRef.current = true;
+          scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+          setShowScrollButton(false);
+        }
+      });
+    },
+    [onSend]
+  );
 
   // 当有新消息时，仅在 shouldAutoScroll 为 true 时自动滚动到底部
   // 只有消息数量增加时才触发滚动，避免消息内容更新时强制滚动
@@ -149,7 +166,7 @@ export function ChatContainer({
           {/* 输入框卡片 */}
           <div className="w-full max-w-2xl mt-8">
             <ChatInputCard
-              onSend={onSend}
+              onSend={handleSend}
               onStop={onStop}
               isLoading={isLoading}
               disabled={disabled}
@@ -241,7 +258,7 @@ export function ChatContainer({
           
           {/* 输入卡片 */}
           <ChatInputCard
-            onSend={onSend}
+            onSend={handleSend}
             onStop={onStop}
             isLoading={isLoading}
             disabled={disabled}
