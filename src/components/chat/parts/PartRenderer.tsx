@@ -583,35 +583,45 @@ function PermissionPromptBar({ permission, onRespond }: PermissionPromptBarProps
 
 /**
  * 获取权限请求的描述文本
+ * patterns 数组通常包含具体的命令、文件路径等信息
  */
 function getPermissionDescription(permission: PermissionRequest): string {
-  const { permission: permType, metadata } = permission;
+  const { permission: permType, metadata, patterns } = permission;
+  // patterns 数组的第一个元素通常是具体的命令/路径
+  const firstPattern = patterns?.[0] || "";
   
   switch (permType) {
     case "edit":
-      return `编辑文件 ${metadata?.filepath || ""}`;
+      return `编辑文件: ${metadata?.filepath || firstPattern || ""}`;
     case "write":
-      return `写入文件 ${metadata?.filepath || ""}`;
+      return `写入文件: ${metadata?.filepath || firstPattern || ""}`;
     case "read":
-      return `读取文件 ${metadata?.filePath || ""}`;
-    case "bash":
-      return `执行命令: ${metadata?.description || metadata?.command || ""}`;
+      return `读取文件: ${metadata?.filePath || firstPattern || ""}`;
+    case "bash": {
+      // bash 命令：优先使用 metadata 中的描述，其次是 patterns 中的命令
+      const cmd = metadata?.description || metadata?.command || firstPattern || "";
+      // 截断过长的命令
+      const cmdStr = String(cmd);
+      const displayCmd = cmdStr.length > 100 ? cmdStr.slice(0, 100) + "..." : cmdStr;
+      return `执行命令: ${displayCmd}`;
+    }
     case "glob":
-      return `搜索文件: ${metadata?.pattern || ""}`;
+      return `搜索文件: ${metadata?.pattern || firstPattern || ""}`;
     case "grep":
-      return `搜索内容: ${metadata?.pattern || ""}`;
+      return `搜索内容: ${metadata?.pattern || firstPattern || ""}`;
     case "webfetch":
-      return `访问网址: ${metadata?.url || ""}`;
+      return `访问网址: ${metadata?.url || firstPattern || ""}`;
     case "websearch":
-      return `网页搜索: ${metadata?.query || ""}`;
+      return `网页搜索: ${metadata?.query || firstPattern || ""}`;
     case "task":
-      return `执行任务: ${metadata?.description || ""}`;
+      return `执行任务: ${metadata?.description || firstPattern || ""}`;
     case "external_directory":
-      return `访问外部目录: ${metadata?.parentDir || metadata?.filepath || metadata?.path || ""}`;
+      return `访问外部目录: ${metadata?.parentDir || metadata?.filepath || metadata?.path || firstPattern || ""}`;
     case "doom_loop":
       return "继续执行（多次失败后）";
     default:
-      return `需要权限: ${permType}`;
+      // 对于未知权限类型，也尝试显示 patterns 内容
+      return firstPattern ? `${permType}: ${firstPattern}` : `需要权限: ${permType}`;
   }
 }
 
@@ -1046,12 +1056,90 @@ function ToolErrorContent({ state }: { state: ToolStateError }) {
   );
 }
 
+/**
+ * 从工具 input 中提取有意义的描述信息
+ * 根据不同工具类型返回具体的命令/文件路径等
+ */
+function getToolInputDescription(tool: string, input: Record<string, unknown>): string | null {
+  switch (tool) {
+    case "bash":
+      // bash 工具显示具体命令或描述
+      if (input.description && typeof input.description === "string") {
+        return input.description;
+      }
+      if (input.command && typeof input.command === "string") {
+        // 截断过长的命令
+        const cmd = input.command as string;
+        return cmd.length > 80 ? cmd.slice(0, 80) + "..." : cmd;
+      }
+      break;
+    case "read":
+    case "write":
+    case "edit":
+    case "multiedit":
+    case "patch":
+      // 文件操作显示文件路径
+      if (input.filePath && typeof input.filePath === "string") {
+        return input.filePath as string;
+      }
+      if (input.path && typeof input.path === "string") {
+        return input.path as string;
+      }
+      break;
+    case "glob":
+      // 文件搜索显示模式
+      if (input.pattern && typeof input.pattern === "string") {
+        return `模式: ${input.pattern}`;
+      }
+      break;
+    case "grep":
+      // 内容搜索显示模式
+      if (input.pattern && typeof input.pattern === "string") {
+        return `搜索: ${input.pattern}`;
+      }
+      break;
+    case "task":
+      // 子任务显示描述
+      if (input.description && typeof input.description === "string") {
+        return input.description as string;
+      }
+      if (input.prompt && typeof input.prompt === "string") {
+        const prompt = input.prompt as string;
+        return prompt.length > 60 ? prompt.slice(0, 60) + "..." : prompt;
+      }
+      break;
+    case "webfetch":
+    case "websearch":
+      // 网页获取显示 URL
+      if (input.url && typeof input.url === "string") {
+        return input.url as string;
+      }
+      if (input.query && typeof input.query === "string") {
+        return input.query as string;
+      }
+      break;
+    case "list":
+      // 列出目录
+      if (input.path && typeof input.path === "string") {
+        return input.path as string;
+      }
+      break;
+  }
+  return null;
+}
+
 // 运行中内容
 function ToolRunningContent({ tool, state }: { tool: string; state: ToolStateRunning }) {
+  // 优先使用 title，否则从 input 中提取具体描述
+  const inputDescription = getToolInputDescription(tool, state.input);
+  const displayText = state.title || inputDescription 
+    ? `${state.title || inputDescription}`
+    : `正在执行 ${getToolDisplayName(tool)}...`;
+  
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" />
-      <span>{state.title || `正在执行 ${getToolDisplayName(tool)}...`}</span>
+      <span className="truncate">{displayText}</span>
     </div>
   );
 }
