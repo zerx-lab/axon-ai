@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search } from "lucide-react";
 import {
   Dialog,
@@ -25,6 +25,14 @@ export function AddProviderDialog({ open, onOpenChange, client }: AddProviderDia
   const [selectedRegistryId, setSelectedRegistryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // 编辑模式：当 dialog 打开且存在 editingProvider 时，直接进入配置页面
+  useEffect(() => {
+    if (open && editingProvider) {
+      setStep("configure");
+      setSelectedRegistryId(editingProvider.registryId);
+    }
+  }, [open, editingProvider]);
+
   const filteredRegistry = useMemo(() => {
     if (!searchQuery.trim()) return registry;
     const query = searchQuery.toLowerCase();
@@ -43,13 +51,19 @@ export function AddProviderDialog({ open, onOpenChange, client }: AddProviderDia
   };
 
   const handleBack = () => {
-    setStep("select");
-    setSelectedRegistryId(null);
+    // 如果是编辑模式，返回时直接关闭 dialog
+    if (editingProvider) {
+      handleClose(false);
+    } else {
+      setStep("select");
+      setSelectedRegistryId(null);
+    }
   };
 
   const handleComplete = () => {
     setStep("select");
     setSelectedRegistryId(null);
+    setSearchQuery("");
     setEditingProvider(null);
     onOpenChange(false);
   };
@@ -58,15 +72,19 @@ export function AddProviderDialog({ open, onOpenChange, client }: AddProviderDia
     if (!open) {
       setStep("select");
       setSelectedRegistryId(null);
+      setSearchQuery("");
       setEditingProvider(null);
     }
     onOpenChange(open);
   };
 
+  // 判断当前是否为编辑模式
+  const isEditMode = !!editingProvider;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        {step === "select" ? (
+        {step === "select" && !isEditMode ? (
           <>
             <DialogHeader>
               <DialogTitle>选择服务商</DialogTitle>

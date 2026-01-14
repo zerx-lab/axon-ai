@@ -128,6 +128,10 @@ export interface CustomConfig {
   timeout?: number | false;
   headers?: Record<string, string>;
   env?: Record<string, string>;
+  /** 模型白名单 - 只显示这些模型 */
+  whitelist?: string[];
+  /** 模型黑名单 - 隐藏这些模型 */
+  blacklist?: string[];
   [key: string]: unknown;
 }
 

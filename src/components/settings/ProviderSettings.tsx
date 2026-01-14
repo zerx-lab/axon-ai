@@ -1,13 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Plus, Bot, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProviderStore } from "@/stores/provider";
-import { useOpencode } from "@/hooks";
+import { useOpencodeContext } from "@/providers";
 import { ProviderCard } from "./provider/ProviderCard";
 import { AddProviderDialog } from "./provider/AddProviderDialog";
 
 export function ProviderSettings() {
-  const { client, isConnected } = useOpencode();
+  const { client, isConnected, restartService, state } = useOpencodeContext();
+  const [isRestarting, setIsRestarting] = useState(false);
   const {
     userProviders,
     connectedProviders,
@@ -18,6 +19,11 @@ export function ProviderSettings() {
     syncWithOpenCode,
     isLoading,
   } = useProviderStore();
+
+  // 判断是否正在进行中（服务启动/连接等）
+  const isInProgress = ["downloading", "starting", "uninitialized"].includes(
+    state.backendStatus.type
+  ) || state.connectionState.status === "connecting";
 
   useEffect(() => {
     loadUserProviders();
@@ -30,18 +36,21 @@ export function ProviderSettings() {
     }
   }, [client, isConnected, loadRegistry, syncWithOpenCode]);
 
-  const handleRefresh = async () => {
-    if (client && isConnected) {
-      try {
-        await client.instance.dispose();
-      } catch (e) {
-        console.warn("清除 OpenCode 缓存失败:", e);
-      }
-      
-      await loadRegistry(client);
-      await syncWithOpenCode(client);
+  // 处理刷新/重启
+  const handleRefresh = useCallback(async () => {
+    if (isRestarting || isInProgress) return;
+
+    setIsRestarting(true);
+    try {
+      // 重启 opencode server 以应用更改
+      await restartService();
+    } finally {
+      // 延迟重置状态，让用户看到动画效果
+      setTimeout(() => {
+        setIsRestarting(false);
+      }, 500);
     }
-  };
+  }, [restartService, isRestarting, isInProgress]);
 
   const allProviders = [
     ...userProviders,
@@ -54,7 +63,6 @@ export function ProviderSettings() {
         auth: { type: "oauth" as const, connected: true, method: 0 },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        isOpencodeManaged: true,
       })),
   ];
 
@@ -73,10 +81,10 @@ export function ProviderSettings() {
             variant="outline" 
             size="icon"
             onClick={handleRefresh} 
-            disabled={isLoading || !isConnected}
-            title="刷新服务商列表"
+            disabled={isRestarting || isInProgress}
+            title="重启服务以刷新配置"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isRestarting || isInProgress ? "animate-spin" : ""}`} />
           </Button>
           <Button onClick={() => setShowAddDialog(true)} disabled={isLoading || !isConnected}>
             <Plus className="w-4 h-4 mr-2" />
@@ -111,7 +119,6 @@ export function ProviderSettings() {
             <ProviderCard 
               key={provider.id} 
               provider={provider}
-              isOpencodeManaged={(provider as { isOpencodeManaged?: boolean }).isOpencodeManaged}
             />
           ))}
         </div>

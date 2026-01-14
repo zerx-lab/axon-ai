@@ -7,7 +7,7 @@
  * - Service control actions
  */
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { 
   OpencodeService, 
   getOpencodeService,
@@ -36,6 +36,9 @@ interface UseOpencodeReturn {
   restartBackend: () => Promise<void>;
 }
 
+// 全局初始化标记，确保只初始化一次
+let globalInitialized = false;
+
 /**
  * Hook for interacting with OpenCode service
  */
@@ -44,6 +47,9 @@ export function useOpencode(): UseOpencodeReturn {
   const [state, setState] = useState<OpencodeServiceState>(service.getState());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 使用 ref 缓存 client，避免每次渲染都获取新引用
+  const clientRef = useRef<OpencodeClient | null>(null);
 
   // Subscribe to service state changes
   useEffect(() => {
@@ -58,20 +64,34 @@ export function useOpencode(): UseOpencodeReturn {
       }
     });
 
-    // Initialize service on mount
-    service.initialize().catch((e) => {
-      console.error("Failed to initialize service:", e);
-      setError(e instanceof Error ? e.message : "Initialization failed");
-    });
+    // 只初始化一次（全局）
+    if (!globalInitialized) {
+      globalInitialized = true;
+      service.initialize().catch((e) => {
+        console.error("Failed to initialize service:", e);
+        setError(e instanceof Error ? e.message : "Initialization failed");
+        // 初始化失败时重置标记，允许重试
+        globalInitialized = false;
+      });
+    }
 
     return () => {
       unsubscribe();
     };
   }, [service]);
 
-  // Derived state
+  // 派生状态 - 使用 useMemo 缓存
   const isConnected = state.connectionState.status === "connected";
-  const client = service.getClient();
+  
+  // 只在连接状态变化时更新 client ref
+  const client = useMemo(() => {
+    if (isConnected) {
+      clientRef.current = service.getClient();
+    } else {
+      clientRef.current = null;
+    }
+    return clientRef.current;
+  }, [isConnected, service]);
 
   // Actions
   const connect = useCallback(async () => {

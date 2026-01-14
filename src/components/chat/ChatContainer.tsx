@@ -11,6 +11,7 @@ import { QuickPrompts } from "./QuickPrompts";
 import { TodoListCompact } from "./TodoList";
 import { AutoAcceptToggle } from "./PermissionPrompt";
 import { FloatingPermissionPrompt } from "./FloatingPermissionPrompt";
+import { LspStatusBadge } from "./LspStatusBadge";
 import type { Message, Session, Agent } from "@/types/chat";
 import type { Provider } from "@/stores/chat";
 import type { Attachment } from "@/hooks";
@@ -288,10 +289,13 @@ export function ChatContainer({
             onSelectSession={onSelectSession}
           />
           
-          {/* 底部工具栏：自动批准开关 */}
+          {/* 底部工具栏：自动批准开关 + LSP 状态 */}
           {activeSessionId && (
             <div className="flex items-center justify-between">
-              <AutoAcceptToggle sessionId={activeSessionId} />
+              <div className="flex items-center gap-4">
+                <AutoAcceptToggle sessionId={activeSessionId} />
+                <LspStatusBadge />
+              </div>
               <Disclaimer />
             </div>
           )}

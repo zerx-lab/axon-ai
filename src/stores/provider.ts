@@ -8,6 +8,7 @@ import type {
   ProviderAuth,
   CustomConfig,
   ProviderAuthMethod,
+  OAuthAuthorization,
 } from "@/types/provider";
 import type { OpencodeClient } from "@/services/opencode/types";
 
@@ -28,6 +29,11 @@ interface ProviderStore {
   syncWithOpenCode: (opencodeClient: OpencodeClient) => Promise<void>;
   
   syncApiKeyToOpenCode: (client: OpencodeClient, providerID: string, apiKey: string) => Promise<boolean>;
+  syncProviderOptionsToOpenCode: (client: OpencodeClient, providerID: string, customConfig: CustomConfig) => Promise<boolean>;
+  
+  // OAuth 相关方法
+  startOAuthAuthorize: (client: OpencodeClient, providerID: string, method: number) => Promise<OAuthAuthorization | null>;
+  completeOAuthCallback: (client: OpencodeClient, providerID: string, method: number, code?: string) => Promise<boolean>;
   
   addProvider: (config: {
     registryId: string;
@@ -174,21 +180,82 @@ export const useProviderStore = create<ProviderStore>()(
               key: apiKey,
             },
           });
-          
+
           if (response.data === true) {
             console.log(`[Provider] API Key 已同步到 OpenCode: ${providerID}`);
-            
+
             const listResult = await client.provider.list();
             if (listResult.data) {
               const data = listResult.data as { connected: string[] };
               set({ connectedProviders: new Set(data.connected || []) });
             }
-            
+
             return true;
           }
           return false;
         } catch (error) {
           console.error(`同步 API Key 到 OpenCode 失败 (${providerID}):`, error);
+          return false;
+        }
+      },
+
+      syncProviderOptionsToOpenCode: async (client: OpencodeClient, providerID: string, customConfig: CustomConfig) => {
+        try {
+          // 构建 provider options 配置
+          const options: Record<string, unknown> = {};
+
+          if (customConfig.baseURL) {
+            options.baseURL = customConfig.baseURL;
+          }
+          if (customConfig.enterpriseUrl) {
+            options.enterpriseUrl = customConfig.enterpriseUrl;
+          }
+          if (customConfig.setCacheKey !== undefined) {
+            options.setCacheKey = customConfig.setCacheKey;
+          }
+          if (customConfig.timeout !== undefined) {
+            options.timeout = customConfig.timeout;
+          }
+          // headers 也在 options 里面
+          if (customConfig.headers && Object.keys(customConfig.headers).length > 0) {
+            options.headers = customConfig.headers;
+          }
+
+          // 构建 provider 级别配置（whitelist、blacklist）
+          const providerConfig: Record<string, unknown> = {};
+
+          if (customConfig.whitelist && customConfig.whitelist.length > 0) {
+            providerConfig.whitelist = customConfig.whitelist;
+          }
+          if (customConfig.blacklist && customConfig.blacklist.length > 0) {
+            providerConfig.blacklist = customConfig.blacklist;
+          }
+
+          // 只有当有配置项时才更新
+          if (Object.keys(options).length === 0 && Object.keys(providerConfig).length === 0) {
+            return true;
+          }
+
+          // 合并 options 到 providerConfig
+          if (Object.keys(options).length > 0) {
+            providerConfig.options = options;
+          }
+
+          // 使用 config.update 同步到 opencode 配置文件
+          await client.config.update({
+            config: {
+              provider: {
+                [providerID]: providerConfig,
+              },
+            },
+          });
+
+          // 刷新缓存
+          await client.instance.dispose();
+
+          return true;
+        } catch (error) {
+          console.error(`同步 Provider 配置到 OpenCode 失败 (${providerID}):`, error);
           return false;
         }
       },
@@ -206,15 +273,20 @@ export const useProviderStore = create<ProviderStore>()(
           };
 
           const updatedProviders = [...get().userProviders, newProvider];
-          
+
           await invoke("add_user_provider", { config: newProvider });
-          
+
           set({ userProviders: updatedProviders });
-          
+
           if (client && config.auth.type === "api" && config.auth.key) {
             await get().syncApiKeyToOpenCode(client, config.registryId, config.auth.key);
           }
-          
+
+          // 同步高级配置（options）到 opencode 配置文件
+          if (client && config.customConfig) {
+            await get().syncProviderOptionsToOpenCode(client, config.registryId, config.customConfig);
+          }
+
           toast.success("服务商添加成功");
         } catch (error) {
           console.error("添加服务商失败:", error);
@@ -233,13 +305,18 @@ export const useProviderStore = create<ProviderStore>()(
           );
 
           await invoke("update_user_provider", { id, updates });
-          
+
           set({ userProviders: updatedProviders });
-          
+
           if (client && currentProvider && updates.auth?.type === "api" && updates.auth.key) {
             await get().syncApiKeyToOpenCode(client, currentProvider.registryId, updates.auth.key);
           }
-          
+
+          // 同步高级配置（options）到 opencode 配置文件
+          if (client && currentProvider && updates.customConfig) {
+            await get().syncProviderOptionsToOpenCode(client, currentProvider.registryId, updates.customConfig);
+          }
+
           toast.success("服务商更新成功");
         } catch (error) {
           console.error("更新服务商失败:", error);
@@ -264,28 +341,31 @@ export const useProviderStore = create<ProviderStore>()(
 
       removeProviderAuth: async (registryId, client) => {
         try {
+          // Rust 后端负责清理 auth.json 和 config.json
           await invoke<void>("remove_provider_auth", { providerId: registryId });
-          
+
           set((state) => {
             const newConnected = new Set(state.connectedProviders);
             newConnected.delete(registryId);
             return { connectedProviders: newConnected };
           });
-          
+
           if (client) {
+            // 刷新 OpenCode 缓存使更改生效
             try {
               await client.instance.dispose();
             } catch (e) {
               console.warn("清除 OpenCode 缓存失败:", e);
             }
-            
+
+            // 刷新已连接的 provider 列表
             const listResult = await client.provider.list();
             if (listResult.data) {
               const data = listResult.data as { connected: string[] };
               set({ connectedProviders: new Set(data.connected || []) });
             }
           }
-          
+
           toast.success("已退出登录");
         } catch (error) {
           console.error("退出登录失败:", error);
@@ -306,6 +386,80 @@ export const useProviderStore = create<ProviderStore>()(
         } catch (error) {
           console.error("测试连接失败:", error);
           toast.error("测试连接失败");
+          return false;
+        }
+      },
+
+      startOAuthAuthorize: async (client, providerID, method) => {
+        try {
+          const response = await client.provider.oauth.authorize({
+            providerID,
+            method,
+          });
+          
+          if (response.data) {
+            return response.data as OAuthAuthorization;
+          }
+          
+          // 检查是否有错误响应
+          if (response.error) {
+            const error = response.error as { name?: string; data?: { message?: string } };
+            const errorMessage = error.data?.message || "未知错误";
+            
+            // 解析端口占用错误
+            if (errorMessage.includes("port") && errorMessage.includes("in use")) {
+              const portMatch = errorMessage.match(/port (\d+)/);
+              const port = portMatch ? portMatch[1] : "1455";
+              toast.error(`OAuth 服务端口 ${port} 被占用，请关闭占用该端口的程序后重试`);
+            } else if (errorMessage.includes("Failed to start server")) {
+              toast.error("OAuth 服务启动失败，请检查网络或稍后重试");
+            } else {
+              toast.error(`OAuth 授权失败: ${errorMessage}`);
+            }
+            console.error(`[Provider] OAuth 授权错误:`, error);
+            return null;
+          }
+          
+          return null;
+        } catch (error) {
+          console.error(`启动 OAuth 授权失败 (${providerID}):`, error);
+          
+          // 解析错误信息
+          const errorStr = String(error);
+          if (errorStr.includes("port") && errorStr.includes("in use")) {
+            toast.error("OAuth 服务端口 1455 被占用，请关闭占用该端口的程序后重试");
+          } else {
+            toast.error("启动 OAuth 授权失败，请稍后重试");
+          }
+          return null;
+        }
+      },
+
+      completeOAuthCallback: async (client, providerID, method, code) => {
+        try {
+          const response = await client.provider.oauth.callback({
+            providerID,
+            method,
+            code,
+          });
+          
+          if (response.data === true) {
+            console.log(`[Provider] OAuth 授权成功: ${providerID}`);
+            
+            // 刷新已连接的 provider 列表
+            const listResult = await client.provider.list();
+            if (listResult.data) {
+              const data = listResult.data as { connected: string[] };
+              set({ connectedProviders: new Set(data.connected || []) });
+            }
+            
+            toast.success("授权成功");
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error(`OAuth 回调处理失败 (${providerID}):`, error);
+          toast.error("OAuth 授权失败");
           return false;
         }
       },

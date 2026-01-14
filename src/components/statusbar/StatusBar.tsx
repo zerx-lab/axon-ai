@@ -9,7 +9,7 @@
  * - 支持启用/禁用切换
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -48,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { useOpencode } from "@/hooks";
 import type { McpStatus, McpServersStatus } from "@/types/mcp";
 import { getMcpStatusStats } from "@/types/mcp";
+import { LspStatusButton } from "./LspStatusButton";
 import { getToolsSimple, CATEGORY_NAMES, getToolCategory } from "@/services/opencode/tools";
 import { settings as tauriSettings, fs as tauriFs, opencode as tauriOpencode } from "@/services/tauri";
 import {
@@ -78,6 +79,13 @@ export function StatusBar() {
   const [isToolsLoading, setIsToolsLoading] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [updatingPermission, setUpdatingPermission] = useState<string | null>(null);
+  
+  // 使用 ref 存储 client，避免依赖变化
+  const clientRef = useRef(client);
+  clientRef.current = client;
+  
+  // 跟踪是否已加载
+  const hasLoadedRef = useRef(false);
 
   const closePermissionMenu = useCallback(() => {
     // 关闭权限菜单时的清理逻辑（如果需要）
@@ -94,11 +102,12 @@ export function StatusBar() {
 
   // 加载 MCP 服务器状态
   const loadMcpStatus = useCallback(async () => {
-    if (!client || !isConnected) return;
+    const currentClient = clientRef.current;
+    if (!currentClient || !isConnected) return;
 
     setIsLoading(true);
     try {
-      const result = await client.mcp.status();
+      const result = await currentClient.mcp.status();
       if (result.data) {
         setMcpServers(result.data as unknown as McpServersStatus);
       }
@@ -107,17 +116,18 @@ export function StatusBar() {
     } finally {
       setIsLoading(false);
     }
-  }, [client, isConnected]);
+  }, [isConnected]);
 
   const loadTools = useCallback(async () => {
-    if (!client || !isConnected) return;
+    const currentClient = clientRef.current;
+    if (!currentClient || !isConnected) return;
 
     setIsToolsLoading(true);
     try {
       // 并行获取工具列表和权限配置
       const [toolsResult, configResult] = await Promise.all([
         getToolsSimple(),
-        client.config.get(),
+        currentClient.config.get(),
       ]);
       
       // 解析权限配置
@@ -157,20 +167,24 @@ export function StatusBar() {
         };
       });
       
-      console.log('[StatusBar] loadTools 获取到的工具列表:', toolsWithPermission);
-      console.log('[StatusBar] loadTools 工具数量:', toolsWithPermission.length);
       setTools(toolsWithPermission);
     } catch (error) {
       console.error("加载工具列表失败:", error);
     } finally {
       setIsToolsLoading(false);
     }
-  }, [client, isConnected]);
+  }, [isConnected]);
 
   useEffect(() => {
-    if (isBackendReady) {
+    if (isBackendReady && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       loadMcpStatus();
       loadTools();
+    }
+    
+    // 断开连接时重置标记
+    if (!isBackendReady) {
+      hasLoadedRef.current = false;
     }
   }, [isBackendReady, loadMcpStatus, loadTools]);
 
@@ -786,6 +800,9 @@ export function StatusBar() {
           </TooltipProvider>
         </PopoverContent>
       </Popover>
+
+      {/* LSP 状态 */}
+      <LspStatusButton />
     </div>
   );
 }

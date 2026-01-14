@@ -1,19 +1,20 @@
-import { Trash2, Settings, CheckCircle2, AlertCircle, Lock, LogOut } from "lucide-react";
+import { Pencil, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProviderStore } from "@/stores/provider";
 import { useOpencodeContext } from "@/providers/OpencodeProvider";
+import { useOpencode } from "@/hooks";
 import type { UserProviderConfig } from "@/types/provider";
 import { useState } from "react";
 
 interface ProviderCardProps {
   provider: UserProviderConfig;
-  isOpencodeManaged?: boolean;
 }
 
-export function ProviderCard({ provider, isOpencodeManaged }: ProviderCardProps) {
-  const { registry, connectedProviders, removeProvider, removeProviderAuth, setEditingProvider, setShowAddDialog } = useProviderStore();
+export function ProviderCard({ provider }: ProviderCardProps) {
+  const { registry, connectedProviders, userProviders, removeProvider, removeProviderAuth, setEditingProvider, setShowAddDialog } = useProviderStore();
   const { client } = useOpencodeContext();
+  const { restartBackend } = useOpencode();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const registryEntry = registry[provider.registryId];
 
@@ -23,26 +24,46 @@ export function ProviderCard({ provider, isOpencodeManaged }: ProviderCardProps)
       : provider.auth.connected
   );
 
-  const handleEdit = () => {
-    if (isOpencodeManaged) return;
-    setEditingProvider(provider);
-    setShowAddDialog(true);
-  };
+  // 检查是否为用户在 Axon 中添加的 provider
+  const isUserAdded = userProviders.some(p => p.registryId === provider.registryId);
 
-  const handleRemove = async () => {
-    if (isOpencodeManaged) return;
-    if (confirm(`确定要删除服务商 "${provider.name}" 吗？`)) {
-      await removeProvider(provider.id);
+  const handleEdit = () => {
+    // 如果是用户添加的，直接编辑
+    if (isUserAdded) {
+      const userProvider = userProviders.find(p => p.registryId === provider.registryId);
+      if (userProvider) {
+        setEditingProvider(userProvider);
+        setShowAddDialog(true);
+      }
+    } else {
+      // 如果是 OpenCode 管理的，创建一个新的编辑条目（相当于添加自定义配置）
+      setEditingProvider({
+        ...provider,
+        id: "", // 清空 id，表示需要新建
+      });
+      setShowAddDialog(true);
     }
   };
 
   const handleLogout = async () => {
     if (!isConnected) return;
     if (!confirm(`确定要退出 "${provider.name}" 的登录吗？这将清除保存的认证信息。`)) return;
-    
+
     setIsLoggingOut(true);
     try {
+      // 清除认证信息（auth.json + config.json options）
       await removeProviderAuth(provider.registryId, client || undefined);
+
+      // 如果是用户添加的 Provider，同时删除本地配置记录
+      if (isUserAdded) {
+        const userProvider = userProviders.find(p => p.registryId === provider.registryId);
+        if (userProvider) {
+          await removeProvider(userProvider.id);
+        }
+      }
+
+      // 重启 opencode server 以应用更改
+      await restartBackend();
     } finally {
       setIsLoggingOut(false);
     }
@@ -66,12 +87,6 @@ export function ProviderCard({ provider, isOpencodeManaged }: ProviderCardProps)
             ) : (
               <AlertCircle className="w-4 h-4 text-muted-foreground/50" />
             )}
-            {isOpencodeManaged && (
-              <div className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-600 rounded">
-                <Lock className="w-3 h-3" />
-                <span>OpenCode 管理</span>
-              </div>
-            )}
           </div>
           <p className="text-xs text-muted-foreground/70">
             {registryEntry?.name || provider.registryId}
@@ -93,26 +108,15 @@ export function ProviderCard({ provider, isOpencodeManaged }: ProviderCardProps)
             <LogOut className="w-4 h-4" />
           </Button>
         )}
-        {!isOpencodeManaged && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleEdit}
-              className="h-8 w-8"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRemove}
-              className="h-8 w-8 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleEdit}
+          className="h-8 w-8"
+          title="编辑"
+        >
+          <Pencil className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   );

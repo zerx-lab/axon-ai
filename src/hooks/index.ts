@@ -1,6 +1,11 @@
 export { useServiceStatus } from "./useServiceStatus";
 export { useOpencode } from "./useOpencode";
 export {
+  useLspStatus,
+  type LspServer,
+  type LspStatusStats,
+} from "./useLspStatus";
+export {
   useAttachments,
   type Attachment,
   type ImageAttachment,
