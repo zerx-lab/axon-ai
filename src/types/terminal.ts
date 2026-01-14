@@ -190,18 +190,23 @@ export interface QuickCommand {
   cwd?: string;
 }
 
-// 默认快速命令
+// 检测是否为 Windows 平台
+function isWindows(): boolean {
+  return navigator.platform.toLowerCase().includes("win");
+}
+
+// 默认快速命令（根据平台适配）
 export const DEFAULT_QUICK_COMMANDS: QuickCommand[] = [
   {
     id: "clear",
     label: "清屏",
-    command: "clear",
+    command: isWindows() ? "cls" : "clear",
     description: "清除终端输出",
   },
   {
     id: "ls",
     label: "列出文件",
-    command: "ls -la",
+    command: isWindows() ? "dir" : "ls -la",
     description: "列出当前目录文件",
   },
   {

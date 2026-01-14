@@ -2,7 +2,7 @@
 //!
 //! 支持 PTY 进程管理、Tauri 事件通信和多终端实例
 
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
@@ -26,6 +26,8 @@ pub struct TerminalInstance {
     pub pid: u32,
     /// PTY master（用于 resize）
     master: Box<dyn MasterPty + Send>,
+    /// 子进程句柄（用于关闭时终止进程）
+    child: Box<dyn Child + Send>,
 }
 
 /// 终端管理器 - 管理所有终端实例
@@ -71,8 +73,14 @@ impl TerminalManager {
             .lock()
             .map_err(|_| "获取终端锁失败".to_string())?;
 
-        if instances.remove(terminal_id).is_some() {
-            tracing::info!("[Terminal {}] 已关闭", terminal_id);
+        if let Some(mut instance) = instances.remove(terminal_id) {
+            // 主动终止子进程，防止进程泄漏
+            if let Err(e) = instance.child.kill() {
+                tracing::warn!("[Terminal {}] 终止进程失败 (可能已退出): {}", terminal_id, e);
+            }
+            // 等待进程退出（非阻塞检查）
+            let _ = instance.child.try_wait();
+            tracing::info!("[Terminal {}] 已关闭并终止进程", terminal_id);
         }
 
         Ok(())
@@ -260,13 +268,14 @@ pub async fn create_terminal(
         .take_writer()
         .map_err(|e| format!("获取 PTY writer 失败: {}", e))?;
 
-    // 创建终端实例
+    // 创建终端实例（保存 child 进程句柄，用于关闭时终止进程）
     let instance = TerminalInstance {
         master_writer: writer,
         shell: shell.clone(),
         cwd: work_dir,
         pid,
         master: pty_pair.master,
+        child,
     };
 
     // 保存实例

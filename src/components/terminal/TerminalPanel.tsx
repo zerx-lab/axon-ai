@@ -21,21 +21,61 @@ import { TerminalTabs } from "./TerminalTabs";
 import { cn } from "@/lib/utils";
 import "@xterm/xterm/css/xterm.css";
 
-// 输出缓冲区 - 用于缓存每个终端的输出（在 xterm 还未准备好时）
-const outputBuffers = new Map<string, string[]>();
+// Buffer 最大容量（防止内存泄漏）
+const MAX_BUFFER_SIZE = 1000;
 
-// 获取或创建缓冲区
-function getBuffer(terminalId: string): string[] {
-  if (!outputBuffers.has(terminalId)) {
-    outputBuffers.set(terminalId, []);
+// 输出缓冲区管理类 - 解决 HMR 和内存泄漏问题
+class OutputBufferManager {
+  private buffers = new Map<string, string[]>();
+  private static instance: OutputBufferManager | null = null;
+  
+  // 单例模式，确保 HMR 时不会丢失状态
+  static getInstance(): OutputBufferManager {
+    if (!OutputBufferManager.instance) {
+      OutputBufferManager.instance = new OutputBufferManager();
+    }
+    return OutputBufferManager.instance;
   }
-  return outputBuffers.get(terminalId)!;
+  
+  getBuffer(terminalId: string): string[] {
+    if (!this.buffers.has(terminalId)) {
+      this.buffers.set(terminalId, []);
+    }
+    return this.buffers.get(terminalId)!;
+  }
+  
+  // 添加数据到 buffer，带容量限制
+  pushToBuffer(terminalId: string, data: string): void {
+    const buffer = this.getBuffer(terminalId);
+    buffer.push(data);
+    // 如果超过最大容量，移除最旧的数据
+    while (buffer.length > MAX_BUFFER_SIZE) {
+      buffer.shift();
+    }
+  }
+  
+  clearBuffer(terminalId: string): void {
+    this.buffers.delete(terminalId);
+  }
+  
+  // 清理不存在的终端的 buffer
+  cleanupBuffers(validIds: Set<string>): void {
+    for (const bufferId of this.buffers.keys()) {
+      if (!validIds.has(bufferId)) {
+        console.log("[Terminal] 清理已关闭终端的缓冲区:", bufferId);
+        this.buffers.delete(bufferId);
+      }
+    }
+  }
+  
+  // 获取所有 buffer 的 ID（用于清理）
+  getBufferIds(): string[] {
+    return Array.from(this.buffers.keys());
+  }
 }
 
-// 清空缓冲区
-function clearBuffer(terminalId: string) {
-  outputBuffers.delete(terminalId);
-}
+// 使用单例
+const bufferManager = OutputBufferManager.getInstance();
 
 interface TerminalPanelProps {
   className?: string;
@@ -64,6 +104,8 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
   const isAutoCreatingRef = useRef(false);
   // 记录上一个激活的 tab，用于判断是否需要从 buffer 恢复
   const prevTabRef = useRef<string | null>(null);
+  // 记录每个终端上次发送的尺寸，避免重复发送相同尺寸
+  const lastSentSizeRef = useRef<Map<string, { rows: number; cols: number }>>(new Map());
 
   const { isVisible, isLoading, error, config, updateTabStatus, tabs, createTab } = useTerminal();
   const { tab } = useActiveTerminal();
@@ -150,11 +192,23 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
 
     // 设置 ResizeObserver 监听终端容器尺寸变化
     const container = terminalRef.current;
+    
+    // 记录上次尺寸，避免无限循环
+    let lastWidth = 0;
+    let lastHeight = 0;
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const handleResize = () => {
       if (!container || !fitAddon) return;
       const rect = container.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
+      
+      // 只在尺寸确实变化时才执行 fit（防止无限循环）
+      const widthChanged = Math.abs(rect.width - lastWidth) > 1;
+      const heightChanged = Math.abs(rect.height - lastHeight) > 1;
+      
+      if (rect.width > 0 && rect.height > 0 && (widthChanged || heightChanged)) {
+        lastWidth = rect.width;
+        lastHeight = rect.height;
         try {
           fitAddon.fit();
         } catch (e) {
@@ -164,7 +218,13 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
     };
 
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(handleResize);
+      // 使用防抖，避免过于频繁的 resize
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      resizeTimeout = setTimeout(() => {
+        requestAnimationFrame(handleResize);
+      }, 16); // 约 60fps
     });
 
     resizeObserver.observe(container);
@@ -175,6 +235,9 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
       resizeDisposable.dispose();
       resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
       terminal.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
@@ -228,9 +291,8 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
             activeTabRef.current
           );
 
-          // 缓存到 buffer（无论是否是当前 tab）
-          const buffer = getBuffer(terminal_id);
-          buffer.push(data);
+          // 使用 bufferManager 添加数据（带容量限制，防止内存泄漏）
+          bufferManager.pushToBuffer(terminal_id, data);
 
           // 如果是当前激活的终端且 xterm 已准备好，写入
           if (terminal_id === activeTabRef.current && xtermRef.current) {
@@ -256,7 +318,7 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
           const { terminal_id } = event.payload;
           console.log("[Terminal] 收到退出事件:", terminal_id);
           // 清理缓冲区
-          clearBuffer(terminal_id);
+          bufferManager.clearBuffer(terminal_id);
           if (terminal_id === activeTabRef.current) {
             updateTabStatusRef.current(terminal_id, "disconnected");
             if (xtermRef.current) {
@@ -299,14 +361,16 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
     if (prevTabId === null) {
       // 首次加载，检查 buffer 是否有内容需要恢复
       // （这种情况发生在 activeTabRef 更新前就收到了输出）
-      const buffer = getBuffer(currentTabId);
+      const buffer = bufferManager.getBuffer(currentTabId);
       if (buffer.length > 0) {
         console.log("[Terminal] 首次加载，恢复缓冲区内容:", buffer.length, "条");
-        for (const data of buffer) {
+        // 复制 buffer 内容，避免在写入过程中被修改（解决竞态条件）
+        const bufferSnapshot = [...buffer];
+        // 立即清空 buffer，避免后续重复
+        bufferManager.clearBuffer(currentTabId);
+        for (const data of bufferSnapshot) {
           xtermRef.current.write(data);
         }
-        // 清空 buffer，避免后续重复
-        buffer.length = 0;
       }
     } else if (prevTabId !== currentTabId) {
       // 切换到不同的 tab，需要清空并从 buffer 恢复
@@ -314,7 +378,7 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
       xtermRef.current.clear();
       xtermRef.current.reset();
 
-      const buffer = getBuffer(currentTabId);
+      const buffer = bufferManager.getBuffer(currentTabId);
       if (buffer.length > 0) {
         console.log("[Terminal] 恢复缓冲区内容:", buffer.length, "条");
         for (const data of buffer) {
@@ -323,18 +387,22 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
       }
     }
 
-    // 重新 fit 并聚焦，同时发送尺寸到后端
+    // 重新 fit 并聚焦，同时发送尺寸到后端（仅在尺寸变化时）
     requestAnimationFrame(() => {
       if (fitAddonRef.current && xtermRef.current) {
         fitAddonRef.current.fit();
-        // 发送初始尺寸到后端（fit 之后 rows/cols 已更新）
+        // 发送尺寸到后端（仅在尺寸变化时，避免不必要的调用）
         const { rows, cols } = xtermRef.current;
-        console.log("[Terminal] 发送初始尺寸:", cols, "x", rows);
-        invoke("terminal_resize", {
-          terminalId: currentTabId,
-          rows,
-          cols,
-        }).catch((e) => console.error("[Terminal] 发送尺寸失败:", e));
+        const lastSize = lastSentSizeRef.current.get(currentTabId);
+        if (!lastSize || lastSize.rows !== rows || lastSize.cols !== cols) {
+          console.log("[Terminal] 发送尺寸:", cols, "x", rows);
+          lastSentSizeRef.current.set(currentTabId, { rows, cols });
+          invoke("terminal_resize", {
+            terminalId: currentTabId,
+            rows,
+            cols,
+          }).catch((e) => console.error("[Terminal] 发送尺寸失败:", e));
+        }
       }
       // 确保终端获得焦点
       xtermRef.current?.focus();
@@ -369,13 +437,7 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
   // 清理已关闭终端的缓冲区，防止内存泄漏
   useEffect(() => {
     const tabIds = new Set(tabs.map((t) => t.id));
-    // 遍历缓冲区，删除不存在的终端缓冲区
-    for (const bufferId of outputBuffers.keys()) {
-      if (!tabIds.has(bufferId)) {
-        console.log("[Terminal] 清理已关闭终端的缓冲区:", bufferId);
-        clearBuffer(bufferId);
-      }
-    }
+    bufferManager.cleanupBuffers(tabIds);
   }, [tabs]);
 
   // 点击终端区域时聚焦

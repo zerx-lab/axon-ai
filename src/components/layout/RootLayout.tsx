@@ -51,9 +51,9 @@ export function RootLayout({ children }: RootLayoutProps) {
     if (terminalSaveTimerRef.current) {
       clearTimeout(terminalSaveTimerRef.current);
     }
-    // 防抖 500ms 后保存
+    // 防抖 500ms 后保存，使用 Math.round 避免浮点数精度问题
     terminalSaveTimerRef.current = setTimeout(() => {
-      updateTerminalPanelHeight(size.inPixels);
+      updateTerminalPanelHeight(Math.round(size.inPixels));
     }, 500);
   }, [updateTerminalPanelHeight]);
 
