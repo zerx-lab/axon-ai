@@ -31,6 +31,7 @@
     "chat": "会话",
     "search": "搜索",
     "extensions": "扩展",
+    "terminal": "终端",
     "moveToLeft": "移动到左侧",
     "moveToRight": "移动到右侧",
     "hideSidebar": "隐藏侧边栏",
@@ -80,6 +81,7 @@
     },
     "contextMenu": {
       "deleteSession": "删除会话",
+      "clearSessions": "清空会话",
       "clearAll": "清除全部会话",
       "clearAllConfirm": "确定要清除所有会话吗？此操作不可恢复。"
     },
@@ -106,6 +108,7 @@
     "thinking": "思考中...",
     "welcome": "你好！我是 Axon AI 助手，有什么可以帮助你的吗？",
     "welcomeTitle": "准备好开始了吗？",
+    "welcomeSubtitle": "开始与 AI 助手对话，获取智能帮助",
     "errorMessage": "抱歉，发生了错误，请重试。",
     "emptyState": {
       "title": "开始对话",
@@ -131,6 +134,7 @@
     "history": "历史记录",
     "user": "你",
     "assistant": "Axon",
+    "agent": "代理",
     "selectModel": "选择模型",
     "noModels": "暂无可用模型",
     "loadingModels": "加载模型中...",

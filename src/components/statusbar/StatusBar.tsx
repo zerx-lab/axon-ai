@@ -23,6 +23,7 @@ import {
   HelpCircle,
   X,
   ChevronRight,
+  Terminal,
 } from "lucide-react";
 import {
   Popover,
@@ -56,6 +57,7 @@ import {
   type PermissionConfig,
   getActionDisplayName,
 } from "@/types/permission";
+import { useTerminalVisible, useTerminal, useTerminalTabs } from "@/stores/terminal";
 
 // 工具权限类型
 interface ToolWithPermission {
@@ -67,6 +69,10 @@ interface ToolWithPermission {
 export function StatusBar() {
   const { t } = useTranslation();
   const { client, isConnected, state } = useOpencode();
+
+  const terminalVisible = useTerminalVisible();
+  const { toggleVisible } = useTerminal();
+  const tabs = useTerminalTabs();
 
   const [mcpServers, setMcpServers] = useState<McpServersStatus>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -418,8 +424,38 @@ export function StatusBar() {
 
   return (
     <div className="flex items-center h-6 px-2 bg-sidebar border-t border-border/50 text-xs shrink-0">
-      {/* MCP 状态 */}
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+      {/* 终端按钮 - 左侧 */}
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => {
+                toggleVisible();
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-2 h-full mr-2",
+                "text-muted-foreground/70 hover:text-foreground",
+                "hover:bg-accent/50",
+                "transition-colors duration-150",
+                terminalVisible && "text-foreground bg-accent/50"
+              )}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+              <span className="tabular-nums">
+                {tabs.length > 0 ? tabs.length : ""}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="center" className="text-xs">
+            {t("activityBar.terminal", "终端")}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      {/* 右侧区域 - MCP、工具、LSP */}
+      <div className="flex items-center ml-auto">
+        {/* MCP 状态 */}
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <button
             className={cn(
@@ -801,8 +837,9 @@ export function StatusBar() {
         </PopoverContent>
       </Popover>
 
-      {/* LSP 状态 */}
-      <LspStatusButton />
+        {/* LSP 状态 */}
+        <LspStatusButton />
+      </div>
     </div>
   );
 }

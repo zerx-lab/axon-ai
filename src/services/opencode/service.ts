@@ -123,6 +123,9 @@ export class OpencodeService {
         port: config.port,
         autoStart: config.autoStart,
       };
+      
+      // 立即通知监听器状态已更新，确保 UI 显示正确的初始状态
+      this.notifyListeners();
     } catch (e) {
       console.warn("[OpencodeService] Failed to get initial backend status:", e);
     }

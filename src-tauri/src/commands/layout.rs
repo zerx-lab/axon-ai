@@ -34,6 +34,8 @@ pub struct WorkspaceLayout {
     pub sidebar_width: Option<f64>,
     /// 编辑器面板占比（百分比 0-100）
     pub editor_panel_ratio: Option<f64>,
+    /// 终端面板高度（像素）
+    pub terminal_panel_height: Option<f64>,
     /// 打开的文件标签列表
     pub opened_tabs: Vec<OpenedTab>,
     /// 当前活动的文件路径
@@ -50,6 +52,7 @@ impl Default for WorkspaceLayout {
             project_directory: String::new(),
             sidebar_width: None,
             editor_panel_ratio: Some(50.0), // 默认均匀分割
+            terminal_panel_height: None,
             opened_tabs: Vec::new(),
             active_tab_path: None,
             editor_visible: false,

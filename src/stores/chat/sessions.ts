@@ -100,7 +100,8 @@ export function useCreateNewSession(deps: CreateSessionDeps) {
   
   return useCallback(async (directory?: string) => {
     if (!client) {
-      setError(t("errors.serviceNotConnected"));
+      // 服务尚未连接，静默返回，等待连接完成后 useEffect 会自动刷新
+      console.log("[createNewSession] 服务尚未连接，等待连接...");
       return;
     }
     

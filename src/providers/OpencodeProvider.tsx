@@ -92,6 +92,17 @@ export function OpencodeProvider({
     }
 
     const initService = async () => {
+      // 用于追踪是否已完成初始化的标志
+      let initializationCompleted = false;
+      
+      const completeInitialization = () => {
+        if (!initializationCompleted && mounted) {
+          initializationCompleted = true;
+          setIsInitializing(false);
+          console.log("[OpencodeProvider] Initialization completed");
+        }
+      };
+      
       try {
         console.log("[OpencodeProvider] Starting initialization...");
         setIsInitializing(true);
@@ -109,9 +120,18 @@ export function OpencodeProvider({
             // 更新错误状态
             if (newState.connectionState.status === "error") {
               setError(newState.connectionState.message);
+              // 连接出错时也完成初始化（让用户看到错误）
+              completeInitialization();
             } else if (newState.backendStatus.type === "error") {
               const errorState = newState.backendStatus as { type: "error"; message: string };
               setError(errorState.message);
+              // 后端出错时也完成初始化
+              completeInitialization();
+            }
+            
+            // 当连接成功时，完成初始化
+            if (newState.connectionState.status === "connected") {
+              completeInitialization();
             }
           }
         });
@@ -132,21 +152,38 @@ export function OpencodeProvider({
           if (currentState.backendStatus.type === "ready") {
             console.log("[OpencodeProvider] Starting opencode service...");
             await service.startBackend();
+            // startBackend 会触发状态变化，连接成功后会自动完成初始化
           } else if (currentState.backendStatus.type === "running") {
             // 服务已在运行，直接连接
             console.log("[OpencodeProvider] Service already running, connecting...");
             await service.connect();
+            // connect 完成后检查是否已连接
+            const afterConnectState = service.getState();
+            if (afterConnectState.connectionState.status === "connected") {
+              completeInitialization();
+            }
           } else {
             console.log("[OpencodeProvider] Backend status is:", currentState.backendStatus.type, "- waiting for status change");
+            // 等待后端状态变化，当变为 running 并连接成功时会自动完成初始化
+            // 但设置一个超时保护，避免无限等待
+            setTimeout(() => {
+              if (!initializationCompleted && mounted) {
+                console.log("[OpencodeProvider] Initialization timeout, completing anyway");
+                completeInitialization();
+              }
+            }, 10000); // 10秒超时
           }
         } else if (currentState.config.mode.type === "remote") {
           // 远程模式：直接尝试连接
           console.log("[OpencodeProvider] Remote mode, connecting...");
           await service.connect();
-        }
-
-        if (mounted) {
-          setIsInitializing(false);
+          const afterConnectState = service.getState();
+          if (afterConnectState.connectionState.status === "connected") {
+            completeInitialization();
+          }
+        } else {
+          // 非自动启动模式，直接完成初始化
+          completeInitialization();
         }
 
         return () => {
@@ -157,7 +194,7 @@ export function OpencodeProvider({
         console.error("[OpencodeProvider] Failed to initialize:", e);
         if (mounted) {
           setError(e instanceof Error ? e.message : "初始化失败");
-          setIsInitializing(false);
+          completeInitialization();
         }
       }
     };

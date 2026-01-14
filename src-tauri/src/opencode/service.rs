@@ -63,8 +63,42 @@ impl OpencodeService {
     }
 
     /// Get current service status
+    /// 如果进程在运行但状态未更新，自动修正状态
     pub fn get_status(&self) -> ServiceStatus {
-        self.status.read().clone()
+        let current_status = self.status.read().clone();
+        
+        // 如果状态是 Uninitialized 或 Ready 或 Stopped，但进程实际在运行，修正状态
+        // 注意：我们无法确定实际端口，尝试从 endpoint 获取或使用配置端口
+        if matches!(current_status, ServiceStatus::Uninitialized | ServiceStatus::Ready | ServiceStatus::Stopped) {
+            if self.is_process_running() {
+                // 尝试从现有的 Running 状态或配置中获取端口
+                // 由于进程在运行，说明之前启动过，尝试检测端口
+                let port = self.detect_running_port();
+                let corrected_status = ServiceStatus::Running { port };
+                info!("状态修正: {:?} -> {:?}", current_status, corrected_status);
+                *self.status.write() = corrected_status.clone();
+                return corrected_status;
+            }
+        }
+        
+        current_status
+    }
+    
+    /// 检测正在运行的服务端口
+    fn detect_running_port(&self) -> u16 {
+        // 首先检查当前状态中是否已有端口信息
+        if let ServiceStatus::Running { port } = *self.status.read() {
+            return port;
+        }
+        
+        // 否则使用配置中的端口（可能是 0，表示动态端口）
+        let config_port = self.config.read().port;
+        if config_port != 0 {
+            return config_port;
+        }
+        
+        // 默认端口
+        55567
     }
 
     /// Get current configuration

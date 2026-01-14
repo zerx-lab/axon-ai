@@ -121,6 +121,12 @@ pub fn run() {
             load_workspace_layout,
             delete_workspace_layout,
             list_workspace_layouts,
+            // 终端命令
+            create_terminal,
+            close_terminal,
+            terminal_write,
+            terminal_resize,
+            list_terminals,
         ])
         .setup(|app| {
             let setup_start = std::time::Instant::now();

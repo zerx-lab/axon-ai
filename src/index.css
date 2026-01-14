@@ -423,3 +423,40 @@
   box-shadow: 0 0 0 3px var(--ring);
 }
 
+/*
+ * Terminal (xterm.js) 容器约束
+ * 确保终端内部元素不会溢出父容器
+ */
+.terminal-container {
+  overflow: hidden;
+}
+
+.terminal-container .xterm {
+  height: 100% !important;
+  /* 移除 padding，避免背景色差异导致的"黑框" */
+  padding: 0 !important;
+  border: none !important;
+}
+
+.terminal-container .xterm-viewport {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  /* 确保 viewport 背景色与终端主题一致，避免底部黑色背景 */
+  background-color: inherit !important;
+}
+
+.terminal-container .xterm-screen {
+  border: none !important;
+  outline: none !important;
+}
+
+/* 修复 xterm 底部黑色背景问题：确保所有内部元素都继承背景色 */
+.terminal-container .xterm-helpers {
+  background-color: transparent !important;
+}
+
+.terminal-container .xterm-helper-textarea {
+  background-color: transparent !important;
+}
+

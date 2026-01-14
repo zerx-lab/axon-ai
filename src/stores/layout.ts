@@ -36,6 +36,8 @@ export interface WorkspaceLayout {
   sidebar_width: number | null;
   /** 编辑器面板占比（百分比 0-100） */
   editor_panel_ratio: number | null;
+  /** 终端面板高度（像素） */
+  terminal_panel_height: number | null;
   /** 打开的文件标签列表 */
   opened_tabs: OpenedTab[];
   /** 当前活动的文件路径 */
@@ -70,6 +72,8 @@ interface LayoutActions {
   updateSidebarWidth: (width: number) => void;
   /** 更新编辑器面板比例 */
   updateEditorPanelRatio: (ratio: number) => void;
+  /** 更新终端面板高度 */
+  updateTerminalPanelHeight: (height: number) => void;
   /** 更新打开的标签页 */
   updateOpenedTabs: (tabs: OpenedTab[]) => void;
   /** 更新活动标签页 */
@@ -136,6 +140,7 @@ function createDefaultLayout(projectDirectory: string): WorkspaceLayout {
     project_directory: projectDirectory,
     sidebar_width: 256,
     editor_panel_ratio: 50,
+    terminal_panel_height: null,
     opened_tabs: [],
     active_tab_path: null,
     editor_visible: false,
@@ -283,6 +288,20 @@ export const useLayout = create<LayoutStore>((set, get) => ({
     const updatedLayout = {
       ...layout,
       editor_panel_ratio: ratio,
+      updated_at: Date.now(),
+    };
+    set({ layout: updatedLayout });
+    deferredSave(() => get().layout);
+  },
+
+  // 更新终端面板高度
+  updateTerminalPanelHeight: (height: number) => {
+    const { layout } = get();
+    if (!layout) return;
+
+    const updatedLayout = {
+      ...layout,
+      terminal_panel_height: height,
       updated_at: Date.now(),
     };
     set({ layout: updatedLayout });

@@ -101,7 +101,9 @@ export function useSendMessage(deps: MessageOperationsDeps) {
   
   return useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!client || !activeSessionId) {
-      setError(t("errors.serviceNotConnected"));
+      // 服务尚未连接或没有活动会话，静默返回
+      // 用户在 UI 上应该看不到发送按钮或输入框处于禁用状态
+      console.log("[sendMessage] 服务尚未连接或无活动会话，等待连接...");
       return;
     }
     
