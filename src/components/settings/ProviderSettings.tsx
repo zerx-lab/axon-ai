@@ -1,14 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { Plus, Bot, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProviderStore } from "@/stores/provider";
 import { useOpencodeContext } from "@/providers";
+import { useServiceStore } from "@/stores/service";
 import { ProviderCard } from "./provider/ProviderCard";
 import { AddProviderDialog } from "./provider/AddProviderDialog";
 
 export function ProviderSettings() {
-  const { client, isConnected, restartService, state } = useOpencodeContext();
-  const [isRestarting, setIsRestarting] = useState(false);
+  const { client, isConnected, state } = useOpencodeContext();
+
+  // 使用 ServiceStore 的统一重启方法
+  const restart = useServiceStore(s => s.restart);
+  const isRestarting = useServiceStore(s => s.isRestarting);
+
   const {
     userProviders,
     connectedProviders,
@@ -36,21 +41,11 @@ export function ProviderSettings() {
     }
   }, [client, isConnected, loadRegistry, syncWithOpenCode]);
 
-  // 处理刷新/重启
+  // 处理刷新/重启（使用统一的 ServiceStore.restart）
   const handleRefresh = useCallback(async () => {
     if (isRestarting || isInProgress) return;
-
-    setIsRestarting(true);
-    try {
-      // 重启 opencode server 以应用更改
-      await restartService();
-    } finally {
-      // 延迟重置状态，让用户看到动画效果
-      setTimeout(() => {
-        setIsRestarting(false);
-      }, 500);
-    }
-  }, [restartService, isRestarting, isInProgress]);
+    await restart({ reason: "正在刷新 AI 服务商配置..." });
+  }, [restart, isRestarting, isInProgress]);
 
   const allProviders = [
     ...userProviders,

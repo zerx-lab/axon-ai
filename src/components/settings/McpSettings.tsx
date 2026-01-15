@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useOpencode } from "@/hooks";
+import { useServiceStore } from "@/stores/service";
 
 // MCP 状态类型定义
 type McpStatus =
@@ -139,7 +140,11 @@ interface McpConfigCache {
 
 export function McpSettings() {
   const { t } = useTranslation();
-  const { client, isConnected, state, connect, restartBackend } = useOpencode();
+  const { client, isConnected, state, connect } = useOpencode();
+
+  // 使用 ServiceStore 的统一重启方法
+  const restart = useServiceStore(s => s.restart);
+  const isRestarting = useServiceStore(s => s.isRestarting);
 
   // 从全局状态获取连接状态和后端状态
   const connectionStatus = state.connectionState.status;
@@ -211,45 +216,25 @@ export function McpSettings() {
     }
   }, [client, isConnected, t]);
 
-  // 刷新 MCP 服务器状态（重启 opencode 服务以清除缓存后重新加载）
+  // 刷新 MCP 服务器状态（使用统一的 ServiceStore.restart）
+  // 重启服务会清除所有缓存，重启后 ServiceStore 会自动刷新 MCP 状态
   const refreshMcpStatus = useCallback(async () => {
-    if (!client || !isConnected) return;
+    if (!client || !isConnected || isRestarting) return;
 
-    setIsLoading(true);
     try {
-      // 重启 opencode 服务以清除所有缓存（包括 Config.global）
-      // 这是因为官方 opencode 二进制的 Instance.dispose() 不会重置 Config.global 缓存
-      await restartBackend();
-      
-      // 等待服务重启完成并重新连接
-      // restartBackend 内部会处理重连，这里等待一下确保服务稳定
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // 然后重新加载状态
-      const [statusResult, configResult] = await Promise.all([
-        client.mcp.status(),
-        client.config.get(),
-      ]);
-      
-      if (statusResult.data) {
-        setMcpServers(statusResult.data as unknown as Record<string, McpStatus>);
-      }
-      
-      if (configResult.data) {
-        const config = configResult.data as unknown as { mcp?: Record<string, McpConfig> };
-        if (config.mcp) {
-          setMcpConfigs(config.mcp);
-        }
-      }
-      
+      // 使用统一的重启方法，重启后 ServiceStore 会自动刷新数据
+      await restart({ reason: t("settings.mcpSettings.refreshing") });
+
+      // 重启后，ServiceStore 会刷新全局的 mcpServers 状态
+      // 但本地组件状态也需要同步更新
+      await loadMcpStatus();
+
       toast.success(t("settings.mcpSettings.refreshSuccess"));
     } catch (error) {
       console.error("刷新 MCP 状态失败:", error);
       toast.error(t("errors.unknownError"));
-    } finally {
-      setIsLoading(false);
     }
-  }, [client, isConnected, restartBackend, t]);
+  }, [client, isConnected, isRestarting, restart, loadMcpStatus, t]);
 
   useEffect(() => {
     loadMcpStatus();

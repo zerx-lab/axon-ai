@@ -4,9 +4,10 @@
  * 悬浮弹出面板中显示重启按钮
  */
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useOpencodeContext } from "@/providers";
+import { useServiceStore } from "@/stores/service";
 import {
   Tooltip,
   TooltipContent,
@@ -148,8 +149,11 @@ function getStatusDisplay(
 }
 
 export function ServiceStatus() {
-  const { state, restartService } = useOpencodeContext();
-  const [isRestarting, setIsRestarting] = useState(false);
+  const { state } = useOpencodeContext();
+
+  // 使用 ServiceStore 的统一重启方法
+  const restart = useServiceStore(s => s.restart);
+  const isRestarting = useServiceStore(s => s.isRestarting);
 
   // 提取状态类型
   const backendStatus = state.backendStatus.type;
@@ -178,7 +182,7 @@ export function ServiceStatus() {
     backendStatus
   );
 
-  // 处理重启
+  // 处理重启（使用统一的 ServiceStore.restart）
   const handleRestart = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -186,17 +190,9 @@ export function ServiceStatus() {
 
       if (isRestarting || isInProgress) return;
 
-      setIsRestarting(true);
-      try {
-        await restartService();
-      } finally {
-        // 延迟重置状态，让用户看到动画效果
-        setTimeout(() => {
-          setIsRestarting(false);
-        }, 500);
-      }
+      await restart({ reason: "正在重启服务..." });
     },
-    [restartService, isRestarting, isInProgress]
+    [restart, isRestarting, isInProgress]
   );
 
   return (

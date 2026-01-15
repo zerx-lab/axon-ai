@@ -24,6 +24,7 @@ import {
   type SSEHealthStatus,
 } from "@/services/opencode";
 import { useTerminal } from "@/stores/terminal";
+import { useServiceStore } from "@/stores/service";
 import { hideAppLoading } from "@/main";
 
 interface OpencodeContextValue {
@@ -214,7 +215,11 @@ export function OpencodeProvider({
   // 追踪之前的连接状态，用于检测服务断开
   const prevConnectionStatusRef = useRef<string | null>(null);
 
-  // 同步 client、endpoint 和 directory 到 terminal store
+  // 获取 ServiceStore 的同步方法
+  const setServiceClient = useServiceStore(s => s._setClient);
+  const setServiceConnected = useServiceStore(s => s._setConnected);
+
+  // 同步 client、endpoint 和 directory 到 terminal store 和 service store
   // 并在服务断开时清理终端
   useEffect(() => {
     const client = service.getClient();
@@ -223,8 +228,9 @@ export function OpencodeProvider({
     const directory = ".";
     const currentStatus = state.connectionState.status;
     const prevStatus = prevConnectionStatusRef.current;
+    const isConnected = currentStatus === "connected";
 
-    console.log("[OpencodeProvider] Syncing to terminal store:", {
+    console.log("[OpencodeProvider] Syncing to stores:", {
       hasClient: !!client,
       endpoint,
       directory,
@@ -241,7 +247,11 @@ export function OpencodeProvider({
 
     prevConnectionStatusRef.current = currentStatus;
     setTerminalClient(client, endpoint, directory);
-  }, [service, state.connectionState.status, state.endpoint, setTerminalClient, clearTerminalTabs]);
+
+    // 同步到 ServiceStore
+    setServiceClient(client);
+    setServiceConnected(isConnected);
+  }, [service, state.connectionState.status, state.endpoint, setTerminalClient, clearTerminalTabs, setServiceClient, setServiceConnected]);
 
   // 连接
   const connect = useCallback(async () => {
