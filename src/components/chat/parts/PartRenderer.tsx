@@ -6,7 +6,7 @@
  * 1. DiffViewer 懒加载（仅在 edit 工具需要时加载）
  */
 
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +54,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { useShallow } from "zustand/react/shallow";
 import { usePermissionStore } from "@/stores/permission";
 import { useQuestionStore } from "@/stores/question";
+import { useSubagentPanelStore, type SubagentTab } from "@/stores/subagentPanel";
 import { useOpencode } from "@/hooks/useOpencode";
 import { QuestionPrompt } from "../QuestionPrompt";
 
@@ -473,7 +474,7 @@ function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
             <ToolErrorContent state={state} />
           )}
           {state.status === "running" && (
-            <ToolRunningContent tool={part.tool} state={state} />
+            <ToolRunningContent tool={part.tool} state={state} messageInfo={messageInfo} />
           )}
           {state.status === "pending" && (
             <div className="text-sm text-muted-foreground">等待执行...</div>
@@ -659,7 +660,7 @@ function ToolCompletedContent({ tool, state, messageInfo }: ToolCompletedContent
       );
     case "task":
       return (
-        <TaskToolContent state={state} />
+        <TaskToolContent state={state} messageInfo={messageInfo} />
       );
     default:
       return (
@@ -953,27 +954,151 @@ function TodoToolContent({ state }: { state: ToolStateCompleted }) {
   );
 }
 
-// Task 工具内容
-function TaskToolContent({ state }: { state: ToolStateCompleted }) {
+// Task 工具内容 - 增强版，支持点击打开 Subagent 面板
+function TaskToolContent({
+  state,
+  messageInfo
+}: {
+  state: ToolStateCompleted;
+  messageInfo: AssistantMessageInfo;
+}) {
   const [showOutput, setShowOutput] = useState(false);
+  const { openPanel, activeTabId } = useSubagentPanelStore();
+
   const description = state.input.description as string;
   const prompt = state.input.prompt as string;
-  
+  const subagentType = (state.input.subagent_type as string) || "general";
+  const sessionId = state.metadata?.sessionId as string | undefined;
+  const summary = state.metadata?.summary as Array<{
+    id: string;
+    tool: string;
+    state: { status: string; title?: string };
+  }> | undefined;
+
+  // 获取当前执行的工具（最后一个非 pending 的）
+  const currentTool = summary?.filter((s: { state: { status: string } }) => s.state.status !== "pending").pop();
+  const toolCallCount = summary?.length ?? 0;
+
+  // 判断任务状态
+  const isCompleted = state.metadata?.completed === true || currentTool?.state.status === "completed";
+  const hasError = summary?.some((s) => s.state.status === "error");
+  const taskStatus: "running" | "completed" | "error" = hasError
+    ? "error"
+    : isCompleted
+      ? "completed"
+      : "running";
+
+  // 是否是当前激活的标签
+  const isActive = sessionId ? activeTabId === sessionId : false;
+
+  // 预计算标签数据，减少 handleClick 的依赖项
+  const tabData = useMemo((): SubagentTab | null => {
+    if (!sessionId) return null;
+    return {
+      sessionId,
+      parentSessionId: messageInfo.sessionID,
+      description,
+      subagentType,
+      status: taskStatus,
+      toolCallCount,
+      createdAt: Date.now(),
+    };
+  }, [sessionId, messageInfo.sessionID, description, subagentType, taskStatus, toolCallCount]);
+
+  // 点击打开面板
+  const handleClick = useCallback(() => {
+    if (tabData) {
+      openPanel(tabData);
+    }
+  }, [tabData, openPanel]);
+
+  // 格式化工具名称
+  const formatToolName = (tool: string) => {
+    return tool.charAt(0).toUpperCase() + tool.slice(1);
+  };
+
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium">{description}</div>
+    <div
+      onClick={sessionId ? handleClick : undefined}
+      className={cn(
+        "space-y-2 p-3 -mx-3 -my-2 rounded-md transition-colors duration-150",
+        sessionId && "cursor-pointer",
+        sessionId && (isActive
+          ? "bg-primary/5 border border-primary/30"
+          : "hover:bg-accent/30")
+      )}
+    >
+      {/* 头部：描述 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bot className={cn(
+            "h-4 w-4",
+            taskStatus === "running" && "text-blue-500",
+            taskStatus === "completed" && "text-green-500",
+            taskStatus === "error" && "text-destructive"
+          )} />
+          <span className="text-sm font-medium">{description}</span>
+        </div>
+
+        {/* 状态指示 */}
+        {taskStatus === "running" ? (
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+        ) : taskStatus === "completed" ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        ) : (
+          <AlertCircle className="h-4 w-4 text-destructive" />
+        )}
+      </div>
+
+      {/* 提示词 */}
       {prompt && (
-        <div className="text-sm text-muted-foreground italic">
-          &ldquo;{prompt}&rdquo;
+        <div className="text-sm text-muted-foreground italic pl-6">
+          &ldquo;{prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}&rdquo;
         </div>
       )}
-      {state.output && (
-        <CollapsibleOutput
-          output={state.output}
-          showOutput={showOutput}
-          setShowOutput={setShowOutput}
-          label="输出"
-        />
+
+      {/* 当前执行的工具 */}
+      {currentTool && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6">
+          <span className="text-muted-foreground/70">└</span>
+          <span className={cn(
+            currentTool.state.status === "error" && "text-destructive"
+          )}>
+            {formatToolName(currentTool.tool)}
+          </span>
+          {currentTool.state.title && (
+            <span className="truncate max-w-[200px]">{currentTool.state.title}</span>
+          )}
+        </div>
+      )}
+
+      {/* 底部统计 + 查看详情 */}
+      <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground pl-6">
+        <span>
+          {toolCallCount} 工具调用
+          <span className="mx-1.5 text-muted-foreground/50">·</span>
+          {taskStatus === "completed" ? "已完成" : taskStatus === "error" ? "出错" : "执行中"}
+        </span>
+        {sessionId && (
+          <span className={cn(
+            "text-primary/70",
+            isActive && "text-primary"
+          )}>
+            查看详情 →
+          </span>
+        )}
+      </div>
+
+      {/* 输出（如果没有 sessionId，显示原有的输出） */}
+      {!sessionId && state.output && (
+        <div className="mt-2">
+          <CollapsibleOutput
+            output={state.output}
+            showOutput={showOutput}
+            setShowOutput={setShowOutput}
+            label="输出"
+          />
+        </div>
       )}
     </div>
   );
@@ -1129,17 +1254,113 @@ function getToolInputDescription(tool: string, input: Record<string, unknown>): 
 }
 
 // 运行中内容
-function ToolRunningContent({ tool, state }: { tool: string; state: ToolStateRunning }) {
+function ToolRunningContent({
+  tool,
+  state,
+  messageInfo,
+}: {
+  tool: string;
+  state: ToolStateRunning;
+  messageInfo: AssistantMessageInfo;
+}) {
+  // Task 工具使用专门的组件
+  if (tool === "task") {
+    return <TaskToolRunningContent state={state} messageInfo={messageInfo} />;
+  }
+
   // 优先使用 title，否则从 input 中提取具体描述
   const inputDescription = getToolInputDescription(tool, state.input);
-  const displayText = state.title || inputDescription 
+  const displayText = state.title || inputDescription
     ? `${state.title || inputDescription}`
     : `正在执行 ${getToolDisplayName(tool)}...`;
-  
+
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" />
       <span className="truncate">{displayText}</span>
+    </div>
+  );
+}
+
+// Task 工具运行中内容 - 支持点击打开 Subagent 面板
+function TaskToolRunningContent({
+  state,
+  messageInfo
+}: {
+  state: ToolStateRunning;
+  messageInfo: AssistantMessageInfo;
+}) {
+  const { openPanel, activeTabId } = useSubagentPanelStore();
+
+  const description = state.input.description as string;
+  const prompt = state.input.prompt as string;
+  const subagentType = (state.input.subagent_type as string) || "general";
+  // running 状态下 sessionId 可能在 metadata 中
+  const sessionId = state.metadata?.sessionId as string | undefined;
+
+  // 是否是当前激活的标签
+  const isActive = sessionId ? activeTabId === sessionId : false;
+
+  // 预计算标签数据，减少 handleClick 的依赖项
+  const tabData = useMemo((): SubagentTab | null => {
+    if (!sessionId) return null;
+    return {
+      sessionId,
+      parentSessionId: messageInfo.sessionID,
+      description,
+      subagentType,
+      status: "running" as const,
+      toolCallCount: 0,
+      createdAt: Date.now(),
+    };
+  }, [sessionId, messageInfo.sessionID, description, subagentType]);
+
+  // 点击打开面板
+  const handleClick = useCallback(() => {
+    if (tabData) {
+      openPanel(tabData);
+    }
+  }, [tabData, openPanel]);
+
+  return (
+    <div
+      onClick={sessionId ? handleClick : undefined}
+      className={cn(
+        "space-y-2 p-3 -mx-3 -my-2 rounded-md transition-colors duration-150",
+        sessionId && "cursor-pointer",
+        sessionId && (isActive
+          ? "bg-primary/5 border border-primary/30"
+          : "hover:bg-accent/30")
+      )}
+    >
+      {/* 头部：描述 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-blue-500" />
+          <span className="text-sm font-medium">{description}</span>
+        </div>
+        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+      </div>
+
+      {/* 提示词 */}
+      {prompt && (
+        <div className="text-sm text-muted-foreground italic pl-6">
+          &ldquo;{prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}&rdquo;
+        </div>
+      )}
+
+      {/* 底部统计 + 查看详情 */}
+      <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground pl-6">
+        <span>执行中...</span>
+        {sessionId && (
+          <span className={cn(
+            "text-primary/70",
+            isActive && "text-primary"
+          )}>
+            查看详情 →
+          </span>
+        )}
+      </div>
     </div>
   );
 }

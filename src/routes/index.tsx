@@ -4,6 +4,7 @@ import { ChatContainer } from "@/components/chat";
 import { WorkspaceSidebar } from "@/components/sidebar";
 import { FilePreviewPanel } from "@/components/editor";
 import { ActivityBar } from "@/components/activitybar";
+import { SubagentPanel } from "@/components/subagent-panel";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useActivityBar } from "@/stores/activityBar";
@@ -500,6 +501,9 @@ function HomePage() {
               </>
             )}
           </ResizablePanelGroup>
+
+          {/* Subagent 面板 - 右侧固定宽度 */}
+          <SubagentPanel />
         </div>
 
         {/* 活动栏 - 右侧位置 */}

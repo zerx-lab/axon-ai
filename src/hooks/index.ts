@@ -22,3 +22,7 @@ export {
   isSupportedPdfType,
   isSupportedAttachmentType,
 } from "./useAttachments";
+export {
+  useSubagentSession,
+  useSubagentStats,
+} from "./useSubagentSession";

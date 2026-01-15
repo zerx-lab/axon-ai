@@ -25,6 +25,7 @@ import { usePermissionStore, shouldAutoAccept } from "@/stores/permission";
 import { useQuestionStore } from "@/stores/question";
 import { useTodoStore } from "@/stores/todo";
 import { useEditor } from "@/stores/editor";
+import { handleSubagentSSEEvent } from "@/stores/subagentMessages";
 
 // ============== 类型定义 ==============
 
@@ -163,6 +164,20 @@ export function useSSEHandler({
         console.log("[SSE] Question event received:", event.type, event);
       }
       
+      // 先检查是否是被追踪的 subagent session 的事件
+      // 如果是，交给 subagentMessages store 处理
+      if (event.type === "message.part.updated" || event.type === "message.updated") {
+        const props = event.properties as Record<string, unknown>;
+        const partSessionId = (props?.part as { sessionID?: string } | undefined)?.sessionID;
+        const infoSessionId = (props?.info as { sessionID?: string } | undefined)?.sessionID;
+        const eventSessionId = partSessionId ?? infoSessionId;
+        if (eventSessionId && eventSessionId !== currentSessionId) {
+          // 尝试让 subagent 消息 store 处理
+          const handled = handleSubagentSSEEvent(event.type, eventSessionId, event.properties);
+          if (handled) return;
+        }
+      }
+
       switch (event.type) {
         case "message.part.updated": {
           // 流式内容更新 - 核心事件
