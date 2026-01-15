@@ -13,6 +13,7 @@ interface SubagentTabBarProps {
   tabs: SubagentTab[];
   activeTabId: string | null;
   onTabClick: (sessionId: string) => void;
+  onTabClose: (sessionId: string) => void;
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export function SubagentTabBar({
   tabs,
   activeTabId,
   onTabClick,
+  onTabClose,
   onClose,
 }: SubagentTabBarProps) {
   return (
@@ -30,12 +32,11 @@ export function SubagentTabBar({
           const isActive = tab.sessionId === activeTabId;
 
           return (
-            <button
+            <div
               key={tab.sessionId}
-              onClick={() => onTabClick(tab.sessionId)}
               className={cn(
                 // 基础样式
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-sm",
+                "group flex items-center gap-1 px-2 py-1.5 rounded-sm",
                 "text-xs font-medium whitespace-nowrap",
                 "transition-colors duration-150",
 
@@ -45,24 +46,46 @@ export function SubagentTabBar({
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
             >
-              {/* 状态指示器 */}
-              <span
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                  tab.status === "running" && "bg-blue-500 animate-pulse",
-                  tab.status === "completed" && "bg-green-500",
-                  tab.status === "error" && "bg-destructive"
-                )}
-              />
+              {/* 点击区域 */}
+              <button
+                onClick={() => onTabClick(tab.sessionId)}
+                className="flex items-center gap-1.5"
+              >
+                {/* 状态指示器 */}
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                    tab.status === "running" && "bg-blue-500 animate-pulse",
+                    tab.status === "completed" && "bg-green-500",
+                    tab.status === "error" && "bg-destructive"
+                  )}
+                />
 
-              {/* 标签名称 */}
-              <span className="max-w-[120px] truncate">{tab.description}</span>
-            </button>
+                {/* 标签名称 */}
+                <span className="max-w-[100px] truncate">{tab.description}</span>
+              </button>
+
+              {/* 单个 tab 关闭按钮 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTabClose(tab.sessionId);
+                }}
+                className={cn(
+                  "w-4 h-4 flex items-center justify-center rounded-sm",
+                  "opacity-0 group-hover:opacity-100",
+                  "hover:bg-foreground/10 transition-opacity duration-150",
+                  isActive && "opacity-60"
+                )}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           );
         })}
       </div>
 
-      {/* 关闭按钮 */}
+      {/* 关闭全部按钮 */}
       <Button
         variant="ghost"
         size="sm"

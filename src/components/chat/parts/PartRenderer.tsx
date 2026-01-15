@@ -963,7 +963,7 @@ function TaskToolContent({
   messageInfo: AssistantMessageInfo;
 }) {
   const [showOutput, setShowOutput] = useState(false);
-  const { openPanel, activeTabId } = useSubagentPanelStore();
+  const { openPanel, activeTabId, hasTab, updateTabStatus } = useSubagentPanelStore();
 
   const description = state.input.description as string;
   const prompt = state.input.prompt as string;
@@ -990,6 +990,13 @@ function TaskToolContent({
 
   // 是否是当前激活的标签
   const isActive = sessionId ? activeTabId === sessionId : false;
+
+  // 同步状态到 subagentPanel store（实时更新面板中的 tab 状态）
+  useEffect(() => {
+    if (sessionId && hasTab(sessionId)) {
+      updateTabStatus(sessionId, taskStatus, toolCallCount);
+    }
+  }, [sessionId, taskStatus, toolCallCount, hasTab, updateTabStatus]);
 
   // 预计算标签数据，减少 handleClick 的依赖项
   const tabData = useMemo((): SubagentTab | null => {

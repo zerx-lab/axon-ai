@@ -9,10 +9,11 @@
  * - SSE 事件订阅，实现流式消息更新
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useOpencodeContext } from "@/providers/OpencodeProvider";
 import { useWorkspace } from "@/stores/workspace";
+import { useSubagentPanelStore } from "@/stores/subagentPanel";
 import type { Message, Session, Agent } from "@/types/chat";
 
 // 导入拆分的模块
@@ -52,6 +53,7 @@ export function useChat() {
   const { client, isConnected, onEvent } = useOpencodeContext();
   const { t } = useTranslation();
   const { state: workspaceState } = useWorkspace();
+  const clearSubagentTabs = useSubagentPanelStore((s) => s.clearAllTabs);
   
   // ============== 状态定义 ==============
   
@@ -145,7 +147,7 @@ export function useChat() {
     isGeneratingRef
   );
   
-  const createNewSession = useCreateNewSession({
+  const createNewSessionBase = useCreateNewSession({
     client,
     t,
     defaultDirectory: workspaceState.defaultDirectory,
@@ -154,6 +156,12 @@ export function useChat() {
     setMessages,
     setError,
   });
+
+  // 包装 createNewSession，创建新会话时清空 subagent 面板
+  const createNewSession = useCallback(async (directory?: string) => {
+    clearSubagentTabs();
+    await createNewSessionBase(directory);
+  }, [createNewSessionBase, clearSubagentTabs]);
   
   const refreshSessions = useRefreshSessions(
     {
