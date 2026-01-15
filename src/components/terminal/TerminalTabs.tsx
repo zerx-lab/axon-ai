@@ -71,7 +71,7 @@ export function TerminalTabs() {
             )}
           >
             <TerminalIcon className="w-3 h-3 shrink-0" />
-            <span className="truncate max-w-[100px]">{tab.name}</span>
+            <span className="truncate max-w-[100px]">{tab.title}</span>
             <button
               onClick={(e) => handleCloseTab(e, tab.id)}
               className={cn(

@@ -1,26 +1,39 @@
 /**
  * 终端状态管理
  *
- * 管理终端实例、多标签页、配置和 PTY 通信
+ * 管理终端实例、多标签页、配置
+ * 使用 opencode PTY API（WebSocket 通信）
  * 遵循 Zustand 最佳实践，支持持久化
  */
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { invoke } from "@tauri-apps/api/core";
+import type { OpencodeClient } from "@/services/opencode";
 import type {
-  TerminalTab,
   TerminalConfig,
   TerminalStatus,
-  TerminalTabType,
   QuickCommand,
 } from "@/types/terminal";
 import {
   DEFAULT_QUICK_COMMANDS,
   DEFAULT_TERMINAL_CONFIG,
-  generateTerminalId,
-  getDefaultShell,
 } from "@/types/terminal";
+
+// 终端标签页（兼容 opencode PTY）
+export interface TerminalTab {
+  id: string;                // PTY session ID（来自 opencode）
+  title: string;             // 显示标题
+  titleNumber: number;       // 标题编号（用于 "Terminal 1", "Terminal 2" 等）
+  status: TerminalStatus;
+  cwd: string;
+  pid?: number;
+  createdAt: number;
+  // 状态恢复相关
+  buffer?: string;           // 序列化的终端内容
+  rows?: number;
+  cols?: number;
+  scrollY?: number;
+}
 
 type TerminalStore = TerminalState & TerminalActions;
 
@@ -33,29 +46,42 @@ interface TerminalState {
   quickCommands: QuickCommand[];
   isLoading: boolean;
   error: string | null;
-  ptyConnected: boolean;
+  // opencode 集成
+  _client: OpencodeClient | null;
+  _endpoint: string | null;
+  _directory: string;
 }
 
 // 终端操作
 interface TerminalActions {
+  // 设置 opencode client 和 endpoint（由 Provider 调用）
+  setOpencodeClient: (client: OpencodeClient | null, endpoint: string | null, directory: string) => void;
+
+  // UI 操作
   setVisible: (visible: boolean) => void;
   toggleVisible: () => void;
-  createTab: (type?: TerminalTabType, cwd?: string) => Promise<string>;
+
+  // 标签页管理
+  createTab: (cwd?: string) => Promise<string>;
   closeTab: (id: string) => Promise<void>;
+  clearAllTabs: () => void;
   selectTab: (id: string) => void;
-  updateTabStatus: (id: string, status: TerminalStatus) => void;
-  updateTabPid: (id: string, pid: number) => void;
-  renameTab: (id: string, name: string) => void;
+  updateTab: (id: string, updates: Partial<TerminalTab>) => void;
+  renameTab: (id: string, title: string) => void;
+
+  // 配置
   updateConfig: (config: Partial<TerminalConfig>) => void;
   resetConfig: () => void;
+
+  // 快速命令
   addQuickCommand: (command: Omit<QuickCommand, "id">) => void;
   removeQuickCommand: (id: string) => void;
   updateQuickCommand: (id: string, command: Partial<QuickCommand>) => void;
   resetQuickCommands: () => void;
-  sendCommand: (terminalId: string, command: string) => Promise<void>;
-  resize: (terminalId: string, rows: number, cols: number) => Promise<void>;
+
+  // 错误处理
   clearError: () => void;
-  initialize: () => void;
+  setError: (error: string | null) => void;
 }
 
 // 持久化状态
@@ -84,45 +110,66 @@ export const useTerminal = create<TerminalStore>()(
       quickCommands: DEFAULT_QUICK_COMMANDS,
       isLoading: false,
       error: null,
-      ptyConnected: false,
+      _client: null,
+      _endpoint: null,
+      _directory: ".",
+
+      setOpencodeClient: (client, endpoint, directory) => {
+        set({ _client: client, _endpoint: endpoint, _directory: directory });
+      },
 
       setVisible: (visible: boolean) => set({ isVisible: visible }),
       toggleVisible: () => set((state) => ({ isVisible: !state.isVisible })),
 
-      createTab: async (type?: TerminalTabType, cwd?: string): Promise<string> => {
-        const shellType = type || getDefaultShell();
-        const terminalId = generateTerminalId();
+      createTab: async (cwd?: string): Promise<string> => {
+        const { _client, _directory, tabs } = get();
+
+        if (!_client) {
+          const error = "OpenCode 服务未连接";
+          set({ error });
+          throw new Error(error);
+        }
 
         set({ isLoading: true, error: null });
 
         try {
-          const result = await invoke<{ pid: number; name: string }>(
-            "create_terminal",
-            {
-              terminalId,
-              shell: shellType,
-              cwd: cwd || ".",
-            }
-          );
+          // 计算下一个标题编号
+          const existingNumbers = new Set(tabs.map(t => t.titleNumber));
+          let nextNumber = 1;
+          while (existingNumbers.has(nextNumber)) {
+            nextNumber++;
+          }
+
+          // 调用 opencode PTY API 创建会话
+          const response = await _client.pty.create({
+            directory: _directory,
+            title: `Terminal ${nextNumber}`,
+            cwd: cwd || _directory,
+          });
+
+          const ptyInfo = response.data;
+          if (!ptyInfo?.id) {
+            throw new Error("创建 PTY 会话失败：未返回会话 ID");
+          }
 
           const newTab: TerminalTab = {
-            id: terminalId,
-            name: result.name || `${shellType}`,
-            type: shellType,
+            id: ptyInfo.id,
+            title: ptyInfo.title || `Terminal ${nextNumber}`,
+            titleNumber: nextNumber,
             status: "connected",
-            cwd: cwd || ".",
-            pid: result.pid,
+            cwd: ptyInfo.cwd || cwd || _directory,
+            pid: ptyInfo.pid,
             createdAt: Date.now(),
           };
 
           set((state) => ({
             tabs: [...state.tabs, newTab],
-            activeTabId: terminalId,
+            activeTabId: newTab.id,
             isLoading: false,
             isVisible: true,
           }));
 
-          return terminalId;
+          return newTab.id;
         } catch (e) {
           const error = e instanceof Error ? e.message : "创建终端失败";
           set({ error, isLoading: false });
@@ -131,19 +178,25 @@ export const useTerminal = create<TerminalStore>()(
       },
 
       closeTab: async (id: string) => {
-        const { tabs, activeTabId } = get();
+        const { _client, _directory, tabs, activeTabId } = get();
 
-        try {
-          await invoke("close_terminal", { terminalId: id });
-        } catch (e) {
-          console.warn("[Terminal] 关闭终端失败:", e);
+        // 调用 opencode PTY API 移除会话
+        if (_client) {
+          try {
+            await _client.pty.remove({ ptyID: id, directory: _directory });
+          } catch (e) {
+            console.warn("[Terminal] 关闭终端失败:", e);
+          }
         }
 
         const newTabs = tabs.filter((tab) => tab.id !== id);
         let newActiveId = activeTabId;
 
         if (activeTabId === id) {
-          newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+          // 选择相邻的标签页
+          const closedIndex = tabs.findIndex(t => t.id === id);
+          const nextTab = newTabs[Math.max(0, closedIndex - 1)];
+          newActiveId = nextTab?.id || null;
         }
 
         set({ tabs: newTabs, activeTabId: newActiveId });
@@ -153,28 +206,39 @@ export const useTerminal = create<TerminalStore>()(
         }
       },
 
+      clearAllTabs: () => {
+        console.log("[Terminal] 清理所有终端标签页");
+        set({ tabs: [], activeTabId: null, isVisible: false });
+      },
+
       selectTab: (id: string) => set({ activeTabId: id }),
 
-      updateTabStatus: (id: string, status: TerminalStatus) =>
+      updateTab: (id: string, updates: Partial<TerminalTab>) => {
         set((state) => ({
           tabs: state.tabs.map((tab) =>
-            tab.id === id ? { ...tab, status } : tab
+            tab.id === id ? { ...tab, ...updates } : tab
           ),
-        })),
+        }));
+      },
 
-      updateTabPid: (id: string, pid: number) =>
-        set((state) => ({
-          tabs: state.tabs.map((tab) =>
-            tab.id === id ? { ...tab, pid } : tab
-          ),
-        })),
+      renameTab: (id: string, title: string) => {
+        const { _client, _directory } = get();
 
-      renameTab: (id: string, name: string) =>
         set((state) => ({
           tabs: state.tabs.map((tab) =>
-            tab.id === id ? { ...tab, name } : tab
+            tab.id === id ? { ...tab, title } : tab
           ),
-        })),
+        }));
+
+        // 同步到 opencode
+        if (_client) {
+          _client.pty.update({
+            ptyID: id,
+            directory: _directory,
+            title,
+          }).catch(e => console.warn("[Terminal] 更新标题失败:", e));
+        }
+      },
 
       updateConfig: (configUpdate: Partial<TerminalConfig>) =>
         set((state) => ({
@@ -206,41 +270,14 @@ export const useTerminal = create<TerminalStore>()(
       resetQuickCommands: () =>
         set({ quickCommands: DEFAULT_QUICK_COMMANDS }),
 
-      sendCommand: async (terminalId: string, command: string) => {
-        try {
-          await invoke("terminal_write", {
-            terminalId,
-            data: command + "\n",
-          });
-        } catch (e) {
-          const error = e instanceof Error ? e.message : "发送命令失败";
-          set({ error });
-          throw e;
-        }
-      },
-
-      resize: async (terminalId: string, rows: number, cols: number) => {
-        try {
-          await invoke("terminal_resize", {
-            terminalId,
-            rows,
-            cols,
-          });
-        } catch (e) {
-          console.warn("[Terminal] 调整大小失败:", e);
-        }
-      },
-
       clearError: () => set({ error: null }),
-
-      initialize: () => {
-        set({ ptyConnected: true });
-      },
+      setError: (error: string | null) => set({ error }),
     }),
     terminalStorage
   )
 );
 
+// 便捷 hooks
 export const useTerminalTabs = () => useTerminal((state) => state.tabs);
 
 export const useActiveTerminal = () => {
@@ -258,3 +295,11 @@ export const useTerminalConfig = () =>
 
 export const useTerminalVisible = () =>
   useTerminal((state) => state.isVisible);
+
+// 获取 opencode 连接信息
+export const useTerminalConnection = () => {
+  const endpoint = useTerminal((state) => state._endpoint);
+  const directory = useTerminal((state) => state._directory);
+  const client = useTerminal((state) => state._client);
+  return { endpoint, directory, client };
+};

@@ -5,17 +5,17 @@
  * 提供全局的服务状态上下文
  */
 
-import { 
-  createContext, 
-  useContext, 
-  useEffect, 
-  useState, 
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
   useCallback,
   useRef,
-  type ReactNode 
+  type ReactNode
 } from "react";
-import { 
-  OpencodeService, 
+import {
+  OpencodeService,
   getOpencodeService,
   type OpencodeServiceState,
   type OpencodeClient,
@@ -23,6 +23,7 @@ import {
   type EventListener,
   type SSEHealthStatus,
 } from "@/services/opencode";
+import { useTerminal } from "@/stores/terminal";
 import { hideAppLoading } from "@/main";
 
 interface OpencodeContextValue {
@@ -68,17 +69,21 @@ interface OpencodeProviderProps {
  * 3. 服务启动后自动连接
  * 4. 提供全局状态和操作方法
  */
-export function OpencodeProvider({ 
-  children, 
-  autoStart = true 
+export function OpencodeProvider({
+  children,
+  autoStart = true
 }: OpencodeProviderProps) {
   const [service] = useState<OpencodeService>(() => getOpencodeService());
   const [state, setState] = useState<OpencodeServiceState>(service.getState());
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // 用于确保 loading 只隐藏一次
   const loadingHiddenRef = useRef(false);
+
+  // 获取 terminal store 的方法
+  const setTerminalClient = useTerminal((s) => s.setOpencodeClient);
+  const clearTerminalTabs = useTerminal((s) => s.clearAllTabs);
 
   // 初始化服务
   useEffect(() => {
@@ -205,6 +210,38 @@ export function OpencodeProvider({
       mounted = false;
     };
   }, [service, autoStart]);
+
+  // 追踪之前的连接状态，用于检测服务断开
+  const prevConnectionStatusRef = useRef<string | null>(null);
+
+  // 同步 client、endpoint 和 directory 到 terminal store
+  // 并在服务断开时清理终端
+  useEffect(() => {
+    const client = service.getClient();
+    const endpoint = state.endpoint || null;
+    // 使用当前工作目录作为默认目录
+    const directory = ".";
+    const currentStatus = state.connectionState.status;
+    const prevStatus = prevConnectionStatusRef.current;
+
+    console.log("[OpencodeProvider] Syncing to terminal store:", {
+      hasClient: !!client,
+      endpoint,
+      directory,
+      connectionStatus: currentStatus,
+      prevStatus,
+    });
+
+    // 检测服务断开：从 connected 变为其他状态
+    // 此时服务端的 PTY 会话已失效，需要清理前端终端 tabs
+    if (prevStatus === "connected" && currentStatus !== "connected") {
+      console.log("[OpencodeProvider] 服务断开，清理终端标签页");
+      clearTerminalTabs();
+    }
+
+    prevConnectionStatusRef.current = currentStatus;
+    setTerminalClient(client, endpoint, directory);
+  }, [service, state.connectionState.status, state.endpoint, setTerminalClient, clearTerminalTabs]);
 
   // 连接
   const connect = useCallback(async () => {

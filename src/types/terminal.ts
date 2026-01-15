@@ -27,7 +27,7 @@ export interface TerminalConfig {
   fastScrollModifier: "alt" | "ctrl" | "shift" | "none";
 }
 
-// 终端主题
+// 终端主题（兼容 ghostty-web）
 export interface TerminalTheme {
   foreground: string;
   background: string;
@@ -35,6 +35,7 @@ export interface TerminalTheme {
   cursorAccent: string;
   selection: string;
   selectionForeground: string;
+  selectionBackground?: string; // ghostty-web 使用
   black: string;
   red: string;
   green: string;
@@ -61,6 +62,7 @@ export const TERMINAL_THEME_DARK: TerminalTheme = {
   cursorAccent: "#1c1c1f",
   selection: "#264f78",
   selectionForeground: "#ffffff",
+  selectionBackground: "rgba(204, 204, 204, 0.25)",
   black: "#3c3c3c",
   red: "#f14c4c",
   green: "#23d18b",
@@ -87,6 +89,7 @@ export const TERMINAL_THEME_LIGHT: TerminalTheme = {
   cursorAccent: "#f8f9fa",
   selection: "#bfceff",
   selectionForeground: "#383a42",
+  selectionBackground: "rgba(56, 58, 66, 0.2)",
   black: "#383a42",
   red: "#e45649",
   green: "#50a14f",
@@ -126,48 +129,19 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
   fastScrollModifier: "alt",
 };
 
-// 终端标签页
-export interface TerminalTab {
+// 本地 PTY 信息（兼容 opencode PTY API）
+// 注意：实际的 TerminalTab 定义在 stores/terminal.ts 中
+export interface LocalPTY {
   id: string;
-  name: string;
-  type: TerminalTabType;
-  status: TerminalStatus;
-  cwd: string;
-  pid?: number;
-  createdAt: number;
-}
-
-// 终端标签页配置
-export interface TerminalTabConfig {
-  id: string;
-  name: string;
-  type: TerminalTabType;
+  title: string;
+  titleNumber: number;
   cwd?: string;
-  env?: Record<string, string>;
-}
-
-// PTY 进程信息
-export interface PtyProcess {
-  pid: number;
-  cwd: string;
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-}
-
-// 终端消息类型
-export type TerminalMessageType = "data" | "resize" | "status" | "exit" | "error";
-
-// 终端消息
-export interface TerminalMessage {
-  type: TerminalMessageType;
-  terminalId: string;
-  data?: string;
+  pid?: number;
+  // 状态恢复相关
+  buffer?: string;
   rows?: number;
   cols?: number;
-  status?: TerminalStatus;
-  exitCode?: number;
-  error?: string;
+  scrollY?: number;
 }
 
 // 终端历史记录项
