@@ -135,8 +135,12 @@ export function ChatContainer({
     [onSend]
   );
 
-  // 当有新消息时，仅在 shouldAutoScroll 为 true 时自动滚动到底部
-  // 只有消息数量增加时才触发滚动，避免消息内容更新时强制滚动
+  // 消息内容容器引用，用于监听高度变化
+  const contentRef = useRef<HTMLDivElement>(null);
+  // 追踪上一次内容高度，避免重复滚动
+  const prevContentHeightRef = useRef(0);
+
+  // 当消息数量增加时自动滚动到底部（新消息场景）
   useEffect(() => {
     const currentCount = messages.length;
     const prevCount = prevMessageCountRef.current;
@@ -150,6 +154,38 @@ export function ChatContainer({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages.length]);
+
+  // 使用 ResizeObserver 监听内容高度变化（流式消息场景）
+  // 当内容增长且用户在底部附近时自动滚动
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    const contentElement = contentRef.current;
+    if (!scrollElement || !contentElement) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      const currentHeight = contentElement.scrollHeight;
+      const prevHeight = prevContentHeightRef.current;
+      
+      // 只有内容高度增加且允许自动滚动时才执行
+      if (currentHeight > prevHeight && shouldAutoScrollRef.current) {
+        // 使用 requestAnimationFrame 确保 DOM 更新完成
+        requestAnimationFrame(() => {
+          if (scrollElement) {
+            isProgrammaticScrollRef.current = true;
+            scrollElement.scrollTop = scrollElement.scrollHeight;
+          }
+        });
+      }
+      
+      prevContentHeightRef.current = currentHeight;
+    });
+
+    resizeObserver.observe(contentElement);
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   // 处理快捷提示选择 - 填充到输入框而不是直接发送
   const handleQuickPromptSelect = (prompt: string) => {
@@ -222,7 +258,7 @@ export function ChatContainer({
           onScroll={handleScroll}
           className="absolute inset-0 overflow-y-auto chat-scroll-area"
         >
-          <div className="flex flex-col">
+          <div ref={contentRef} className="flex flex-col">
             {messages.map((message) => (
               <ChatMessage key={message.info.id} message={message} />
             ))}

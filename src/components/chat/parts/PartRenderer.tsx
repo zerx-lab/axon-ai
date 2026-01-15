@@ -963,7 +963,7 @@ function TaskToolContent({
   messageInfo: AssistantMessageInfo;
 }) {
   const [showOutput, setShowOutput] = useState(false);
-  const { openPanel, activeTabId, hasTab, updateTabStatus, tabs } = useSubagentPanelStore();
+  const { openPanel, activeTabId, updateTabStatus, tabs } = useSubagentPanelStore();
 
   const description = state.input.description as string;
   const prompt = state.input.prompt as string;
@@ -982,6 +982,10 @@ function TaskToolContent({
   // 获取 tab 中的状态（如果存在）
   // 这允许我们通过 SSE session.status 事件更新状态
   const tabInfo = sessionId ? tabs.find(t => t.sessionId === sessionId) : null;
+  
+  // 将 tab 存在状态转换为响应式变量，用于 useEffect 依赖
+  // 这解决了 hasTab 函数引用稳定但返回值变化不触发 effect 的问题
+  const tabExists = !!tabInfo;
 
   // 判断任务状态
   // 优先使用 tab 的状态（如果 tab 显示已完成或出错）
@@ -1000,11 +1004,12 @@ function TaskToolContent({
   const isActive = sessionId ? activeTabId === sessionId : false;
 
   // 同步状态到 subagentPanel store（实时更新面板中的 tab 状态）
+  // 依赖 tabExists 而不是 hasTab 函数，确保当 tab 被添加后能立即触发状态同步
   useEffect(() => {
-    if (sessionId && hasTab(sessionId)) {
+    if (sessionId && tabExists) {
       updateTabStatus(sessionId, taskStatus, toolCallCount);
     }
-  }, [sessionId, taskStatus, toolCallCount, hasTab, updateTabStatus]);
+  }, [sessionId, taskStatus, toolCallCount, tabExists, updateTabStatus]);
 
   // 预计算标签数据，减少 handleClick 的依赖项
   const tabData = useMemo((): SubagentTab | null => {
