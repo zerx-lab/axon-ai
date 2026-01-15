@@ -142,9 +142,10 @@ export function McpSettings() {
   const { t } = useTranslation();
   const { client, isConnected, state, connect } = useOpencode();
 
-  // 使用 ServiceStore 的统一重启方法
+  // 使用 ServiceStore 的统一重启方法和 MCP 状态刷新
   const restart = useServiceStore(s => s.restart);
   const isRestarting = useServiceStore(s => s.isRestarting);
+  const loadGlobalMcpStatus = useServiceStore(s => s.loadMcpStatus);
 
   // 从全局状态获取连接状态和后端状态
   const connectionStatus = state.connectionState.status;
@@ -248,7 +249,8 @@ export function McpSettings() {
     try {
       await client.mcp.connect({ name });
       toast.success(t("settings.mcpSettings.connectSuccess", { name }));
-      await loadMcpStatus();
+      // 同时更新本地状态和全局 ServiceStore 状态
+      await Promise.all([loadMcpStatus(), loadGlobalMcpStatus()]);
     } catch (error) {
       console.error("连接 MCP 服务器失败:", error);
       toast.error(t("settings.mcpSettings.connectFailed", { name }));
@@ -265,7 +267,8 @@ export function McpSettings() {
     try {
       await client.mcp.disconnect({ name });
       toast.success(t("settings.mcpSettings.disconnectSuccess", { name }));
-      await loadMcpStatus();
+      // 同时更新本地状态和全局 ServiceStore 状态
+      await Promise.all([loadMcpStatus(), loadGlobalMcpStatus()]);
     } catch (error) {
       console.error("断开 MCP 服务器失败:", error);
       toast.error(t("settings.mcpSettings.disconnectFailed", { name }));
@@ -356,7 +359,8 @@ export function McpSettings() {
       setAddDialog(initialAddDialogState);
       // 刷新 MCP 状态缓存（config.update 更新配置文件后，MCP.state 有缓存需要刷新）
       await client.instance.dispose();
-      await loadMcpStatus();
+      // 同时更新本地状态和全局 ServiceStore 状态
+      await Promise.all([loadMcpStatus(), loadGlobalMcpStatus()]);
     } catch (error) {
       console.error("添加 MCP 服务器失败:", error);
       toast.error(t("errors.unknownError"));
@@ -483,7 +487,8 @@ export function McpSettings() {
       setEditDialog(initialEditDialogState);
       // 刷新 MCP 状态缓存（config.update 更新配置文件后，MCP.state 有缓存需要刷新）
       await client.instance.dispose();
-      await loadMcpStatus();
+      // 同时更新本地状态和全局 ServiceStore 状态
+      await Promise.all([loadMcpStatus(), loadGlobalMcpStatus()]);
     } catch (error) {
       console.error("编辑 MCP 服务器失败:", error);
       toast.error(t("errors.unknownError"));
