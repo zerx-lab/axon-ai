@@ -29,6 +29,19 @@ pub fn set_custom_opencode_path(
 }
 
 #[tauri::command]
+pub fn set_project_directory(
+    state: State<'_, AppState>,
+    path: Option<String>,
+) -> Result<(), String> {
+    state.settings.set_project_directory(path)
+}
+
+#[tauri::command]
+pub fn get_project_directory(state: State<'_, AppState>) -> Option<String> {
+    state.settings.get_project_directory()
+}
+
+#[tauri::command]
 pub fn get_opencode_config_path() -> Result<String, String> {
     paths::get_opencode_config_path()
         .map(|p| p.to_string_lossy().to_string())

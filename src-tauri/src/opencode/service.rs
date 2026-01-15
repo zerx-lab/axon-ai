@@ -253,17 +253,34 @@ impl OpencodeService {
 
         info!("opencode 配置目录: {:?}", opencode_config_dir);
 
+        // 确定工作目录：优先使用用户配置的项目目录，否则使用配置目录
+        let working_directory = if let Some(settings) = &self.settings {
+            settings.get_project_directory()
+                .and_then(|p| {
+                    let path = std::path::Path::new(&p);
+                    if path.exists() && path.is_dir() {
+                        info!("使用用户配置的项目目录作为工作目录: {:?}", path);
+                        Some(path.to_path_buf())
+                    } else {
+                        warn!("配置的项目目录不存在或不是目录: {:?}，使用默认配置目录", p);
+                        None
+                    }
+                })
+                .unwrap_or_else(|| opencode_config_dir.clone())
+        } else {
+            opencode_config_dir.clone()
+        };
+
+        info!("OpenCode 工作目录: {:?}", working_directory);
+
         let mut cmd = std::process::Command::new(&binary_path);
         cmd.args(["serve", "--port", &actual_port.to_string()])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            // 设置工作目录为 opencode 配置目录
-            // 这样：
-            // 1. opencode 不会向上查找到项目目录下的配置文件
-            // 2. Instance.directory = opencode_config_dir
-            // 3. Config.update 会写入到 opencode_config_dir/config.json
-            // 4. 与 Global.Path.config (XDG_CONFIG_HOME/opencode) 一致
-            .current_dir(&opencode_config_dir)
+            // 设置工作目录
+            // - 如果用户配置了项目目录，使用项目目录（能够扫描到项目的 .opencode）
+            // - 否则使用 opencode 配置目录（保持原有行为）
+            .current_dir(&working_directory)
             // 设置 XDG 环境变量实现配置隔离
             // xdg-basedir 会自动在这些目录下创建 /opencode 子目录
             .env("XDG_CONFIG_HOME", &app_data_dir)
@@ -431,26 +448,28 @@ impl OpencodeService {
                     .await;
                 match output {
                     Ok(o) => {
-                        if !o.status.success() {
-                            debug!("taskkill output: {}", String::from_utf8_lossy(&o.stderr));
+                        if o.status.success() {
+                            info!("taskkill 成功终止进程");
+                        } else {
+                            warn!("taskkill 失败: {}", String::from_utf8_lossy(&o.stderr));
                         }
                     }
-                    Err(e) => warn!("taskkill failed: {}", e),
+                    Err(e) => warn!("taskkill 执行失败: {}", e),
                 }
 
-                // 使用异步等待，最多等待 3 秒（30 次 × 100ms）
-                for attempt in 1..=30 {
+                // 使用异步等待，最多等待 5 秒（50 次 × 100ms）
+                for attempt in 1..=50 {
                     let still_running = {
                         let mut process = self.process.write();
                         if let Some(ref mut child) = *process {
                             match child.try_wait() {
                                 Ok(Some(status)) => {
-                                    info!("Process exited with status: {:?}", status);
+                                    info!("进程已退出，状态码: {:?}", status);
                                     false
                                 }
                                 Ok(None) => true, // 仍在运行
                                 Err(e) => {
-                                    warn!("try_wait error: {}", e);
+                                    debug!("try_wait error: {}", e);
                                     false
                                 }
                             }
@@ -460,14 +479,25 @@ impl OpencodeService {
                     };
 
                     if !still_running {
+                        info!("进程已在第 {} 次尝试后确认退出", attempt);
                         break;
                     }
 
                     if attempt % 10 == 0 {
-                        debug!("Waiting for process to exit... (attempt {}/30)", attempt);
+                        debug!("等待进程退出... (尝试 {}/50)", attempt);
                     }
                     // 使用异步 sleep，不阻塞运行时
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+                
+                // 最后再次确认进程状态
+                {
+                    let mut process = self.process.write();
+                    if let Some(ref mut child) = *process {
+                        if let Ok(None) = child.try_wait() {
+                            warn!("进程在 5 秒后仍在运行，强制标记为已停止");
+                        }
+                    }
                 }
             }
 
@@ -565,62 +595,20 @@ impl OpencodeService {
         self.get_version_info().await
     }
 
-    #[cfg(target_os = "windows")]
-    async fn wait_for_file_unlocked(path: &std::path::Path, max_attempts: u32, delay_ms: u64) -> bool {
-        use std::fs::OpenOptions;
-
-        for attempt in 1..=max_attempts {
-            match OpenOptions::new().write(true).open(path) {
-                Ok(_) => {
-                    info!("文件已解锁 (尝试 {}/{})", attempt, max_attempts);
-                    return true;
-                }
-                Err(e) => {
-                    if attempt % 10 == 0 {
-                        debug!("文件仍被锁定 (尝试 {}/{}): {}", attempt, max_attempts, e);
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-                }
-            }
-        }
-        false
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    async fn wait_for_file_unlocked(
-        _path: &std::path::Path,
-        _max_attempts: u32,
-        _delay_ms: u64,
-    ) -> bool {
-        true
-    }
-
     pub async fn update_opencode(self: &Arc<Self>) -> Result<(), OpencodeError> {
-        info!("Starting update process...");
+        info!("开始更新流程...");
 
         let was_running = matches!(self.get_status(), ServiceStatus::Running { .. });
 
+        // 停止服务
         self.stop().await?;
 
-        let binary_path = self.downloader.get_binary_path();
-
+        // 给操作系统一点时间清理进程资源
+        // 注意：主要的文件替换逻辑（重命名旧文件）在 downloader 的 extract_zip_sync 中处理
         #[cfg(target_os = "windows")]
-        if let Some(ref path) = binary_path {
-            info!("等待 Windows 释放文件句柄...");
-
-            let unlocked = Self::wait_for_file_unlocked(path, 30, 500).await;
-
-            if !unlocked {
-                warn!("文件仍被锁定，继续等待...");
-                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-                if !Self::wait_for_file_unlocked(path, 10, 500).await {
-                    return Err(OpencodeError::ExtractError(
-                        "无法更新：文件被锁定。请关闭可能使用 opencode 的其他程序后重试。"
-                            .to_string(),
-                    ));
-                }
-            }
+        {
+            info!("等待 Windows 释放进程资源...");
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         }
 
         #[cfg(not(target_os = "windows"))]

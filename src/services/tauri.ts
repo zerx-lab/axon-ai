@@ -35,6 +35,7 @@ export interface AppSettings {
   autoUpdate: boolean;
   customOpencodePath: string | null;
   installedVersion: string | null;
+  projectDirectory: string | null;
 }
 
 // OpenCode service commands
@@ -59,6 +60,8 @@ export const settings = {
   set: (settings: AppSettings) => invoke("set_app_settings", { settings }),
   setAutoUpdate: (enabled: boolean) => invoke("set_auto_update", { enabled }),
   setCustomOpencodePath: (path: string | null) => invoke("set_custom_opencode_path", { path }),
+  setProjectDirectory: (path: string | null) => invoke("set_project_directory", { path }),
+  getProjectDirectory: () => invoke<string | null>("get_project_directory"),
   getOpencodeConfigPath: () => invoke<string>("get_opencode_config_path"),
 };
 

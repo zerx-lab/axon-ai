@@ -85,6 +85,8 @@ pub fn run() {
             set_app_settings,
             set_auto_update,
             set_custom_opencode_path,
+            set_project_directory,
+            get_project_directory,
             get_opencode_config_path,
             // Provider 管理命令
             add_user_provider,

@@ -963,7 +963,7 @@ function TaskToolContent({
   messageInfo: AssistantMessageInfo;
 }) {
   const [showOutput, setShowOutput] = useState(false);
-  const { openPanel, activeTabId, hasTab, updateTabStatus } = useSubagentPanelStore();
+  const { openPanel, activeTabId, hasTab, updateTabStatus, tabs } = useSubagentPanelStore();
 
   const description = state.input.description as string;
   const prompt = state.input.prompt as string;
@@ -979,9 +979,17 @@ function TaskToolContent({
   const currentTool = summary?.filter((s: { state: { status: string } }) => s.state.status !== "pending").pop();
   const toolCallCount = summary?.length ?? 0;
 
+  // 获取 tab 中的状态（如果存在）
+  // 这允许我们通过 SSE session.status 事件更新状态
+  const tabInfo = sessionId ? tabs.find(t => t.sessionId === sessionId) : null;
+
   // 判断任务状态
-  const isCompleted = state.metadata?.completed === true || currentTool?.state.status === "completed";
-  const hasError = summary?.some((s) => s.state.status === "error");
+  // 优先使用 tab 的状态（如果 tab 显示已完成或出错）
+  // 然后使用 metadata.completed 或最后一个工具的状态
+  const isCompletedFromTab = tabInfo?.status === "completed";
+  const hasErrorFromTab = tabInfo?.status === "error";
+  const isCompleted = isCompletedFromTab || state.metadata?.completed === true || currentTool?.state.status === "completed";
+  const hasError = hasErrorFromTab || summary?.some((s) => s.state.status === "error");
   const taskStatus: "running" | "completed" | "error" = hasError
     ? "error"
     : isCompleted

@@ -98,6 +98,15 @@ impl SettingsManager {
     pub fn get_installed_version(&self) -> Option<String> {
         self.settings.read().installed_version.clone()
     }
+
+    pub fn set_project_directory(&self, path: Option<String>) -> Result<(), String> {
+        self.settings.write().project_directory = path;
+        self.save_settings()
+    }
+
+    pub fn get_project_directory(&self) -> Option<String> {
+        self.settings.read().project_directory.clone()
+    }
 }
 
 impl Default for SettingsManager {

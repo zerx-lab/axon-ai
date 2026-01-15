@@ -21,6 +21,8 @@
     "settings": "Settings",
     "default": "Default",
     "defaultWorkspace": "Default Workspace",
+    "switchingProject": "Switching project directory...",
+    "projectSwitched": "Project directory switched, Agent list updated",
     "theme": {
       "light": "Light Mode",
       "dark": "Dark Mode",

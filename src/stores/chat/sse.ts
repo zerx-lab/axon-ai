@@ -178,6 +178,16 @@ export function useSSEHandler({
         }
       }
 
+      // 检查是否是 subagent 的 session.status 事件
+      if (event.type === "session.status") {
+        const { sessionID } = event.properties;
+        if (sessionID && sessionID !== currentSessionId) {
+          // 尝试让 subagent 消息 store 处理 session 状态变化
+          const handled = handleSubagentSSEEvent(event.type, sessionID, event.properties);
+          if (handled) return;
+        }
+      }
+
       switch (event.type) {
         case "message.part.updated": {
           // 流式内容更新 - 核心事件

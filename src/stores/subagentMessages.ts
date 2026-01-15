@@ -13,6 +13,7 @@ import type {
   UserMessageInfo,
   AssistantMessageInfo,
 } from "@/types/chat";
+import { useSubagentPanelStore } from "@/stores/subagentPanel";
 
 // ============== 类型定义 ==============
 
@@ -250,8 +251,14 @@ interface MessageUpdatedEventProperties {
   info: UserMessageInfo | AssistantMessageInfo;
 }
 
+/** SSE session.status 事件属性 */
+interface SessionStatusEventProperties {
+  sessionID: string;
+  status: { type: string };
+}
+
 /** SSE 事件属性联合类型 */
-type SSEEventProperties = PartUpdatedEventProperties | MessageUpdatedEventProperties;
+type SSEEventProperties = PartUpdatedEventProperties | MessageUpdatedEventProperties | SessionStatusEventProperties;
 
 /**
  * 处理 SSE 事件，更新 subagent 消息
@@ -262,23 +269,40 @@ export function handleSubagentSSEEvent(
   sessionId: string,
   properties: SSEEventProperties
 ): boolean {
-  const store = useSubagentMessagesStore.getState();
+  // 获取 stores 的当前状态
+  const panelStore = useSubagentPanelStore.getState();
+  const messagesStore = useSubagentMessagesStore.getState();
 
-  // 如果 session 没有被追踪，返回 false
-  if (!store.isTracked(sessionId)) {
+  // 对于 session.status 事件，检查 panel 中是否有对应的 tab
+  if (eventType === "session.status") {
+    if (!panelStore.hasTab(sessionId)) {
+      return false;
+    }
+
+    const { status } = properties as SessionStatusEventProperties;
+    if (status.type === "idle") {
+      // session 空闲表示任务完成，更新 tab 状态为 completed
+      panelStore.updateTabStatus(sessionId, "completed");
+      console.log("[SSE] Subagent session completed:", sessionId);
+    }
+    return true;
+  }
+
+  // 其他事件需要 session 被追踪
+  if (!messagesStore.isTracked(sessionId)) {
     return false;
   }
 
   switch (eventType) {
     case "message.part.updated": {
       const { part, delta } = properties as PartUpdatedEventProperties;
-      store.handlePartUpdated(sessionId, part.messageID, part, delta);
+      messagesStore.handlePartUpdated(sessionId, part.messageID, part, delta);
       return true;
     }
 
     case "message.updated": {
       const { info } = properties as MessageUpdatedEventProperties;
-      store.handleMessageUpdated(sessionId, info);
+      messagesStore.handleMessageUpdated(sessionId, info);
       return true;
     }
 

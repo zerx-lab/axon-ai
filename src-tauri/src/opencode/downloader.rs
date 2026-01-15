@@ -95,49 +95,88 @@ fn extract_zip_sync(
         let file_name = file.name().to_string();
         if file_name.ends_with(binary_name) {
             let dest_path = dest_dir.join(binary_name);
+            let old_path = dest_dir.join(format!("{}.old", binary_name));
 
+            // 策略：先重命名旧文件，再提取新文件，最后清理
+            // 这样即使旧文件被锁定，重命名通常也能成功（Windows 允许重命名正在使用的文件）
             if dest_path.exists() {
-                let max_retries = 20;
-                let mut deleted = false;
-                for attempt in 1..=max_retries {
-                    match std::fs::remove_file(&dest_path) {
-                        Ok(_) => {
-                            debug!("Removed old binary on attempt {}", attempt);
-                            deleted = true;
-                            break;
-                        }
-                        Err(e) => {
-                            if attempt < max_retries {
-                                debug!(
-                                    "Retry {}/{}: waiting for file release: {}",
-                                    attempt, max_retries, e
-                                );
-                                std::thread::sleep(std::time::Duration::from_millis(500));
-                            } else {
-                                warn!(
-                                    "Failed to remove old binary after {} attempts ({}s): {}",
-                                    max_retries,
-                                    max_retries as f32 * 0.5,
-                                    e
-                                );
-                                return Err(OpencodeError::ExtractError(format!(
-                                    "无法替换旧版本文件，文件被占用。请确保 opencode 进程已完全退出后重试。错误: {}",
-                                    e
-                                )));
+                // 先清理可能存在的旧 .old 文件
+                if old_path.exists() {
+                    let _ = std::fs::remove_file(&old_path);
+                }
+
+                // 尝试重命名而非直接删除
+                match std::fs::rename(&dest_path, &old_path) {
+                    Ok(_) => {
+                        info!("已将旧版本重命名为 {}.old", binary_name);
+                    }
+                    Err(e) => {
+                        // 重命名失败，回退到直接删除策略
+                        warn!("重命名失败，尝试直接删除: {}", e);
+                        let max_retries = 30;
+                        let mut deleted = false;
+                        for attempt in 1..=max_retries {
+                            match std::fs::remove_file(&dest_path) {
+                                Ok(_) => {
+                                    debug!("第 {} 次尝试成功删除旧文件", attempt);
+                                    deleted = true;
+                                    break;
+                                }
+                                Err(e) => {
+                                    if attempt < max_retries {
+                                        if attempt % 10 == 0 {
+                                            debug!(
+                                                "等待文件释放 ({}/{}): {}",
+                                                attempt, max_retries, e
+                                            );
+                                        }
+                                        std::thread::sleep(std::time::Duration::from_millis(500));
+                                    } else {
+                                        warn!(
+                                            "在 {} 次尝试后仍无法删除文件 ({}秒): {}",
+                                            max_retries,
+                                            max_retries as f32 * 0.5,
+                                            e
+                                        );
+                                        return Err(OpencodeError::ExtractError(format!(
+                                            "无法替换旧版本文件，文件被占用。\n\n\
+                                            可能原因：\n\
+                                            - Windows 系统进程仍持有文件句柄\n\
+                                            - 防病毒软件正在扫描文件\n\n\
+                                            建议：稍等片刻后重试，或重启应用程序。\n\
+                                            错误详情: {}",
+                                            e
+                                        )));
+                                    }
+                                }
                             }
+                        }
+                        if !deleted {
+                            return Err(OpencodeError::ExtractError(
+                                "无法删除旧版本文件，文件被锁定".to_string(),
+                            ));
                         }
                     }
                 }
-                if !deleted {
-                    return Err(OpencodeError::ExtractError(
-                        "无法删除旧版本文件，文件被锁定".to_string(),
-                    ));
-                }
             }
 
+            // 提取新文件
             let mut dest_file = std::fs::File::create(&dest_path)?;
             std::io::copy(&mut file, &mut dest_file)?;
-            debug!("Extracted {} to {:?}", binary_name, dest_path);
+            info!("已提取 {} 到 {:?}", binary_name, dest_path);
+
+            // 后台清理 .old 文件（不阻塞，失败也无所谓）
+            if old_path.exists() {
+                std::thread::spawn(move || {
+                    // 等待一会儿再删除
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    if let Err(e) = std::fs::remove_file(&old_path) {
+                        // 不是严重错误，下次更新时会再次尝试清理
+                        debug!("清理旧版本文件失败（将在下次更新时重试）: {}", e);
+                    }
+                });
+            }
+
             return Ok(());
         }
     }

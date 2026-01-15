@@ -124,6 +124,9 @@ pub struct AppSettings {
     pub custom_opencode_path: Option<String>,
     /// 已安装的 opencode 版本（用于版本记录）
     pub installed_version: Option<String>,
+    /// 项目工作目录（OpenCode 服务的工作目录，用于扫描 .opencode 等配置）
+    #[serde(default)]
+    pub project_directory: Option<String>,
     /// 用户添加的服务商配置
     #[serde(default)]
     pub providers: Vec<UserProviderConfig>,
@@ -135,6 +138,7 @@ impl Default for AppSettings {
             auto_update: false,
             custom_opencode_path: None,
             installed_version: None,
+            project_directory: None,
             providers: Vec::new(),
         }
     }
