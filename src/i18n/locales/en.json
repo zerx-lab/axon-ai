@@ -76,7 +76,9 @@
       "noProject": "No project selected",
       "selectSession": "Select a session to view project files",
       "empty": "Directory is empty",
-      "loadError": "Failed to load"
+      "loadError": "Failed to load",
+      "showHidden": "Show Hidden Files",
+      "hideHidden": "Hide Hidden Files"
     },
     "contextMenu": {
       "deleteSession": "Delete Session",
@@ -85,6 +87,7 @@
     },
     "explorerContextMenu": {
       "newFile": "New File",
+      "newFolder": "New Folder",
       "delete": "Delete",
       "rename": "Rename",
       "copy": "Copy",

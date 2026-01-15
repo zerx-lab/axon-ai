@@ -77,7 +77,9 @@
       "noProject": "未选择项目",
       "selectSession": "选择一个会话以查看项目文件",
       "empty": "目录为空",
-      "loadError": "加载失败"
+      "loadError": "加载失败",
+      "showHidden": "显示隐藏文件",
+      "hideHidden": "隐藏隐藏文件"
     },
     "contextMenu": {
       "deleteSession": "删除会话",
@@ -87,6 +89,7 @@
     },
     "explorerContextMenu": {
       "newFile": "新建文件",
+      "newFolder": "新建文件夹",
       "delete": "删除",
       "rename": "重命名",
       "copy": "复制",

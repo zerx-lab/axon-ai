@@ -37,6 +37,7 @@ import {
   ClipboardPaste,
   Pencil,
   FilePlus,
+  FolderPlus,
 } from "lucide-react";
 
 // ============== 类型定义 ==============
@@ -80,6 +81,7 @@ interface FileExplorerContextValue {
   onPaste: (targetDir: string) => void;
   onMove: (sourcePath: string, targetDir: string) => void;
   onNewFile: (parentPath: string) => void;
+  onNewFolder: (parentPath: string) => void;
   getParentDir: (path: string) => string;
   rootPath: string;
   activeFilePath: string | null | undefined;
@@ -184,7 +186,7 @@ function FileTreeItem({
   onFileClick,
 }: FileTreeItemProps) {
   const { t } = useTranslation();
-  const { clipboard, renaming, onDelete, onStartRename, onConfirmRename, onCancelRename, onCopy, onPaste, onMove, onNewFile, getParentDir, rootPath, activeFilePath } = useFileExplorerContext();
+  const { clipboard, renaming, onDelete, onStartRename, onConfirmRename, onCancelRename, onCopy, onPaste, onMove, onNewFile, onNewFolder, getParentDir, rootPath, activeFilePath } = useFileExplorerContext();
   const [isDragOver, setIsDragOver] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -361,6 +363,10 @@ function FileTreeItem({
           <ContextMenuItem onClick={() => onNewFile(newFileTargetDir)}>
             <FilePlus className="h-4 w-4 mr-2" />
             {t("sidebar.explorerContextMenu.newFile")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onNewFolder(newFileTargetDir)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            {t("sidebar.explorerContextMenu.newFolder")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={() => onCopy(node.path, node.name, node.is_directory)}>
@@ -596,22 +602,45 @@ export function FileExplorer({
     let newFileName = "untitled";
     let counter = 1;
     const separator = parentPath.includes("/") ? "/" : "\\";
-    
+
     const existingChildren = loadedChildren.get(parentPath) || [];
     const existingNames = new Set(existingChildren.map(c => c.name));
-    
+
     while (existingNames.has(newFileName)) {
       newFileName = `untitled${counter}`;
       counter++;
     }
     const newFilePath = `${parentPath}${separator}${newFileName}`;
-    
+
     try {
       await invoke("write_file_content", { path: newFilePath, content: "" });
       await refreshDirectory(parentPath);
       setRenaming({ path: newFilePath, currentName: newFileName });
     } catch (e) {
       console.error("[FileExplorer] 创建文件失败:", e);
+    }
+  }, [loadedChildren, refreshDirectory]);
+
+  const handleNewFolder = useCallback(async (parentPath: string) => {
+    let newFolderName = "新建文件夹";
+    let counter = 1;
+    const separator = parentPath.includes("/") ? "/" : "\\";
+
+    const existingChildren = loadedChildren.get(parentPath) || [];
+    const existingNames = new Set(existingChildren.map(c => c.name));
+
+    while (existingNames.has(newFolderName)) {
+      newFolderName = `新建文件夹${counter}`;
+      counter++;
+    }
+    const newFolderPath = `${parentPath}${separator}${newFolderName}`;
+
+    try {
+      await invoke("ensure_directory_exists", { path: newFolderPath });
+      await refreshDirectory(parentPath);
+      setRenaming({ path: newFolderPath, currentName: newFolderName });
+    } catch (e) {
+      console.error("[FileExplorer] 创建文件夹失败:", e);
     }
   }, [loadedChildren, refreshDirectory]);
 
@@ -627,10 +656,11 @@ export function FileExplorer({
     onPaste: handlePaste,
     onMove: handleMove,
     onNewFile: handleNewFile,
+    onNewFolder: handleNewFolder,
     getParentDir,
     rootPath,
     activeFilePath,
-  }), [clipboard, renaming, handleDelete, handleStartRename, handleConfirmRename, handleCancelRename, handleCopy, handlePaste, handleMove, handleNewFile, getParentDir, rootPath, activeFilePath]);
+  }), [clipboard, renaming, handleDelete, handleStartRename, handleConfirmRename, handleCancelRename, handleCopy, handlePaste, handleMove, handleNewFile, handleNewFolder, getParentDir, rootPath, activeFilePath]);
 
   const buildTree = useCallback(
     (node: FileTreeNode): FileTreeNode => {
@@ -721,6 +751,10 @@ export function FileExplorer({
           <ContextMenuItem onClick={() => handleNewFile(rootPath)}>
             <FilePlus className="h-4 w-4 mr-2" />
             {t("sidebar.explorerContextMenu.newFile")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => handleNewFolder(rootPath)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            {t("sidebar.explorerContextMenu.newFolder")}
           </ContextMenuItem>
           {canPasteToRoot && (
             <>

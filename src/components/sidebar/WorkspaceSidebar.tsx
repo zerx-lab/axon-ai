@@ -34,6 +34,8 @@ import {
   Trash2,
   RefreshCw,
   Files,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 // ============== 类型定义 ==============
@@ -66,6 +68,7 @@ interface WorkspaceSidebarProps {
 // 面板展开状态的 localStorage 键名
 const PANEL_STATE_KEY = "axon-sidebar-panels";
 const PANEL_RATIO_KEY = "axon-sidebar-panel-ratio";
+const SHOW_HIDDEN_KEY = "axon-explorer-show-hidden";
 
 const DEFAULT_PANEL_STATE = {
   sessions: true,
@@ -121,6 +124,26 @@ function savePanelRatio(ratio: number) {
   }
 }
 
+function loadShowHidden(): boolean {
+  try {
+    const saved = localStorage.getItem(SHOW_HIDDEN_KEY);
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+  } catch {
+    // 忽略
+  }
+  return false;
+}
+
+function saveShowHidden(value: boolean) {
+  try {
+    localStorage.setItem(SHOW_HIDDEN_KEY, JSON.stringify(value));
+  } catch {
+    // 忽略
+  }
+}
+
 // ============== 主组件 ==============
 
 export function WorkspaceSidebar({
@@ -139,6 +162,7 @@ export function WorkspaceSidebar({
   const { t } = useTranslation();
   const [panelState, setPanelState] = useState(loadPanelState);
   const [panelRatio, setPanelRatio] = useState(loadPanelRatio);
+  const [showHidden, setShowHidden] = useState(loadShowHidden);
   const [explorerKey, setExplorerKey] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,6 +171,14 @@ export function WorkspaceSidebar({
     setPanelState((prev) => {
       const next = { ...prev, [panel]: !prev[panel] };
       savePanelState(next);
+      return next;
+    });
+  }, []);
+
+  const toggleShowHidden = useCallback(() => {
+    setShowHidden((prev) => {
+      const next = !prev;
+      saveShowHidden(next);
       return next;
     });
   }, []);
@@ -224,6 +256,15 @@ export function WorkspaceSidebar({
       onClick: onNewSession,
     },
   ], [t, onNewSession]);
+
+  // 资源管理器面板操作按钮
+  const explorerPanelActions = useMemo(() => [
+    {
+      icon: showHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />,
+      tooltip: showHidden ? t("sidebar.explorerPanel.hideHidden", "隐藏隐藏文件") : t("sidebar.explorerPanel.showHidden", "显示隐藏文件"),
+      onClick: toggleShowHidden,
+    },
+  ], [t, showHidden, toggleShowHidden]);
 
   return (
     <div
@@ -322,6 +363,7 @@ export function WorkspaceSidebar({
           title={t("sidebar.explorer", "资源管理器")}
           isOpen={panelState.explorer}
           onToggle={() => togglePanel("explorer")}
+          actions={explorerPanelActions}
           flexGrow={panelFlexGrow.explorer}
         >
           {currentProject ? (
@@ -329,7 +371,7 @@ export function WorkspaceSidebar({
               key={explorerKey}
               rootPath={currentProject.directory}
               rootName={currentProject.name}
-              showHidden={false}
+              showHidden={showHidden}
               onFileClick={onFileClick}
               activeFilePath={activeFilePath}
             />
