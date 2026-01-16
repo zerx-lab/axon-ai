@@ -9,7 +9,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, ChevronDown, PanelRight } from "lucide-react";
-import { toast } from "sonner";
 import { WindowControls } from "./WindowControls";
 import { ThemeToggle } from "./ThemeToggle";
 import { ServiceStatus } from "./ServiceStatus";
@@ -26,17 +25,14 @@ import { useChat } from "@/providers/ChatProvider";
 import { useWorkspace } from "@/stores/workspace";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useSubagentPanelStore } from "@/stores/subagentPanel";
-import { useOpencode } from "@/hooks";
-import { settings as tauriSettings } from "@/services/tauri";
 import { cn } from "@/lib/utils";
 
 export function Titlebar() {
   const { t } = useTranslation();
-  const { activeSession, createNewSession, refreshAgents } = useChat();
+  const { activeSession, createNewSession } = useChat();
   const { getDisplayPath, state: workspaceState, openDirectoryPicker } = useWorkspace();
   const { projects, openProject } = useProjectContext();
   const { isOpen: isPanelOpen, tabs: panelTabs, togglePanel } = useSubagentPanelStore();
-  const { restartBackend } = useOpencode();
 
   // 项目选择器状态
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -67,38 +63,16 @@ export function Titlebar() {
   }, []);
 
   // 处理选择项目
+  // OpenCode 采用 API 级别的 directory 参数设计，不需要重启服务
+  // 每个 API 调用都会传入 directory，OpenCode 会自动加载对应目录的配置
   const handleSelectProject = useCallback(async (directory: string) => {
     // 添加项目到列表（如果还未添加）
     openProject(directory);
 
-    // 获取当前保存的项目目录
-    const currentProjectDir = await tauriSettings.getProjectDirectory();
-
-    // 如果切换到不同目录，更新后端设置并重启服务
-    if (currentProjectDir !== directory) {
-      try {
-        // 更新后端的项目目录设置
-        await tauriSettings.setProjectDirectory(directory);
-        toast.info(t("titlebar.switchingProject"));
-
-        // 重启服务以应用新的工作目录
-        await restartBackend();
-
-        // 刷新 agents 列表（新目录可能有自定义 agent）
-        if (refreshAgents) {
-          await refreshAgents();
-        }
-
-        toast.success(t("titlebar.projectSwitched"));
-      } catch (error) {
-        console.error("切换项目目录失败:", error);
-        toast.error(t("errors.unknownError"));
-      }
-    }
-
     // 在该目录下创建新会话
+    // session.create 会传入 directory，OpenCode 会加载该目录的 .opencode 配置
     await createNewSession(directory);
-  }, [openProject, createNewSession, restartBackend, refreshAgents, t]);
+  }, [openProject, createNewSession]);
 
   // 处理打开目录选择器
   const handleOpenDirectoryPicker = useCallback(async () => {

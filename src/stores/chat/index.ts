@@ -278,15 +278,42 @@ export function useChat() {
 
   // ============== 初始化 ==============
 
-  // 连接成功后加载数据
+  // 连接成功后加载 sessions 和 providers
   useEffect(() => {
     if (isConnected && client) {
       refreshSessions();
       refreshProviders();
-      refreshAgents();
+      // 注意：agents 的加载由下方的 effect 统一处理，避免重复请求
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, client]);
+
+  // 统一的 agents 加载逻辑
+  // - 首次连接时加载（全局 agents 或项目 agents）
+  // - 项目切换时重新加载（OpenCode 支持 .opencode/agents/ 自定义 agents）
+  const lastDirectoryRef = useRef<string | undefined>(undefined);
+  const agentsLoadedForConnectionRef = useRef(false);
+  
+  useEffect(() => {
+    // 连接断开时重置状态
+    if (!isConnected || !client) {
+      agentsLoadedForConnectionRef.current = false;
+      lastDirectoryRef.current = undefined;
+      return;
+    }
+
+    const currentDirectory = activeSession?.directory;
+    const isDirectoryChanged = currentDirectory !== lastDirectoryRef.current;
+    const needsInitialLoad = !agentsLoadedForConnectionRef.current;
+    
+    // 首次加载或目录变化时刷新 agents
+    if (needsInitialLoad || (currentDirectory && isDirectoryChanged)) {
+      console.log("[useChat] 加载 agents:", currentDirectory || "(全局)");
+      agentsLoadedForConnectionRef.current = true;
+      lastDirectoryRef.current = currentDirectory;
+      refreshAgents(currentDirectory);
+    }
+  }, [isConnected, client, activeSession?.directory, refreshAgents]);
 
   // ============== SSE 事件处理 ==============
   

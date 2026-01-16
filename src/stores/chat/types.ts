@@ -101,7 +101,8 @@ export interface UseChatReturn {
   // Agent 操作
   selectAgent: (agentName: string) => void;
   cycleAgent: (direction?: 1 | -1) => void;
-  refreshAgents: () => Promise<void>;
+  /** 刷新 agents 列表，可传入 directory 以加载项目级自定义 agents */
+  refreshAgents: (directory?: string) => Promise<void>;
   
   // 其他
   clearError: () => void;

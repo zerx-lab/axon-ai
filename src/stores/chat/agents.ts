@@ -23,6 +23,14 @@ function saveAgent(agentName: string | null): void {
   }
 }
 
+/**
+ * 刷新 agents 列表
+ * 
+ * OpenCode 支持项目级自定义 agents（在 .opencode/agents/ 目录下）
+ * 通过传递 directory 参数，可以获取该项目的自定义 agents
+ * 
+ * @param directory - 可选的项目目录，传入时会加载该目录的 .opencode 配置中的 agents
+ */
 export function useRefreshAgents(
   client: OpencodeClient | null,
   selectedAgentRef: React.MutableRefObject<string | null>,
@@ -30,12 +38,14 @@ export function useRefreshAgents(
   setSelectedAgent: React.Dispatch<React.SetStateAction<string | null>>,
   setIsLoadingAgents: React.Dispatch<React.SetStateAction<boolean>>
 ) {
-  return useCallback(async () => {
+  return useCallback(async (directory?: string) => {
     if (!client) return;
 
     setIsLoadingAgents(true);
     try {
-      const response = await client.app.agents();
+      // 传递 directory 参数以获取项目级 agents
+      // OpenCode 会自动加载该目录下 .opencode/agents/ 中的自定义 agents
+      const response = await client.app.agents({ directory });
 
       if (response.data) {
         const allAgents = response.data as Agent[];

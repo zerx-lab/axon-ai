@@ -6,7 +6,11 @@ export interface ToolInfo {
   parameters: object;
 }
 
-export async function getToolIds(): Promise<string[]> {
+/**
+ * 获取工具 ID 列表
+ * @param directory - 可选的项目目录，传入时会获取项目级工具配置
+ */
+export async function getToolIds(directory?: string): Promise<string[]> {
   const service = getOpencodeService();
   const state = service.getState();
   
@@ -14,9 +18,12 @@ export async function getToolIds(): Promise<string[]> {
     throw new Error("OpenCode not connected");
   }
   
-  const response = await fetch(
-    `${state.endpoint}/experimental/tool/ids`
-  );
+  const url = new URL(`${state.endpoint}/experimental/tool/ids`);
+  if (directory) {
+    url.searchParams.set("directory", directory);
+  }
+  
+  const response = await fetch(url.toString());
   
   if (!response.ok) {
     throw new Error(`Failed to fetch tool IDs: ${response.statusText}`);
@@ -49,7 +56,11 @@ export async function getTools(
   return await response.json();
 }
 
-export async function getToolsSimple(): Promise<{ id: string; description?: string }[]> {
+/**
+ * 获取工具列表（简化版，只包含 ID 和描述）
+ * @param directory - 可选的项目目录，传入时会获取项目级工具配置
+ */
+export async function getToolsSimple(directory?: string): Promise<{ id: string; description?: string }[]> {
   const service = getOpencodeService();
   const state = service.getState();
   
@@ -58,7 +69,7 @@ export async function getToolsSimple(): Promise<{ id: string; description?: stri
   }
   
   try {
-    const ids = await getToolIds();
+    const ids = await getToolIds(directory);
     console.log('[getToolsSimple] 从API获取到的工具ID列表:', ids);
     console.log('[getToolsSimple] 工具数量:', ids.length);
     
