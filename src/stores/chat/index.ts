@@ -38,7 +38,7 @@ import {
   useVariantOperations,
   loadSavedVariants,
 } from "./providers";
-import { useLoadMessages, useSendMessage, useStopGeneration } from "./messages";
+import { useLoadMessages, useSendMessage, useSendCommand, useStopGeneration } from "./messages";
 import { useRefreshAgents, useAgentOperations, AGENT_STORAGE_KEY } from "./agents";
 
 // 重新导出类型
@@ -266,7 +266,21 @@ export function useChat() {
     setError,
     isGeneratingRef,
   });
-  
+
+  // SDK 命令发送
+  const sendCommand = useSendCommand({
+    client,
+    t,
+    activeSessionId,
+    activeSession,
+    selectedModel,
+    isLoading,
+    setMessages,
+    setIsLoading,
+    setError,
+    isGeneratingRef,
+  });
+
   const stopGeneration = useStopGeneration(
     client,
     activeSessionId,
@@ -370,6 +384,7 @@ export function useChat() {
     
     // 消息操作
     sendMessage,
+    sendCommand,
     stopGeneration,
     
     // 模型操作

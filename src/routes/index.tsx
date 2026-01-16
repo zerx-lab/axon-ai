@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChatContainer } from "@/components/chat";
 import { WorkspaceSidebar } from "@/components/sidebar";
 import { FilePreviewPanel } from "@/components/editor";
@@ -74,6 +74,9 @@ function HomePage() {
     saveLayout,
   } = useLayout();
 
+  // 路由导航
+  const navigate = useNavigate();
+
   // 用于防抖保存的定时器
   const sidebarSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -95,6 +98,7 @@ function HomePage() {
     agents,
     currentAgent,
     sendMessage,
+    sendCommand,
     stopGeneration,
     createNewSession,
     selectSession,
@@ -263,6 +267,18 @@ function HomePage() {
     }
   }, [currentProject, clearAllSessions]);
 
+  // 处理清空当前会话消息（用于 /clear 命令）
+  const handleClearMessages = useCallback(() => {
+    // 清空当前会话的消息（通过重新创建会话实现）
+    handleNewSession();
+  }, [handleNewSession]);
+
+  // 处理打开设置（用于 /settings 命令）
+  const handleOpenSettings = useCallback(() => {
+    // 导航到设置页面
+    navigate({ to: "/settings" });
+  }, [navigate]);
+
   // 监听 Ctrl+N 和 Ctrl+W 快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -411,6 +427,7 @@ function HomePage() {
                       <ChatContainer
                         messages={messages}
                         onSend={sendMessage}
+                        onSendCommand={sendCommand}
                         onStop={stopGeneration}
                         isLoading={isLoading}
                         providers={providers}
@@ -427,6 +444,10 @@ function HomePage() {
                         sessions={sessions}
                         activeSessionId={activeSession?.id ?? null}
                         onSelectSession={selectSession}
+                        onClearMessages={handleClearMessages}
+                        onNewSession={handleNewSession}
+                        onOpenSettings={handleOpenSettings}
+                        projectPath={currentProject?.directory}
                       />
                     </div>
                   </ResizablePanel>
@@ -452,6 +473,7 @@ function HomePage() {
                   <ChatContainer
                     messages={messages}
                     onSend={sendMessage}
+                    onSendCommand={sendCommand}
                     onStop={stopGeneration}
                     isLoading={isLoading}
                     providers={providers}
@@ -468,6 +490,10 @@ function HomePage() {
                     sessions={sessions}
                     activeSessionId={activeSession?.id ?? null}
                     onSelectSession={selectSession}
+                    onClearMessages={handleClearMessages}
+                    onNewSession={handleNewSession}
+                    onOpenSettings={handleOpenSettings}
+                    projectPath={currentProject?.directory}
                   />
                 </div>
               )}

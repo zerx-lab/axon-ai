@@ -188,6 +188,18 @@
       "select": "选择",
       "close": "关闭",
       "sessions": "个会话"
+    },
+    "mention": {
+      "filesAndFolders": "文件和文件夹",
+      "noFilesFound": "未找到匹配的文件",
+      "emptyDirectory": "目录为空",
+      "moreFiles": "还有 {{count}} 个文件..."
+    },
+    "command": {
+      "noCommandFound": "未找到匹配的命令",
+      "actions": "操作",
+      "prompts": "提示",
+      "settings": "设置"
     }
   },
   "settings": {
@@ -495,6 +507,8 @@
     "unknownError": "未知错误",
     "sendMessageFailed": "发送消息失败",
     "sendMessageFailedWithDetail": "发送消息失败: {{detail}}",
+    "sendCommandFailed": "执行命令失败",
+    "sendCommandFailedWithDetail": "执行命令失败: {{detail}}",
     "sessionError": "会话错误",
     "sessionErrorWithDetail": "会话错误: {{detail}}",
     "serviceNotConnected": "服务未连接或无活动会话",

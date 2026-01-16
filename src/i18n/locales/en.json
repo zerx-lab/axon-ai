@@ -184,6 +184,18 @@
       "select": "Select",
       "close": "Close",
       "sessions": "sessions"
+    },
+    "mention": {
+      "filesAndFolders": "Files & Folders",
+      "noFilesFound": "No matching files found",
+      "emptyDirectory": "Directory is empty",
+      "moreFiles": "{{count}} more files..."
+    },
+    "command": {
+      "noCommandFound": "No matching command found",
+      "actions": "Actions",
+      "prompts": "Prompts",
+      "settings": "Settings"
     }
   },
   "settings": {
@@ -484,6 +496,8 @@
     "unknownError": "Unknown error",
     "sendMessageFailed": "Failed to send message",
     "sendMessageFailedWithDetail": "Failed to send message: {{detail}}",
+    "sendCommandFailed": "Failed to execute command",
+    "sendCommandFailedWithDetail": "Failed to execute command: {{detail}}",
     "sessionError": "Session error",
     "sessionErrorWithDetail": "Session error: {{detail}}",
     "serviceNotConnected": "Service not connected or no active session",

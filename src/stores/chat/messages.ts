@@ -13,7 +13,7 @@ import type {
 import type { OpencodeClient } from "@/services/opencode/types";
 import type { Message, Session } from "@/types/chat";
 import type { SelectedModel } from "./types";
-import type { Attachment } from "@/hooks";
+import type { Attachment, MentionPart } from "@/hooks";
 import {
   mapApiMessage,
   extractErrorDetail,
@@ -99,7 +99,7 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     isGeneratingRef,
   } = deps;
   
-  return useCallback(async (content: string, attachments?: Attachment[]) => {
+  return useCallback(async (content: string, attachments?: Attachment[], mentionParts?: MentionPart[]) => {
     if (!client || !activeSessionId) {
       // 服务尚未连接或没有活动会话，静默返回
       // 用户在 UI 上应该看不到发送按钮或输入框处于禁用状态
@@ -129,16 +129,22 @@ export function useSendMessage(deps: MessageOperationsDeps) {
     setMessages((prev) => [...prev, tempAssistantMessage]);
     
     try {
-      type PromptPart = 
-        | { type: "text"; text: string }
-        | { type: "file"; mime: string; url: string; filename?: string };
-      
-      const parts: PromptPart[] = [];
-      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parts: any[] = [];
+
+      // 1. 添加文本内容
       if (content.trim()) {
         parts.push({ type: "text" as const, text: content });
       }
-      
+
+      // 2. 添加 @ 提及的文件、Agent、资源
+      if (mentionParts && mentionParts.length > 0) {
+        for (const part of mentionParts) {
+          parts.push(part);
+        }
+      }
+
+      // 3. 添加附件（图片/PDF）
       if (attachments && attachments.length > 0) {
         for (const attachment of attachments) {
           parts.push({
@@ -153,7 +159,8 @@ export function useSendMessage(deps: MessageOperationsDeps) {
       const promptParams: {
         sessionID: string;
         directory?: string;
-        parts: PromptPart[];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        parts: any[];
         model: { providerID: string; modelID: string };
         variant?: string;
         agent?: string;
@@ -276,7 +283,7 @@ export function useStopGeneration(
 ) {
   return useCallback(async () => {
     if (!client || !activeSessionId) return;
-    
+
     try {
       // SDK v2 使用扁平化参数结构: { sessionID, directory? }
       await client.session.abort({ sessionID: activeSessionId, directory: activeSession?.directory });
@@ -285,9 +292,140 @@ export function useStopGeneration(
     } finally {
       setIsLoading(false);
       isGeneratingRef.current = false;
-      
+
       // 刷新消息
       await loadMessages(activeSessionId, activeSession?.directory);
     }
   }, [client, activeSessionId, activeSession, setIsLoading, isGeneratingRef, loadMessages]);
+}
+
+// ============== 发送命令 ==============
+
+/** 发送命令依赖项 */
+export interface CommandOperationsDeps {
+  client: OpencodeClient | null;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  activeSessionId: string | null;
+  activeSession: Session | null;
+  selectedModel: SelectedModel | null;
+  isLoading: boolean;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  isGeneratingRef: React.MutableRefObject<boolean>;
+}
+
+/**
+ * 发送 SDK 命令 Hook
+ * 用于处理 /commandName args 格式的命令
+ * 通过 session.command() API 发送，template 由后端处理
+ */
+export function useSendCommand(deps: CommandOperationsDeps) {
+  const {
+    client,
+    t,
+    activeSessionId,
+    activeSession,
+    selectedModel,
+    isLoading,
+    setMessages,
+    setIsLoading,
+    setError,
+    isGeneratingRef,
+  } = deps;
+
+  return useCallback(async (commandName: string, args: string) => {
+    if (!client || !activeSessionId) {
+      console.log("[sendCommand] 服务尚未连接或无活动会话");
+      return;
+    }
+
+    if (!selectedModel) {
+      setError(t("errors.modelRequired"));
+      return;
+    }
+
+    if (isLoading) return;
+
+    setIsLoading(true);
+    isGeneratingRef.current = true;
+    setError(null);
+
+    // 创建临时消息显示用户输入
+    const displayText = args ? `/${commandName} ${args}` : `/${commandName}`;
+    const tempUserMessage = createTempUserMessage(activeSessionId, displayText, selectedModel);
+    setMessages((prev) => [...prev, tempUserMessage]);
+
+    const tempAssistantMessage = createTempAssistantMessage(
+      activeSessionId,
+      tempUserMessage.info.id,
+      selectedModel
+    );
+    setMessages((prev) => [...prev, tempAssistantMessage]);
+
+    try {
+      // 使用 SDK session.command() API 发送命令
+      // 后端会处理 template 和参数
+      // model 格式为 "providerID/modelID" 字符串
+      // arguments 是必填字段，没有参数时传空字符串
+      const commandParams: {
+        sessionID: string;
+        directory?: string;
+        command: string;
+        arguments: string;
+        model: string;
+      } = {
+        sessionID: activeSessionId,
+        directory: activeSession?.directory,
+        command: commandName,
+        arguments: args || "",
+        model: `${selectedModel.providerId}/${selectedModel.modelId}`,
+      };
+
+      console.log("[sendCommand] 发送命令参数:", JSON.stringify(commandParams, null, 2));
+
+      const response = await client.session.command(commandParams);
+
+      // 检查 API 响应是否成功
+      const responseAny = response as Record<string, unknown>;
+      const dataObj = responseAny.data as Record<string, unknown> | undefined;
+      const topLevelError = responseAny.error;
+      const dataLevelError = dataObj?.error;
+      const topLevelSuccess = responseAny.success;
+      const dataLevelSuccess = dataObj?.success;
+      const hasError = topLevelError || dataLevelError || topLevelSuccess === false || dataLevelSuccess === false;
+
+      if (hasError) {
+        console.log("命令响应结构:", JSON.stringify(response, null, 2));
+        const detail = extractErrorDetail(response);
+        console.log("提取的错误详情:", detail);
+
+        const errorMessage = detail
+          ? t("errors.sendCommandFailedWithDetail", { detail })
+          : t("errors.sendCommandFailed");
+        setError(errorMessage);
+
+        // 移除临时消息
+        setMessages((prev) => filterTempMessages(prev));
+        setIsLoading(false);
+        isGeneratingRef.current = false;
+        return;
+      }
+
+      // 成功后由 SSE 事件处理消息更新
+    } catch (e) {
+      console.error("发送命令失败:", e);
+      const detail = extractErrorDetail(e);
+      const errorMessage = detail
+        ? t("errors.sendCommandFailedWithDetail", { detail })
+        : t("errors.sendCommandFailed");
+      setError(errorMessage);
+
+      // 移除失败的消息
+      setMessages((prev) => filterTempMessages(prev));
+      setIsLoading(false);
+      isGeneratingRef.current = false;
+    }
+    // 注意：不在 finally 中关闭 isLoading，由 SSE 事件控制
+  }, [client, activeSessionId, selectedModel, isLoading, activeSession, t, setMessages, setIsLoading, setError, isGeneratingRef]);
 }

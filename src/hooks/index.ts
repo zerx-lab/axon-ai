@@ -26,3 +26,46 @@ export {
   useSubagentSession,
   useSubagentStats,
 } from "./useSubagentSession";
+export {
+  useTriggerDetection,
+  type TriggerType,
+  type TriggerState,
+  type UseTriggerDetectionReturn,
+} from "./useTriggerDetection";
+export {
+  useCommands,
+  BUILTIN_COMMANDS,
+  type SlashCommand,
+  type SDKCommand,
+  type UseCommandsOptions,
+  type UseCommandsReturn,
+} from "./useCommands";
+export {
+  useFileSearch,
+  type FileSearchResult,
+  type UseFileSearchOptions,
+  type UseFileSearchReturn,
+} from "./useFileSearch";
+export {
+  useMcpResources,
+  type McpResource,
+  type UseMcpResourcesOptions,
+  type UseMcpResourcesReturn,
+} from "./useMcpResources";
+export {
+  useMentions,
+  type Mention,
+  type FileMention,
+  type AgentMention,
+  type ResourceMention,
+  type MentionPart,
+  type FilePartForSdk,
+  type AgentPartForSdk,
+  type ResourcePartForSdk,
+  type UseMentionsReturn,
+} from "./useMentions";
+export {
+  useFileReader,
+  toAbsolutePath,
+  type UseFileReaderReturn,
+} from "./useFileReader";

@@ -7,6 +7,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInputCard } from "./ChatInputCard";
+import type { SlashCommand } from "@/hooks";
 import { QuickPrompts } from "./QuickPrompts";
 import { TodoListCompact } from "./TodoList";
 import { AutoAcceptToggle } from "./PermissionPrompt";
@@ -21,6 +22,8 @@ import { cn } from "@/lib/utils";
 interface ChatContainerProps {
   messages: Message[];
   onSend: (message: string, attachments?: Attachment[]) => void;
+  /** SDK 命令发送回调（/commandName args） */
+  onSendCommand?: (commandName: string, args: string) => void;
   onStop?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
@@ -38,11 +41,20 @@ interface ChatContainerProps {
   sessions?: Session[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
+  /** 清空会话消息回调 */
+  onClearMessages?: () => void;
+  /** 新建会话回调 */
+  onNewSession?: () => void;
+  /** 打开设置回调 */
+  onOpenSettings?: () => void;
+  /** 项目路径（用于 @ 文件提及） */
+  projectPath?: string;
 }
 
 export function ChatContainer({
   messages,
   onSend,
+  onSendCommand,
   onStop,
   isLoading = false,
   disabled = false,
@@ -60,12 +72,58 @@ export function ChatContainer({
   sessions = [],
   activeSessionId = null,
   onSelectSession,
+  onClearMessages,
+  onNewSession,
+  onOpenSettings,
+  projectPath,
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isEmptyState = messages.length === 0;
   
   // 快捷提示填充值状态
   const [quickPromptFillValue, setQuickPromptFillValue] = useState("");
+  
+  // 处理 / 命令
+  const handleCommand = useCallback((command: SlashCommand) => {
+    switch (command.id) {
+      case "clear":
+        // 清空当前会话消息
+        onClearMessages?.();
+        break;
+      case "new":
+        // 开始新会话
+        onNewSession?.();
+        break;
+      case "settings":
+        // 打开设置面板
+        onOpenSettings?.();
+        break;
+      case "help":
+        // 发送帮助请求（让 AI 回复帮助信息）
+        onSend("请告诉我你能帮我做什么？列出你的主要功能和常用命令。");
+        break;
+      case "review":
+        // 代码审查
+        onSend("请帮我审查当前项目的代码，指出潜在的问题和改进建议。");
+        break;
+      case "explain":
+        // 解释代码
+        onSend("请解释一下当前选中或最近讨论的代码的功能和逻辑。");
+        break;
+      case "git":
+        // Git 操作助手
+        onSend("请帮我处理 Git 相关操作。你可以查看状态、提交更改或解决冲突。");
+        break;
+      case "debug":
+        // 调试模式（暂时只是发送消息）
+        onSend("已进入调试模式。请告诉我你遇到的问题，我会帮你分析和调试。");
+        break;
+      default:
+        // 对于未知命令，发送消息让 AI 处理
+        onSend(`执行命令: /${command.name}`);
+        break;
+    }
+  }, [onClearMessages, onNewSession, onOpenSettings, onSend]);
   
   // 是否应该自动滚动（用户未手动向上滚动时为 true）
   const shouldAutoScrollRef = useRef(true);
@@ -210,6 +268,7 @@ export function ChatContainer({
           <div className="w-full max-w-2xl mt-8">
             <ChatInputCard
               onSend={handleSend}
+              onSendCommand={onSendCommand}
               onStop={onStop}
               isLoading={isLoading}
               disabled={disabled}
@@ -230,6 +289,8 @@ export function ChatContainer({
               onSelectSession={onSelectSession}
               fillValue={quickPromptFillValue}
               onFillValueConsumed={handleFillValueConsumed}
+              onCommand={handleCommand}
+              projectPath={projectPath}
             />
           </div>
 
@@ -305,6 +366,7 @@ export function ChatContainer({
           {/* 输入卡片 */}
           <ChatInputCard
             onSend={handleSend}
+            onSendCommand={onSendCommand}
             onStop={onStop}
             isLoading={isLoading}
             disabled={disabled}
@@ -323,6 +385,8 @@ export function ChatContainer({
             sessions={sessions}
             activeSessionId={activeSessionId}
             onSelectSession={onSelectSession}
+            onCommand={handleCommand}
+            projectPath={projectPath}
           />
           
           {/* 底部工具栏：自动批准开关 + LSP 状态 */}

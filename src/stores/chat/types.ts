@@ -9,7 +9,7 @@ import type {
   Session,
   Agent,
 } from "@/types/chat";
-import type { Attachment } from "@/hooks";
+import type { Attachment, MentionPart } from "@/hooks";
 
 // ============== 常量 ==============
 
@@ -87,7 +87,9 @@ export interface UseChatReturn {
   clearAllSessions: (directory: string) => Promise<void>;
   
   // 消息操作
-  sendMessage: (content: string, attachments?: Attachment[]) => Promise<void>;
+  sendMessage: (content: string, attachments?: Attachment[], mentionParts?: MentionPart[]) => Promise<void>;
+  /** 发送 SDK 命令（/commandName args） */
+  sendCommand: (commandName: string, args: string) => Promise<void>;
   stopGeneration: () => Promise<void>;
   
   // 模型操作
