@@ -56,6 +56,7 @@ export function TerminalInstance({ tab, onCleanup }: TerminalInstanceProps) {
   const { endpoint, directory, client } = useTerminalConnection();
   const { isDark } = useTheme();
 
+  // 根据当前主题计算终端颜色（组件挂载时确定，主题变化时会重新挂载）
   const terminalColors: TerminalColors = isDark
     ? DEFAULT_TERMINAL_COLORS.dark
     : DEFAULT_TERMINAL_COLORS.light;
@@ -263,7 +264,7 @@ export function TerminalInstance({ tab, onCleanup }: TerminalInstanceProps) {
 
     init();
 
-    // 清理
+  // 清理
     return () => {
       disposed = true;
       console.log("[TerminalInstance] 清理:", tab.id);
@@ -301,15 +302,8 @@ export function TerminalInstance({ tab, onCleanup }: TerminalInstanceProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.id, endpoint, directory]);
 
-  // 主题变化
-  useEffect(() => {
-    if (!termRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const setOption = (termRef.current as any).setOption;
-    if (setOption) {
-      setOption("theme", terminalColors);
-    }
-  }, [terminalColors]);
+  // 注意：ghostty-web 不支持运行时主题切换
+  // 主题变化时通过 TerminalPanel 中的 key 变化来重新挂载组件
 
   return (
     <div

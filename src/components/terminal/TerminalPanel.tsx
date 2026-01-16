@@ -89,9 +89,10 @@ export function TerminalPanel({ className }: TerminalPanelProps) {
         style={{ backgroundColor: terminalBackground }}
       >
         {/* 渲染活动终端实例 */}
+        {/* key 包含 isDark 以便主题切换时重新挂载（ghostty-web 不支持运行时主题切换） */}
         {tab && endpoint && (
           <TerminalInstance
-            key={tab.id}
+            key={`${tab.id}-${isDark ? 'dark' : 'light'}`}
             tab={tab}
             onCleanup={handleInstanceCleanup}
           />
