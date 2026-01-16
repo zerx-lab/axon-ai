@@ -53,7 +53,8 @@ axon_desktop/
 │   │   ├── settings/         # 配置管理
 │   │   └── state/            # 全局状态
 │   └── Cargo.toml
-├── opencode/                 # 参考源码（独立项目）
+├── github/                   # 第三方参考项目
+│   └── opencode/             # OpenCode 参考源码
 └── public/                   # 静态资源
 ```
 
@@ -274,11 +275,11 @@ fn command_name(param: &str) -> Result<String, String> {
 - **Dev server port**: 1420
 - **App identifier**: `com.zero.axon_desktop`
 - **CSP**: 当前禁用，生产需配置
-- **opencode 源码**: 根目录 `opencode/` 可用于功能调研
+- **opencode 源码**: `github/opencode/` 可用于功能调研
 
 ---
 
 ## 子目录指南
 
 - `src-tauri/AGENTS.md` - Rust 后端专用规范
-- `opencode/AGENTS.md` - OpenCode 参考项目规范
+- `github/opencode/AGENTS.md` - OpenCode 参考项目规范

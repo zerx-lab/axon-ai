@@ -23,6 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 /docs
-/opencode
 /.claude
 /tmp
+/github
