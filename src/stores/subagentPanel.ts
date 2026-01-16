@@ -6,6 +6,20 @@
 
 import { create } from "zustand";
 
+// ============== 常量 ==============
+
+/** 图面板折叠状态存储 key */
+const GRAPH_COLLAPSED_STORAGE_KEY = "axon-subagent-graph-collapsed";
+/** 图面板高度存储 key */
+const GRAPH_HEIGHT_STORAGE_KEY = "axon-subagent-graph-height";
+
+/** 图面板最小高度 */
+export const GRAPH_MIN_HEIGHT = 120;
+/** 图面板最大高度 */
+export const GRAPH_MAX_HEIGHT = 400;
+/** 图面板默认高度 */
+export const GRAPH_DEFAULT_HEIGHT = 200;
+
 // ============== 类型定义 ==============
 
 /** Subagent 状态 */
@@ -39,11 +53,17 @@ interface SubagentPanelState {
   activeTabId: string | null;
   /** 面板宽度（像素） */
   panelWidth: number;
+  /** 图面板是否展开 */
+  isGraphExpanded: boolean;
+  /** 用户是否手动折叠过图面板（用于控制自动展开逻辑） */
+  graphManuallyCollapsed: boolean;
+  /** 图面板高度（像素） */
+  graphHeight: number;
 }
 
 /** Subagent 面板操作 */
 interface SubagentPanelActions {
-  /** 打开面板并添加/激活标签 */
+  /** 打开面板并激活指定标签 */
   openPanel: (tab: SubagentTab) => void;
   /** 关闭面板（同时清空所有标签） */
   closePanel: () => void;
@@ -51,6 +71,11 @@ interface SubagentPanelActions {
   togglePanel: () => void;
   /** 设置面板宽度 */
   setPanelWidth: (width: number) => void;
+  /** 
+   * 注册 subagent（不打开面板，仅注册到列表）
+   * 用于组件挂载时自动收集所有 subagent 信息
+   */
+  registerSubagent: (tab: SubagentTab) => void;
   /** 添加标签页 */
   addTab: (tab: SubagentTab) => void;
   /** 移除标签页 */
@@ -73,6 +98,12 @@ interface SubagentPanelActions {
   hasTab: (sessionId: string) => boolean;
   /** 重置状态 */
   reset: () => void;
+  /** 设置图面板展开状态 */
+  setGraphExpanded: (expanded: boolean) => void;
+  /** 切换图面板展开状态（用户手动操作） */
+  toggleGraphExpanded: () => void;
+  /** 设置图面板高度 */
+  setGraphHeight: (height: number) => void;
 }
 
 type SubagentPanelStore = SubagentPanelState & SubagentPanelActions;
@@ -86,11 +117,58 @@ export const PANEL_MAX_WIDTH = 800;
 /** 面板默认宽度 */
 export const PANEL_DEFAULT_WIDTH = 400;
 
+/** 从 localStorage 读取图面板折叠状态 */
+const loadGraphCollapsedState = (): boolean => {
+  try {
+    const saved = localStorage.getItem(GRAPH_COLLAPSED_STORAGE_KEY);
+    return saved === "true";
+  } catch {
+    return false;
+  }
+};
+
+/** 保存图面板折叠状态到 localStorage */
+const saveGraphCollapsedState = (collapsed: boolean): void => {
+  try {
+    localStorage.setItem(GRAPH_COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    // 忽略存储错误
+  }
+};
+
+/** 从 localStorage 读取图面板高度 */
+const loadGraphHeight = (): number => {
+  try {
+    const saved = localStorage.getItem(GRAPH_HEIGHT_STORAGE_KEY);
+    if (saved) {
+      const height = parseInt(saved, 10);
+      if (!isNaN(height)) {
+        return Math.max(GRAPH_MIN_HEIGHT, Math.min(GRAPH_MAX_HEIGHT, height));
+      }
+    }
+  } catch {
+    // 忽略读取错误
+  }
+  return GRAPH_DEFAULT_HEIGHT;
+};
+
+/** 保存图面板高度到 localStorage */
+const saveGraphHeight = (height: number): void => {
+  try {
+    localStorage.setItem(GRAPH_HEIGHT_STORAGE_KEY, String(height));
+  } catch {
+    // 忽略存储错误
+  }
+};
+
 const initialState: SubagentPanelState = {
   isOpen: false,
   tabs: [],
   activeTabId: null,
   panelWidth: PANEL_DEFAULT_WIDTH,
+  isGraphExpanded: true,
+  graphManuallyCollapsed: loadGraphCollapsedState(),
+  graphHeight: loadGraphHeight(),
 };
 
 export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => ({
@@ -118,10 +196,13 @@ export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => 
       }
 
       // 添加新标签并激活
+      // 如果用户没有手动折叠过图面板，则自动展开
+      const shouldExpandGraph = !state.graphManuallyCollapsed;
       return {
         isOpen: true,
         tabs: [...state.tabs, tab],
         activeTabId: tab.sessionId,
+        isGraphExpanded: shouldExpandGraph ? true : state.isGraphExpanded,
       };
     });
   },
@@ -145,6 +226,29 @@ export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => 
     // 确保宽度在允许范围内
     const clampedWidth = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, width));
     set({ panelWidth: clampedWidth });
+  },
+
+  registerSubagent: (tab) => {
+    set((state) => {
+      // 检查是否已存在
+      const existingIndex = state.tabs.findIndex((t) => t.sessionId === tab.sessionId);
+      
+      if (existingIndex !== -1) {
+        // 已存在，更新状态
+        const updatedTabs = [...state.tabs];
+        updatedTabs[existingIndex] = {
+          ...updatedTabs[existingIndex],
+          status: tab.status,
+          toolCallCount: tab.toolCallCount,
+        };
+        return { tabs: updatedTabs };
+      }
+      
+      // 不存在，添加到列表（但不打开面板，不设置激活）
+      return {
+        tabs: [...state.tabs, tab],
+      };
+    });
   },
 
   addTab: (tab) => {
@@ -237,7 +341,15 @@ export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => 
   },
 
   clearAllTabs: () => {
-    set({ tabs: [], activeTabId: null, isOpen: false });
+    // 新会话时重置图面板状态：展开图面板，清除手动折叠标记
+    saveGraphCollapsedState(false);
+    set({ 
+      tabs: [], 
+      activeTabId: null, 
+      isOpen: false,
+      isGraphExpanded: true,
+      graphManuallyCollapsed: false,
+    });
   },
 
   getActiveTab: () => {
@@ -252,5 +364,33 @@ export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => 
 
   reset: () => {
     set(initialState);
+  },
+
+  setGraphExpanded: (expanded) => {
+    set({ isGraphExpanded: expanded });
+  },
+
+  toggleGraphExpanded: () => {
+    set((state) => {
+      const newExpanded = !state.isGraphExpanded;
+      // 用户手动折叠时，记录状态并持久化
+      if (!newExpanded) {
+        saveGraphCollapsedState(true);
+        return { 
+          isGraphExpanded: false, 
+          graphManuallyCollapsed: true,
+        };
+      }
+      // 用户手动展开时，不改变 graphManuallyCollapsed
+      // （因为用户可能只是临时查看，下次新会话还是要自动展开）
+      return { isGraphExpanded: true };
+    });
+  },
+
+  setGraphHeight: (height) => {
+    // 确保高度在允许范围内
+    const clampedHeight = Math.max(GRAPH_MIN_HEIGHT, Math.min(GRAPH_MAX_HEIGHT, height));
+    saveGraphHeight(clampedHeight);
+    set({ graphHeight: clampedHeight });
   },
 }));

@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
     "@monaco-editor/react": "^4.7.0",
     "@opencode-ai/sdk": "^1.1.14",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -32,6 +33,7 @@
     "@tanstack/react-router": "^1.145.7",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

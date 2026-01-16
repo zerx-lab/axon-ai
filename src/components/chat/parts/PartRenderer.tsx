@@ -238,6 +238,47 @@ interface ToolPartViewProps {
 function ToolPartView({ part, messageInfo }: ToolPartViewProps) {
   const { state } = part;
   const { client } = useOpencode();
+  const { registerSubagent } = useSubagentPanelStore();
+  
+  // Task 工具：自动注册到 subagent store（不管是否展开）
+  // 这确保图拓扑能展示所有的 subagent 关系
+  useEffect(() => {
+    if (part.tool !== "task") return;
+    if (state.status === "pending") return; // pending 状态没有 metadata
+    
+    // 类型断言：running/completed/error 状态都有 metadata
+    const stateWithMeta = state as { 
+      status: string; 
+      input?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    };
+    
+    const sessionId = stateWithMeta.metadata?.sessionId as string | undefined;
+    if (!sessionId) return;
+    
+    const description = stateWithMeta.input?.description as string || "";
+    const subagentType = (stateWithMeta.input?.subagent_type as string) || "general";
+    const summary = stateWithMeta.metadata?.summary as Array<{ state: { status: string } }> | undefined;
+    
+    // 计算状态
+    const isCompleted = state.status === "completed" || stateWithMeta.metadata?.completed === true;
+    const hasError = summary?.some((s) => s.state.status === "error") || state.status === "error";
+    const taskStatus: "running" | "completed" | "error" = hasError
+      ? "error"
+      : isCompleted
+        ? "completed"
+        : "running";
+    
+    registerSubagent({
+      sessionId,
+      parentSessionId: messageInfo.sessionID,
+      description,
+      subagentType,
+      status: taskStatus,
+      toolCallCount: summary?.length ?? 0,
+      createdAt: Date.now(),
+    });
+  }, [part.tool, state, messageInfo.sessionID, registerSubagent]);
   
   // 获取与当前工具调用相关的权限请求 - 使用 useShallow 避免无限循环
   const pendingRequests = usePermissionStore(
