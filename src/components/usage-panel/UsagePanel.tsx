@@ -8,7 +8,7 @@
  * - 点击消息展开显示详细信息和 JSON 数据
  */
 
-import { useEffect, useRef, useCallback, useState, useMemo } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
 import { cn } from "@/lib/utils";
 import {
   X,
@@ -18,6 +18,8 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useTheme } from "@/stores/theme";
+import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import { useTranslation } from "react-i18next";
 import {
   useUsagePanelStore,
@@ -37,6 +39,51 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Message, AssistantMessageInfo } from "@/types/chat";
+
+// ============== JSON 高亮主题与语言加载 ==============
+
+// 主题缓存
+const themeCache = {
+  dark: null as Record<string, React.CSSProperties> | null,
+  light: null as Record<string, React.CSSProperties> | null,
+};
+
+const loadDarkTheme = async () => {
+  if (!themeCache.dark) {
+    const mod = await import(
+      "react-syntax-highlighter/dist/esm/styles/prism/one-dark"
+    );
+    themeCache.dark = mod.default;
+  }
+  return themeCache.dark;
+};
+
+const loadLightTheme = async () => {
+  if (!themeCache.light) {
+    const mod = await import(
+      "react-syntax-highlighter/dist/esm/styles/prism/one-light"
+    );
+    themeCache.light = mod.default;
+  }
+  return themeCache.light;
+};
+
+// JSON 语言注册状态
+let jsonRegistered = false;
+
+const registerJsonLanguage = async () => {
+  if (jsonRegistered) return true;
+  try {
+    const mod = await import(
+      "react-syntax-highlighter/dist/esm/languages/prism/json"
+    );
+    SyntaxHighlighter.registerLanguage("json", mod.default);
+    jsonRegistered = true;
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // ============== 类型定义 ==============
 
@@ -582,7 +629,7 @@ function MessageUsageRow({
             </div>
           )}
 
-          {/* JSON 数据 */}
+          {/* JSON 数据（带语法高亮） */}
           <div className="mt-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-muted-foreground/60">
@@ -617,9 +664,7 @@ function MessageUsageRow({
                 "max-h-[200px]"
               )}
             >
-              <pre className="text-[10px] font-mono text-foreground/70 whitespace-pre-wrap break-all leading-relaxed">
-                {jsonString}
-              </pre>
+              <JsonHighlighter json={jsonString} />
             </div>
           </div>
         </div>
@@ -644,3 +689,78 @@ function StatItem({ label, value, className }: StatItemProps) {
     </div>
   );
 }
+
+// ============== JSON 高亮组件 ==============
+
+interface JsonHighlighterProps {
+  json: string;
+  className?: string;
+}
+
+/**
+ * 轻量级 JSON 语法高亮组件
+ * 使用 react-syntax-highlighter 的 PrismLight 版本，按需加载 JSON 语法
+ */
+const JsonHighlighter = memo(function JsonHighlighter({
+  json,
+  className,
+}: JsonHighlighterProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
+  const [darkTheme, setDarkTheme] = useState<Record<
+    string,
+    React.CSSProperties
+  > | null>(themeCache.dark);
+  const [lightTheme, setLightTheme] = useState<Record<
+    string,
+    React.CSSProperties
+  > | null>(themeCache.light);
+  const [languageReady, setLanguageReady] = useState(jsonRegistered);
+
+  // 加载主题和语言
+  useEffect(() => {
+    loadDarkTheme().then(setDarkTheme);
+    loadLightTheme().then(setLightTheme);
+    registerJsonLanguage().then(setLanguageReady);
+  }, []);
+
+  const currentTheme = isDark ? darkTheme : lightTheme;
+
+  // 主题或语言未就绪时显示简单的 pre 标签
+  if (!currentTheme || !languageReady) {
+    return (
+      <pre
+        className={cn(
+          "text-[10px] font-mono text-foreground/70 whitespace-pre-wrap break-all leading-relaxed",
+          className
+        )}
+      >
+        {json}
+      </pre>
+    );
+  }
+
+  return (
+    <SyntaxHighlighter
+      style={currentTheme}
+      language="json"
+      PreTag="div"
+      customStyle={{
+        margin: 0,
+        padding: 0,
+        background: "transparent",
+        fontSize: "10px",
+        lineHeight: "1.5",
+      }}
+      codeTagProps={{
+        style: {
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        },
+      }}
+    >
+      {json}
+    </SyntaxHighlighter>
+  );
+});
