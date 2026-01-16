@@ -35,7 +35,10 @@ interface ChatContainerProps {
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
+  /** 主代理列表（用于 AgentSelector 切换） */
   agents?: Agent[];
+  /** 子代理列表（用于 @ 提及调用 task tool） */
+  subagents?: Agent[];
   currentAgent?: Agent | null;
   onSelectAgent?: (agentName: string) => void;
   sessions?: Session[];
@@ -67,6 +70,7 @@ export function ChatContainer({
   onSelectVariant,
   onCycleVariant,
   agents = [],
+  subagents = [],
   currentAgent,
   onSelectAgent,
   sessions = [],
@@ -281,6 +285,7 @@ export function ChatContainer({
               onSelectVariant={onSelectVariant}
               onCycleVariant={onCycleVariant}
               agents={agents}
+              subagents={subagents}
               currentAgent={currentAgent}
               onSelectAgent={onSelectAgent}
               isEmptyState={true}
@@ -379,6 +384,7 @@ export function ChatContainer({
             onSelectVariant={onSelectVariant}
             onCycleVariant={onCycleVariant}
             agents={agents}
+            subagents={subagents}
             currentAgent={currentAgent}
             onSelectAgent={onSelectAgent}
             isEmptyState={false}

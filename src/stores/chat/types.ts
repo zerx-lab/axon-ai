@@ -77,6 +77,8 @@ export interface UseChatReturn {
   
   // Agent 相关
   agents: Agent[];
+  /** 子代理列表，用于 @ 提及（mode !== "primary"） */
+  subagents: Agent[];
   currentAgent: Agent | null;
   isLoadingAgents: boolean;
   

@@ -96,6 +96,7 @@ function HomePage() {
     currentVariants,
     selectedVariant,
     agents,
+    subagents,
     currentAgent,
     sendMessage,
     sendCommand,
@@ -439,6 +440,7 @@ function HomePage() {
                         onSelectVariant={selectVariant}
                         onCycleVariant={cycleVariant}
                         agents={agents}
+                        subagents={subagents}
                         currentAgent={currentAgent}
                         onSelectAgent={selectAgent}
                         sessions={sessions}
@@ -485,6 +487,7 @@ function HomePage() {
                     onSelectVariant={selectVariant}
                     onCycleVariant={cycleVariant}
                     agents={agents}
+                    subagents={subagents}
                     currentAgent={currentAgent}
                     onSelectAgent={selectAgent}
                     sessions={sessions}

@@ -86,7 +86,10 @@ interface ChatInputCardProps {
   selectedVariant?: string | undefined;
   onSelectVariant?: (variant: string | undefined) => void;
   onCycleVariant?: () => void;
+  /** 主代理列表（用于 AgentSelector 切换） */
   agents?: Agent[];
+  /** 子代理列表（用于 @ 提及调用 task tool） */
+  subagents?: Agent[];
   currentAgent?: Agent | null;
   onSelectAgent?: (agentName: string) => void;
   isEmptyState?: boolean;
@@ -151,6 +154,7 @@ export function ChatInputCard({
   onSelectVariant,
   onCycleVariant,
   agents = [],
+  subagents = [],
   currentAgent = null,
   onSelectAgent,
   isEmptyState = false,
@@ -232,13 +236,16 @@ export function ChatInputCard({
     return filterCommands(trigger?.searchText || "");
   }, [filterCommands, trigger?.searchText]);
 
-  // 过滤后的 @ 提及选项（agents + files + resources）
+  // 过滤后的 @ 提及选项（subagents + files + resources）
+  // 注意：这里使用 subagents（子代理）而不是 agents（主代理）
+  // 子代理用于 @ 提及，触发 SDK 注入 synthetic prompt 调用 task tool
   const filteredAtOptions = useMemo(() => {
     const search = trigger?.searchText?.toLowerCase() || "";
     const result: AtOption[] = [];
 
-    // 1. Agents（优先显示）
-    for (const agent of agents) {
+    // 1. Subagents（子代理，优先显示）
+    // mode !== "primary" 的 agent 用于 @ 提及
+    for (const agent of subagents) {
       const display = agent.name;
       if (!search || display.toLowerCase().includes(search)) {
         result.push({ type: "agent", name: agent.name, display });
@@ -269,7 +276,7 @@ export function ChatInputCard({
     }
 
     return result.slice(0, 30); // 限制显示数量
-  }, [agents, fileResults, filterResources, trigger?.searchText]);
+  }, [subagents, fileResults, filterResources, trigger?.searchText]);
   
   // 计算当前弹窗的项目数量（用于键盘导航）
   const currentItemCount = useMemo(() => {

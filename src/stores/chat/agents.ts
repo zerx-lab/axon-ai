@@ -29,12 +29,17 @@ function saveAgent(agentName: string | null): void {
  * OpenCode 支持项目级自定义 agents（在 .opencode/agents/ 目录下）
  * 通过传递 directory 参数，可以获取该项目的自定义 agents
  * 
+ * 区分两类 agents：
+ * - 主代理（primaryAgents）：mode !== "subagent"，用于 AgentSelector 切换
+ * - 子代理（subagents）：mode !== "primary"，用于 @ 提及调用 task tool
+ * 
  * @param directory - 可选的项目目录，传入时会加载该目录的 .opencode 配置中的 agents
  */
 export function useRefreshAgents(
   client: OpencodeClient | null,
   selectedAgentRef: React.MutableRefObject<string | null>,
   setAgents: React.Dispatch<React.SetStateAction<Agent[]>>,
+  setSubagents: React.Dispatch<React.SetStateAction<Agent[]>>,
   setSelectedAgent: React.Dispatch<React.SetStateAction<string | null>>,
   setIsLoadingAgents: React.Dispatch<React.SetStateAction<boolean>>
 ) {
@@ -49,17 +54,27 @@ export function useRefreshAgents(
 
       if (response.data) {
         const allAgents = response.data as Agent[];
-        const visibleAgents = allAgents.filter(
+        
+        // 主代理：mode !== "subagent" && !hidden
+        // 用于左下角 AgentSelector 切换
+        const primaryAgents = allAgents.filter(
           (a) => a.mode !== "subagent" && !a.hidden
         );
-        setAgents(visibleAgents);
+        setAgents(primaryAgents);
 
-        if (visibleAgents.length > 0 && !selectedAgentRef.current) {
+        // 子代理：mode !== "primary" && !hidden
+        // 用于 @ 提及，触发 task tool 调用
+        const subagentList = allAgents.filter(
+          (a) => a.mode !== "primary" && !a.hidden
+        );
+        setSubagents(subagentList);
+
+        if (primaryAgents.length > 0 && !selectedAgentRef.current) {
           const savedAgent = loadSavedAgent();
           const agentToSelect =
-            savedAgent && visibleAgents.some((a) => a.name === savedAgent)
+            savedAgent && primaryAgents.some((a) => a.name === savedAgent)
               ? savedAgent
-              : visibleAgents[0].name;
+              : primaryAgents[0].name;
           setSelectedAgent(agentToSelect);
           saveAgent(agentToSelect);
         }
@@ -69,7 +84,7 @@ export function useRefreshAgents(
     } finally {
       setIsLoadingAgents(false);
     }
-  }, [client, selectedAgentRef, setAgents, setSelectedAgent, setIsLoadingAgents]);
+  }, [client, selectedAgentRef, setAgents, setSubagents, setSelectedAgent, setIsLoadingAgents]);
 }
 
 export function useSelectAgent(

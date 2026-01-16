@@ -97,7 +97,10 @@ export function useChat() {
   const [selectedVariants, setSelectedVariants] = useState<SelectedVariants>(() => loadSavedVariants());
   
   // Agent 状态
+  // agents: 主代理列表（用于 AgentSelector）
+  // subagents: 子代理列表（用于 @ 提及）
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [subagents, setSubagents] = useState<Agent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(() => {
     try {
       return localStorage.getItem(AGENT_STORAGE_KEY);
@@ -237,6 +240,7 @@ export function useChat() {
     client,
     selectedAgentRef,
     setAgents,
+    setSubagents,
     setSelectedAgent,
     setIsLoadingAgents
   );
@@ -373,6 +377,7 @@ export function useChat() {
     
     // Agent 相关
     agents,
+    subagents,  // 子代理列表，用于 @ 提及
     currentAgent: agentOps.currentAgent(),
     isLoadingAgents,
     
