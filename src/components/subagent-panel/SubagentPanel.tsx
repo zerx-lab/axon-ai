@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Network, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Network, X, Layers } from "lucide-react";
 import {
   useSubagentPanelStore,
   PANEL_MIN_WIDTH,
@@ -160,9 +160,12 @@ export function SubagentPanel() {
   }, [isOpen, activeTab?.sessionId, reload]);
 
   // 不显示面板
-  if (!isOpen || tabs.length === 0) {
+  if (!isOpen) {
     return null;
   }
+
+  // 空状态标志
+  const isEmpty = tabs.length === 0;
 
   return (
     <div
@@ -210,82 +213,100 @@ export function SubagentPanel() {
         </Button>
       </div>
 
-      {/* 图拓扑视图折叠面板 */}
-      <Collapsible
-        open={isGraphExpanded}
-        onOpenChange={toggleGraphExpanded}
-        className="shrink-0"
-      >
-        {/* 折叠面板头部 */}
-        <CollapsibleTrigger asChild>
-          <div
-            className={cn(
-              "group flex items-center h-[26px] px-2 cursor-pointer select-none",
-              "bg-sidebar hover:bg-sidebar-accent/50",
-              "border-b border-sidebar-border/40",
-              "transition-colors duration-150"
-            )}
-          >
-            {/* 展开/折叠图标 */}
-            <span className="h-5 w-5 flex items-center justify-center shrink-0">
-              {isGraphExpanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </span>
-
-            {/* 标题 */}
-            <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/90 truncate">
-              调用拓扑
-            </span>
-
-            {/* 节点数量 */}
-            <span className="text-xs text-muted-foreground/70">
-              {tabs.length}
-            </span>
+      {/* 空状态 */}
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-muted/50 mb-4">
+            <Layers className="h-6 w-6 text-muted-foreground/60" />
           </div>
-        </CollapsibleTrigger>
-
-        {/* 图视图内容 */}
-        <CollapsibleContent>
-          <div 
-            className="relative border-b border-border/40"
-            style={{ height: `${graphHeight}px` }}
-          >
-            <SubagentGraph />
-            
-            {/* 底部高度拖拽手柄 */}
-            <div
-              className={cn(
-                "absolute left-0 right-0 bottom-0 h-1 cursor-ns-resize z-10",
-                "hover:bg-primary/30 transition-colors duration-150",
-                isHeightDragging && "bg-primary/50"
-              )}
-              onMouseDown={handleHeightDragStart}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* 面板内容 */}
-      {activeTab && (
+          <p className="text-sm font-medium text-foreground/80 mb-1">
+            暂无子任务
+          </p>
+          <p className="text-xs text-muted-foreground/70 text-center leading-relaxed">
+            当 AI 启动 subagent 执行任务时，<br />
+            相关信息将在此处显示
+          </p>
+        </div>
+      ) : (
         <>
-          {/* 头部 */}
-          <SubagentPanelHeader tab={activeTab} />
+          {/* 图拓扑视图折叠面板 */}
+          <Collapsible
+            open={isGraphExpanded}
+            onOpenChange={toggleGraphExpanded}
+            className="shrink-0"
+          >
+            {/* 折叠面板头部 */}
+            <CollapsibleTrigger asChild>
+              <div
+                className={cn(
+                  "group flex items-center h-[26px] px-2 cursor-pointer select-none",
+                  "bg-sidebar hover:bg-sidebar-accent/50",
+                  "border-b border-sidebar-border/40",
+                  "transition-colors duration-150"
+                )}
+              >
+                {/* 展开/折叠图标 */}
+                <span className="h-5 w-5 flex items-center justify-center shrink-0">
+                  {isGraphExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </span>
 
-          {/* 会话内容 */}
-          <SubagentSessionView
-            messages={messages}
-            isLoading={isLoading}
-            error={error}
-          />
+                {/* 标题 */}
+                <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/90 truncate">
+                  调用拓扑
+                </span>
 
-          {/* 底部统计 */}
-          <SubagentPanelFooter
-            messages={messages}
-            toolCallCount={activeTab.toolCallCount}
-          />
+                {/* 节点数量 */}
+                <span className="text-xs text-muted-foreground/70">
+                  {tabs.length}
+                </span>
+              </div>
+            </CollapsibleTrigger>
+
+            {/* 图视图内容 */}
+            <CollapsibleContent>
+              <div 
+                className="relative border-b border-border/40"
+                style={{ height: `${graphHeight}px` }}
+              >
+                <SubagentGraph />
+                
+                {/* 底部高度拖拽手柄 */}
+                <div
+                  className={cn(
+                    "absolute left-0 right-0 bottom-0 h-1 cursor-ns-resize z-10",
+                    "hover:bg-primary/30 transition-colors duration-150",
+                    isHeightDragging && "bg-primary/50"
+                  )}
+                  onMouseDown={handleHeightDragStart}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* 面板内容 */}
+          {activeTab && (
+            <>
+              {/* 头部 */}
+              <SubagentPanelHeader tab={activeTab} />
+
+              {/* 会话内容 */}
+              <SubagentSessionView
+                messages={messages}
+                isLoading={isLoading}
+                error={error}
+              />
+
+              {/* 底部统计 */}
+              <SubagentPanelFooter
+                messages={messages}
+                toolCallCount={activeTab.toolCallCount}
+              />
+            </>
+          )}
         </>
       )}
     </div>

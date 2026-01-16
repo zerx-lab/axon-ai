@@ -32,13 +32,12 @@ export function Titlebar() {
   const { activeSession, createNewSession } = useChat();
   const { getDisplayPath, state: workspaceState, openDirectoryPicker } = useWorkspace();
   const { projects, openProject } = useProjectContext();
-  const { isOpen: isPanelOpen, tabs: panelTabs, togglePanel } = useSubagentPanelStore();
+  const { isOpen: isPanelOpen, togglePanel } = useSubagentPanelStore();
 
   // 项目选择器状态
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // 是否有可显示的 subagent 标签
-  const hasSubagentTabs = panelTabs.length > 0;
+
 
   // 获取当前会话的目录显示名称
   const currentDirectory = activeSession?.directory || workspaceState.defaultDirectory;
@@ -136,31 +135,29 @@ export function Titlebar() {
           <Separator orientation="vertical" className="mx-1 h-4" />
 
           <div className="flex items-center gap-1 px-2">
-            {/* Subagent 面板切换按钮 */}
-            {hasSubagentTabs && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={togglePanel}
-                      className={cn(
-                        "flex items-center justify-center w-7 h-7 rounded-md",
-                        "text-muted-foreground hover:text-foreground",
-                        "hover:bg-accent transition-colors duration-150",
-                        isPanelOpen && "text-foreground bg-accent"
-                      )}
-                    >
-                      <PanelRight className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="text-xs">
-                      {isPanelOpen ? t("titlebar.hideSubagentPanel", "隐藏子任务面板") : t("titlebar.showSubagentPanel", "显示子任务面板")}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            {/* Subagent 面板切换按钮 - 始终显示 */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={togglePanel}
+                    className={cn(
+                      "flex items-center justify-center w-7 h-7 rounded-md",
+                      "text-muted-foreground hover:text-foreground",
+                      "hover:bg-accent transition-colors duration-150",
+                      isPanelOpen && "text-foreground bg-accent"
+                    )}
+                  >
+                    <PanelRight className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">
+                    {isPanelOpen ? t("titlebar.hideSubagentPanel", "隐藏子任务面板") : t("titlebar.showSubagentPanel", "显示子任务面板")}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <ThemeToggle />
           </div>

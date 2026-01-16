@@ -213,13 +213,7 @@ export const useSubagentPanelStore = create<SubagentPanelStore>()((set, get) => 
   },
 
   togglePanel: () => {
-    set((state) => {
-      // 如果没有标签页，不能打开面板
-      if (!state.isOpen && state.tabs.length === 0) {
-        return state;
-      }
-      return { isOpen: !state.isOpen };
-    });
+    set((state) => ({ isOpen: !state.isOpen }));
   },
 
   setPanelWidth: (width) => {
