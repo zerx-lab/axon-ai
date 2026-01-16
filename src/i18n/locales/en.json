@@ -33,6 +33,7 @@
     "chat": "Chat",
     "search": "Search",
     "extensions": "Extensions",
+    "orchestration": "Orchestration",
     "moveToLeft": "Move to Left",
     "moveToRight": "Move to Right",
     "hideSidebar": "Hide Sidebar",
@@ -532,6 +533,26 @@
     "serviceStarted": "Service started",
     "serviceStopped": "Service stopped",
     "languageChanged": "Language changed"
+  },
+  "orchestration": {
+    "title": "Orchestration",
+    "newWorkflow": "New Workflow",
+    "save": "Save",
+    "noWorkflow": "No workflow selected",
+    "emptyTitle": "Start Creating Workflow",
+    "emptyDescription": "Click the + button on the left to create a new workflow",
+    "nodes": {
+      "agent": "Agent Node",
+      "tool": "Tool Node",
+      "condition": "Condition Node",
+      "start": "Start",
+      "end": "End"
+    },
+    "nodeLabels": {
+      "agent": "Agent",
+      "tool": "Tool",
+      "condition": "Condition"
+    }
   },
   "permissions": {
     "types": {

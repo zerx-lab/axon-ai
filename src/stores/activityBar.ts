@@ -12,7 +12,7 @@ import { persist } from "zustand/middleware";
 export type ActivityBarPosition = "left" | "right";
 
 // 活动项类型
-export type ActivityId = "chat" | "search" | "extensions" | "terminal";
+export type ActivityId = "chat" | "orchestration" | "search" | "extensions" | "terminal";
 
 interface ActivityBarState {
   // 活动栏位置（左侧或右侧）

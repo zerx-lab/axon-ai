@@ -5,6 +5,7 @@
 
 mod commands;
 mod opencode;
+mod plugin_api;
 mod settings;
 mod state;
 mod utils;
@@ -197,10 +198,24 @@ pub fn run() {
             //    下载 opencode 二进制、启动服务等耗时操作都在这里进行
             let init_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
-                info!("开始异步初始化 OpenCode 服务...");
+                info!("开始异步初始化服务...");
                 let state: tauri::State<'_, AppState> = init_handle.state();
 
-                // 初始化服务（如需要会下载二进制）
+                // 启动 Plugin API 服务器
+                let plugin_api = std::sync::Arc::clone(&state.plugin_api);
+                // 使用 spawn_blocking 避免 Send 问题
+                let _ = tokio::task::spawn_blocking(move || {
+                    let rt = tokio::runtime::Handle::current();
+                    let mut server = plugin_api.write();
+                    rt.block_on(async {
+                        match server.start().await {
+                            Ok(()) => info!("Plugin API 服务器启动成功"),
+                            Err(e) => tracing::error!("Plugin API 服务器启动失败: {}", e),
+                        }
+                    });
+                }).await;
+
+                // 初始化 OpenCode 服务（如需要会下载二进制）
                 match state.opencode.initialize().await {
                     Ok(()) => {
                         info!("OpenCode 服务初始化成功");

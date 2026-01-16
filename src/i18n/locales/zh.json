@@ -33,6 +33,7 @@
     "chat": "会话",
     "search": "搜索",
     "extensions": "扩展",
+    "orchestration": "编排",
     "terminal": "终端",
     "moveToLeft": "移动到左侧",
     "moveToRight": "移动到右侧",
@@ -543,6 +544,26 @@
     "serviceStarted": "服务已启动",
     "serviceStopped": "服务已停止",
     "languageChanged": "语言已切换"
+  },
+  "orchestration": {
+    "title": "编排",
+    "newWorkflow": "新建工作流",
+    "save": "保存",
+    "noWorkflow": "未选择工作流",
+    "emptyTitle": "开始创建工作流",
+    "emptyDescription": "点击左侧 + 按钮创建新的工作流",
+    "nodes": {
+      "agent": "Agent 节点",
+      "tool": "工具节点",
+      "condition": "条件节点",
+      "start": "开始",
+      "end": "结束"
+    },
+    "nodeLabels": {
+      "agent": "Agent",
+      "tool": "工具",
+      "condition": "条件"
+    }
   },
   "permissions": {
     "types": {

@@ -288,7 +288,10 @@ impl OpencodeService {
             .env("XDG_STATE_HOME", &app_data_dir)
             .env("XDG_CACHE_HOME", &cache_dir)
             // 禁用自动更新（由 Axon 管理）
-            .env("OPENCODE_DISABLE_AUTOUPDATE", "true");
+            .env("OPENCODE_DISABLE_AUTOUPDATE", "true")
+            // 标识这是由 Axon 启动的 opencode 实例，用于 axon-bridge 插件判断
+            .env("AXON_RUNNING", "true")
+            .env("AXON_BRIDGE_PORT", &actual_port.to_string());
 
         // Windows 平台：设置 CREATE_NO_WINDOW 标志，避免弹出 CMD 控制台窗口
         #[cfg(target_os = "windows")]

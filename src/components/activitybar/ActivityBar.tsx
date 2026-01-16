@@ -9,7 +9,7 @@
 
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { MessageSquare, Settings, PanelLeftClose, PanelLeft, BarChart3 } from "lucide-react";
+import { MessageSquare, Settings, PanelLeftClose, PanelLeft, BarChart3, Workflow } from "lucide-react";
 import { useUsagePanelStore } from "@/stores/usagePanel";
 import {
   Tooltip,
@@ -35,11 +35,19 @@ interface ActivityItem {
 }
 
 // 活动项列表
-const ACTIVITY_ITEMS: ActivityItem[] = [
+// route 为 undefined 表示该活动项不需要路由导航（如 chat 在主页面内切换）
+const ACTIVITY_ITEMS: (ActivityItem & { route?: string })[] = [
   {
     id: "chat",
     icon: MessageSquare,
     labelKey: "activityBar.chat",
+    route: "/", // 聊天在主页
+  },
+  {
+    id: "orchestration",
+    icon: Workflow,
+    labelKey: "activityBar.orchestration",
+    route: "/orchestration", // 编排有独立路由
   },
 ];
 
@@ -49,7 +57,6 @@ export function ActivityBar() {
   const { t } = useTranslation();
   const {
     position,
-    activeActivity,
     sidebarVisible,
     togglePosition,
     handleActivityClick,
@@ -63,8 +70,17 @@ export function ActivityBar() {
     closePanel: closeUsagePanel,
   } = useUsagePanelStore();
 
+  // 获取当前路由路径
+  const currentPath = routerState.location.pathname;
   // 判断是否在设置页面
-  const isSettingsPage = routerState.location.pathname === "/settings";
+  const isSettingsPage = currentPath === "/settings";
+  
+  // 根据路由判断活动项是否激活
+  const isActivityActive = (route?: string) => {
+    if (!route) return false;
+    if (isSettingsPage) return false;
+    return currentPath === route;
+  };
 
   // 处理设置按钮点击
   const handleSettingsClick = () => {
@@ -85,14 +101,18 @@ export function ActivityBar() {
     }
   };
 
-  // 处理会话按钮点击（与使用量面板互斥）
-  const handleChatActivityClick = (activity: ActivityId) => {
+  // 处理活动按钮点击（与使用量面板互斥，支持路由导航）
+  const handleChatActivityClick = (activity: ActivityId, route?: string) => {
     // 如果使用量面板打开，先关闭它
     if (isUsagePanelOpen) {
       closeUsagePanel();
     }
     // 调用原有的活动项点击处理
     handleActivityClick(activity);
+    // 如果有对应路由，导航到该路由
+    if (route) {
+      navigate({ to: route });
+    }
   };
 
   return (
@@ -112,9 +132,9 @@ export function ActivityBar() {
               <ActivityButton
                 key={item.id}
                 item={item}
-                isActive={activeActivity === item.id && sidebarVisible && !isSettingsPage}
+                isActive={isActivityActive(item.route)}
                 position={position}
-                onClick={() => handleChatActivityClick(item.id)}
+                onClick={() => handleChatActivityClick(item.id, item.route)}
               />
             ))}
           </div>

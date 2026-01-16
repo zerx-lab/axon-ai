@@ -1,6 +1,6 @@
 ---
 description: git commit and push
-model: opencode/minimax-m2.1-free
+model: anthropic/claude-haiku-4-5
 subtask: true
 ---
 
@@ -12,5 +12,4 @@ WHAT was done.
 do not do generic messages like "improved agent experience" be very specific
 about what user facing changes were made
 
-if there are changes do a git pull --rebase
 if there are conflicts DO NOT FIX THEM. notify me and I will fix them
