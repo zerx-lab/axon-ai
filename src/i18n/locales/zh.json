@@ -37,7 +37,8 @@
     "moveToLeft": "移动到左侧",
     "moveToRight": "移动到右侧",
     "hideSidebar": "隐藏侧边栏",
-    "showSidebar": "显示侧边栏"
+    "showSidebar": "显示侧边栏",
+    "usage": "使用量"
   },
   "projectPicker": {
     "searchPlaceholder": "搜索项目或输入路径...",
@@ -498,6 +499,21 @@
     "closeOthers": "关闭其他",
     "closeAll": "关闭全部",
     "emptyFile": "文件为空"
+  },
+  "usagePanel": {
+    "title": "使用量",
+    "messages": "消息",
+    "totalCost": "总费用",
+    "inputTokens": "输入",
+    "outputTokens": "输出",
+    "reasoningTokens": "推理",
+    "cacheRead": "缓存读取",
+    "cacheWrite": "缓存写入",
+    "cost": "费用",
+    "model": "模型",
+    "empty": "暂无消息",
+    "user": "用户",
+    "assistant": "助手"
   },
   "errors": {
     "connectionFailed": "连接失败",

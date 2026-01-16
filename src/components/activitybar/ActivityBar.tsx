@@ -9,7 +9,8 @@
 
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { MessageSquare, Settings, PanelLeftClose, PanelLeft } from "lucide-react";
+import { MessageSquare, Settings, PanelLeftClose, PanelLeft, BarChart3 } from "lucide-react";
+import { useUsagePanelStore } from "@/stores/usagePanel";
 import {
   Tooltip,
   TooltipContent,
@@ -55,12 +56,43 @@ export function ActivityBar() {
     toggleSidebarVisible,
   } = useActivityBar();
 
+  // 使用量面板状态
+  const {
+    isOpen: isUsagePanelOpen,
+    openPanel: openUsagePanel,
+    closePanel: closeUsagePanel,
+  } = useUsagePanelStore();
+
   // 判断是否在设置页面
   const isSettingsPage = routerState.location.pathname === "/settings";
 
   // 处理设置按钮点击
   const handleSettingsClick = () => {
     navigate({ to: "/settings" });
+  };
+
+  // 处理使用量面板按钮点击（与会话列表互斥）
+  const handleUsagePanelClick = () => {
+    if (isUsagePanelOpen) {
+      // 如果使用量面板已打开，则关闭它
+      closeUsagePanel();
+    } else {
+      // 打开使用量面板，同时关闭会话列表
+      if (sidebarVisible) {
+        toggleSidebarVisible();
+      }
+      openUsagePanel();
+    }
+  };
+
+  // 处理会话按钮点击（与使用量面板互斥）
+  const handleChatActivityClick = (activity: ActivityId) => {
+    // 如果使用量面板打开，先关闭它
+    if (isUsagePanelOpen) {
+      closeUsagePanel();
+    }
+    // 调用原有的活动项点击处理
+    handleActivityClick(activity);
   };
 
   return (
@@ -82,13 +114,52 @@ export function ActivityBar() {
                 item={item}
                 isActive={activeActivity === item.id && sidebarVisible && !isSettingsPage}
                 position={position}
-                onClick={() => handleActivityClick(item.id)}
+                onClick={() => handleChatActivityClick(item.id)}
               />
             ))}
           </div>
 
           {/* 底部工具区域 */}
           <div className="mt-auto flex flex-col items-center w-full pb-1">
+            {/* 使用量面板按钮 */}
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleUsagePanelClick}
+                    className={cn(
+                      "activity-btn group relative flex items-center justify-center",
+                      "w-9 h-9 my-0.5",
+                      "text-muted-foreground/70",
+                      "hover:text-foreground",
+                      "transition-colors duration-150",
+                      // 激活状态
+                      isUsagePanelOpen && "text-foreground"
+                    )}
+                  >
+                    <BarChart3 className="w-[18px] h-[18px]" />
+                    {/* 激活指示器 */}
+                    {isUsagePanelOpen && (
+                      <span
+                        className={cn(
+                          "absolute w-0.5 rounded-full bg-primary",
+                          "top-1.5 bottom-1.5",
+                          position === "left" ? "left-0" : "right-0"
+                        )}
+                      />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side={position === "left" ? "right" : "left"}
+                  sideOffset={8}
+                  className="text-xs"
+                >
+                  {t("activityBar.usage", "使用量")}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* 侧边栏切换按钮 */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>

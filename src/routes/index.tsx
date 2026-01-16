@@ -5,6 +5,7 @@ import { WorkspaceSidebar } from "@/components/sidebar";
 import { FilePreviewPanel } from "@/components/editor";
 import { ActivityBar } from "@/components/activitybar";
 import { SubagentPanel } from "@/components/subagent-panel";
+import { UsagePanel } from "@/components/usage-panel";
 import { useChat } from "@/providers/ChatProvider";
 import { useProjectContext } from "@/providers/ProjectProvider";
 import { useActivityBar } from "@/stores/activityBar";
@@ -348,6 +349,9 @@ function HomePage() {
         {/* 活动栏 - 左侧位置 */}
         {activityBarPosition === "left" && <ActivityBar />}
 
+        {/* 使用量面板 - 左侧位置 */}
+        {activityBarPosition === "left" && <UsagePanel messages={messages} />}
+
         {/* 主内容区域 */}
         <div className="flex flex-1 h-full overflow-hidden">
           <ResizablePanelGroup
@@ -534,6 +538,9 @@ function HomePage() {
           {/* Subagent 面板 - 右侧固定宽度 */}
           <SubagentPanel />
         </div>
+
+        {/* 使用量面板 - 右侧位置 */}
+        {activityBarPosition === "right" && <UsagePanel messages={messages} />}
 
         {/* 活动栏 - 右侧位置 */}
         {activityBarPosition === "right" && <ActivityBar />}

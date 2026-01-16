@@ -36,7 +36,8 @@
     "moveToLeft": "Move to Left",
     "moveToRight": "Move to Right",
     "hideSidebar": "Hide Sidebar",
-    "showSidebar": "Show Sidebar"
+    "showSidebar": "Show Sidebar",
+    "usage": "Usage"
   },
   "projectPicker": {
     "searchPlaceholder": "Search projects or enter path...",
@@ -472,6 +473,21 @@
     "lspConnectedHint": "Connected",
     "lspErrorHint": "Connection failed",
     "lspMoreServers": "{{count}} more servers"
+  },
+  "usagePanel": {
+    "title": "Usage",
+    "messages": "Messages",
+    "totalCost": "Total Cost",
+    "inputTokens": "Input",
+    "outputTokens": "Output",
+    "reasoningTokens": "Reasoning",
+    "cacheRead": "Cache Read",
+    "cacheWrite": "Cache Write",
+    "cost": "Cost",
+    "model": "Model",
+    "empty": "No messages",
+    "user": "User",
+    "assistant": "Assistant"
   },
   "questionPrompt": {
     "otherCustom": "Other (custom input)",
