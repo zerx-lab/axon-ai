@@ -344,6 +344,7 @@ impl OpencodeService {
             }
         };
 
+        // 更新服务器端口
         if let Some(server) = config.get_mut("server") {
             if let Some(obj) = server.as_object_mut() {
                 obj.insert("port".to_string(), serde_json::json!(port));
@@ -353,6 +354,19 @@ impl OpencodeService {
                 "port": port,
                 "hostname": "127.0.0.1"
             });
+        }
+        
+        // 检查是否需要添加插件配置（如果存在符号链接但配置中没有）
+        let has_plugin_config = config.get("plugin").is_some();
+        if !has_plugin_config {
+            let plugin_exists = get_app_data_dir()
+                .map(|p| p.join("opencode").join("plugins").join("opencode").join("axon-bridge.ts").exists())
+                .unwrap_or(false);
+            
+            if plugin_exists {
+                info!("检测到 axon-bridge 插件符号链接，添加到配置");
+                config["plugin"] = serde_json::json!(["plugins/opencode/axon-bridge.ts"]);
+            }
         }
 
         match serde_json::to_string_pretty(&config) {
@@ -374,7 +388,18 @@ impl OpencodeService {
     /// 这里只需要配置 Axon 需要的基本设置即可。
     /// 注意：不设置 permission 字段，让 opencode 使用默认的交互式权限确认流程
     fn build_opencode_config(&self, port: u16) -> String {
-        let config = serde_json::json!({
+        // 检查是否存在开发模式的插件符号链接
+        // 开发时通过 `bun run dev:link-plugin` 创建符号链接
+        // 插件位于 plugins/opencode/ 目录（独立于 .opencode，避免污染项目配置）
+        let plugin_path = get_app_data_dir()
+            .map(|p| p.join("opencode").join("plugins").join("opencode").join("axon-bridge.ts"));
+        
+        let has_plugin = plugin_path
+            .as_ref()
+            .map(|p| p.exists())
+            .unwrap_or(false);
+        
+        let mut config = serde_json::json!({
             // JSON Schema（帮助编辑器提供自动补全）
             "$schema": "https://opencode.ai/config.json",
             
@@ -394,6 +419,15 @@ impl OpencodeService {
             // MCP 服务器配置 - 初始为空，用户可通过 Axon UI 添加
             // "mcp": {}
         });
+        
+        // 如果存在插件符号链接，添加 plugin 配置
+        // 路径相对于 opencode 配置目录（XDG_CONFIG_HOME/opencode）
+        if has_plugin {
+            info!("检测到 axon-bridge 插件，已添加到配置");
+            config["plugin"] = serde_json::json!(["plugins/opencode/axon-bridge.ts"]);
+        } else {
+            debug!("未检测到 axon-bridge 插件符号链接，跳过插件配置");
+        }
 
         serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".to_string())
     }

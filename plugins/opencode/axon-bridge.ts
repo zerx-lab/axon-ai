@@ -330,7 +330,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     description: "执行 Axon 编排工作流，协调多个 Agent 完成复杂任务",
     args: {
       workflow_id: z.string().describe("工作流 ID"),
-      input: z.record(z.unknown()).optional().describe("工作流输入参数"),
+      input: z.record(z.string(), z.unknown()).optional().describe("工作流输入参数"),
     },
     async execute(args, _context) {
       const result = await client.executeWorkflow(
@@ -350,7 +350,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     description: "与 Axon Desktop 后端通信，获取配置或发送命令",
     args: {
       action: z.enum(["get_config", "get_agents", "send_event"]).describe("操作类型"),
-      payload: z.record(z.unknown()).optional().describe("操作负载"),
+      payload: z.record(z.string(), z.unknown()).optional().describe("操作负载"),
     },
     async execute(args, _context) {
       switch (args.action) {
