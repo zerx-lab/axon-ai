@@ -78,3 +78,22 @@ pub fn ensure_dir_exists(path: &Path) -> Result<(), std::io::Error> {
     }
     Ok(())
 }
+
+/// 获取 OpenCode 插件目录
+/// 路径: <app_data_dir>/opencode/plugins
+pub fn get_opencode_plugins_dir() -> Option<PathBuf> {
+    get_opencode_config_dir().map(|p| p.join("plugins"))
+}
+
+/// 获取 Axon Bridge 插件安装目录
+/// 路径: <app_data_dir>/opencode/plugins/opencode/dist
+/// 与 service.rs 中的检测路径保持一致
+pub fn get_axon_bridge_plugin_dir() -> Option<PathBuf> {
+    get_opencode_plugins_dir().map(|p| p.join("opencode").join("dist"))
+}
+
+/// 获取 Axon Bridge 插件文件路径
+/// 路径: <app_data_dir>/opencode/plugins/opencode/dist/index.js
+pub fn get_axon_bridge_plugin_path() -> Option<PathBuf> {
+    get_axon_bridge_plugin_dir().map(|p| p.join("index.js"))
+}

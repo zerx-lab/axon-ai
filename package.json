@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsc --noEmit",
+    "build:plugin": "cd plugins/opencode && bun install && bun run build",
+    "build:all": "bun run build:plugin && bun run build",
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:link-plugin": "pwsh -ExecutionPolicy Bypass -File scripts/dev-link-plugin.ps1",

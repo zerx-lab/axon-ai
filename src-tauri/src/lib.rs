@@ -214,6 +214,10 @@ pub fn run() {
             utils::paths::init_app_data_dir(&handle)
                 .map_err(|e| Box::new(std::io::Error::other(e)))?;
 
+            if let Err(e) = utils::plugin_installer::install_bundled_plugins(&handle) {
+                tracing::warn!("插件安装失败: {}，继续启动应用", e);
+            }
+
             // 2. 设置 app_handle 用于事件发送（必须在异步操作之前）
             {
                 let state: tauri::State<'_, AppState> = handle.state();
