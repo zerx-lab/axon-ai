@@ -139,6 +139,13 @@ pub fn run() {
             save_workflow,
             delete_workflow,
             save_workflows_batch,
+            // 编排组配置命令
+            get_orchestrations_directory,
+            list_orchestrations,
+            read_orchestration,
+            save_orchestration,
+            delete_orchestration,
+            save_orchestrations_batch,
             // 模型注册表命令
             get_model_defaults,
             get_all_model_defaults,
@@ -228,13 +235,16 @@ pub fn run() {
 
                 // 启动 Plugin API 服务器
                 let plugin_api = std::sync::Arc::clone(&state.plugin_api);
-                // 使用 spawn_blocking 避免 Send 问题
+                let opencode = std::sync::Arc::clone(&state.opencode);
                 let _ = tokio::task::spawn_blocking(move || {
                     let rt = tokio::runtime::Handle::current();
                     let mut server = plugin_api.write();
                     rt.block_on(async {
                         match server.start().await {
-                            Ok(()) => info!("Plugin API 服务器启动成功"),
+                            Ok(port) => {
+                                info!("Plugin API 服务器启动成功，端口: {}", port);
+                                opencode.set_plugin_api_port(port);
+                            }
                             Err(e) => tracing::error!("Plugin API 服务器启动失败: {}", e),
                         }
                     });
@@ -262,6 +272,16 @@ pub fn run() {
             });
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label() == "main" {
+                    info!("主窗口关闭，停止 Plugin API 服务器");
+                    let state: tauri::State<'_, AppState> = window.state();
+                    let mut server = state.plugin_api.write();
+                    server.stop();
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时发生错误");

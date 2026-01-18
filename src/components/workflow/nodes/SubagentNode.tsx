@@ -243,6 +243,18 @@ function SubagentNodeComponent({ data }: NodeProps<SubagentNodeType>) {
           </div>
         )}
       </div>
+
+      {/* 输出连接点（底部，可连接到其他 Agent） */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className={cn(
+          "!w-2.5 !h-2.5 !border-2 !-bottom-1",
+          isEnabled
+            ? "!bg-muted-foreground/50 !border-background"
+            : "!bg-muted-foreground/30 !border-background"
+        )}
+      />
     </div>
   );
 }

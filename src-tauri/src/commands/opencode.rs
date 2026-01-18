@@ -41,6 +41,8 @@ pub async fn initialize_service(state: State<'_, AppState>) -> Result<(), String
 /// Start the opencode service
 #[tauri::command]
 pub async fn start_service(state: State<'_, AppState>) -> Result<(), String> {
+    let plugin_api_port = state.plugin_api.read().state().get_port();
+    state.opencode.set_plugin_api_port(plugin_api_port);
     state.opencode.start().await.map_err(|e| e.to_string())
 }
 
@@ -53,6 +55,8 @@ pub async fn stop_service(state: State<'_, AppState>) -> Result<(), String> {
 /// Restart the opencode service
 #[tauri::command]
 pub async fn restart_service(state: State<'_, AppState>) -> Result<(), String> {
+    let plugin_api_port = state.plugin_api.read().state().get_port();
+    state.opencode.set_plugin_api_port(plugin_api_port);
     state.opencode.restart().await.map_err(|e| e.to_string())
 }
 

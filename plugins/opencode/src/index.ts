@@ -526,6 +526,10 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
       if (customAgents && Object.keys(customAgents).length > 0) {
         const agentConfig = inputConfig.agent ?? {};
         for (const [name, agentCfg] of Object.entries(customAgents)) {
+          // 某些模型不支持同时指定 temperature 和 top_p，优先使用 temperature
+          const hasTemperature = agentCfg.temperature !== undefined && agentCfg.temperature !== null;
+          const hasTopP = agentCfg.top_p !== undefined && agentCfg.top_p !== null;
+
           agentConfig[name] = {
             description: agentCfg.description,
             mode: agentCfg.mode,
@@ -533,8 +537,9 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
             prompt: agentCfg.prompt,
             color: agentCfg.color,
             disable: agentCfg.disable,
-            temperature: agentCfg.temperature,
-            top_p: agentCfg.top_p,
+            // 只传递其中一个采样参数，避免模型报错
+            temperature: hasTemperature ? agentCfg.temperature : undefined,
+            top_p: hasTemperature ? undefined : hasTopP ? agentCfg.top_p : undefined,
             permission: agentCfg.permission,
             tools: agentCfg.tools,
           };

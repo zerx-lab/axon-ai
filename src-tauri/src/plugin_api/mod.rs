@@ -23,9 +23,6 @@ use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::{error, info};
 
-/// 插件 API 服务器默认端口
-pub const DEFAULT_PLUGIN_API_PORT: u16 = 23517;
-
 /// 插件 API 状态
 #[derive(Debug, Clone)]
 pub struct PluginApiState {
@@ -37,8 +34,8 @@ pub struct PluginApiState {
     pub workflows: Arc<RwLock<HashMap<String, OrchestrationWorkflow>>>,
     /// 接收到的事件（用于调试）
     pub events: Arc<RwLock<Vec<PluginEvent>>>,
-    /// 服务端口
-    pub port: u16,
+    /// 服务端口（启动后会更新为实际分配的端口）
+    pub port: Arc<RwLock<u16>>,
 }
 
 impl Default for PluginApiState {
@@ -48,18 +45,22 @@ impl Default for PluginApiState {
             disabled_agents: Arc::new(RwLock::new(Vec::new())),
             workflows: Arc::new(RwLock::new(HashMap::new())),
             events: Arc::new(RwLock::new(Vec::new())),
-            port: DEFAULT_PLUGIN_API_PORT,
+            port: Arc::new(RwLock::new(0)),
         }
     }
 }
 
 impl PluginApiState {
-    /// 创建新的状态实例
-    pub fn new(port: u16) -> Self {
-        Self {
-            port,
-            ..Default::default()
-        }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn get_port(&self) -> u16 {
+        *self.port.read()
+    }
+
+    pub fn set_port(&self, port: u16) {
+        *self.port.write() = port;
     }
 
     /// 添加或更新 Agent 配置
@@ -128,64 +129,59 @@ pub struct PluginApiServer {
 }
 
 impl PluginApiServer {
-    /// 创建新的服务器实例
-    pub fn new(port: u16) -> Self {
+    pub fn new() -> Self {
         Self {
-            state: PluginApiState::new(port),
+            state: PluginApiState::new(),
             shutdown_tx: None,
         }
     }
 
-    /// 获取状态引用
     pub fn state(&self) -> &PluginApiState {
         &self.state
     }
 
-    /// 启动服务器
-    pub async fn start(&mut self) -> Result<(), String> {
+    pub async fn start(&mut self) -> Result<u16, String> {
         if self.shutdown_tx.is_some() {
             return Err("服务器已在运行".to_string());
         }
 
-        let state = self.state.clone();
-        let port = state.port;
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let listener = match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                error!("无法绑定端口: {}", e);
+                return Err(format!("无法绑定端口: {}", e));
+            }
+        };
+
+        let actual_port = listener.local_addr()
+            .map_err(|e| format!("无法获取本地地址: {}", e))?
+            .port();
+
+        self.state.set_port(actual_port);
+
+        let state = self.state.clone();
 
         // 构建路由
         let app = Router::new()
-            // 健康检查
             .route("/api/plugin/health", get(handlers::health_check))
-            // 配置端点
             .route("/api/plugin/config", get(handlers::get_config))
-            // Agent 管理
             .route("/api/plugin/agents", get(handlers::get_agents))
             .route("/api/plugin/agents", post(handlers::set_agent))
-            .route("/api/plugin/agents/:name", axum::routing::delete(handlers::delete_agent))
-            // 事件接收
+            .route("/api/plugin/agents/{name}", axum::routing::delete(handlers::delete_agent))
             .route("/api/plugin/events", post(handlers::receive_event))
-            // 编排端点
             .route("/api/plugin/orchestration", get(handlers::get_workflows))
             .route("/api/plugin/orchestration", post(handlers::add_workflow))
             .route(
-                "/api/plugin/orchestration/:id/execute",
+                "/api/plugin/orchestration/{id}/execute",
                 post(handlers::execute_workflow),
             )
             .with_state(state);
 
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
-        
-        // 尝试绑定端口
-        let listener = match tokio::net::TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) => {
-                error!("无法绑定端口 {}: {}", port, e);
-                return Err(format!("无法绑定端口 {}: {}", port, e));
-            }
-        };
+        info!("Plugin API 服务器启动于 http://127.0.0.1:{}", actual_port);
 
-        info!("Plugin API 服务器启动于 http://{}", addr);
-
-        // 在后台运行服务器
         tokio::spawn(async move {
             axum::serve(listener, app)
                 .with_graceful_shutdown(async {
@@ -197,7 +193,7 @@ impl PluginApiServer {
         });
 
         self.shutdown_tx = Some(shutdown_tx);
-        Ok(())
+        Ok(actual_port)
     }
 
     /// 停止服务器

@@ -2,7 +2,7 @@
 
 use crate::models_registry::ModelsRegistryManager;
 use crate::opencode::OpencodeService;
-use crate::plugin_api::{PluginApiServer, DEFAULT_PLUGIN_API_PORT};
+use crate::plugin_api::PluginApiServer;
 use crate::settings::SettingsManager;
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -11,7 +11,6 @@ pub struct AppState {
     pub opencode: Arc<OpencodeService>,
     pub settings: Arc<SettingsManager>,
     pub plugin_api: Arc<RwLock<PluginApiServer>>,
-    /// 模型注册表管理器（用于获取模型默认参数）
     pub models_registry: Arc<ModelsRegistryManager>,
 }
 
@@ -22,7 +21,7 @@ impl AppState {
         Self {
             opencode: OpencodeService::with_settings(Arc::clone(&settings)),
             settings,
-            plugin_api: Arc::new(RwLock::new(PluginApiServer::new(DEFAULT_PLUGIN_API_PORT))),
+            plugin_api: Arc::new(RwLock::new(PluginApiServer::new())),
             models_registry,
         }
     }

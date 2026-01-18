@@ -28,6 +28,7 @@ pub struct OpencodeService {
     downloader: OpencodeDownloader,
     app_handle: RwLock<Option<AppHandle>>,
     settings: Option<Arc<SettingsManager>>,
+    plugin_api_port: RwLock<u16>,
 }
 
 impl OpencodeService {
@@ -39,7 +40,16 @@ impl OpencodeService {
             downloader: OpencodeDownloader::new(),
             app_handle: RwLock::new(None),
             settings: Some(settings),
+            plugin_api_port: RwLock::new(0),
         })
+    }
+
+    pub fn set_plugin_api_port(&self, port: u16) {
+        *self.plugin_api_port.write() = port;
+    }
+
+    pub fn get_plugin_api_port(&self) -> u16 {
+        *self.plugin_api_port.read()
     }
 
     /// Set the app handle for event emission
@@ -289,10 +299,8 @@ impl OpencodeService {
             .env("XDG_CACHE_HOME", &cache_dir)
             // 禁用自动更新（由 Axon 管理）
             .env("OPENCODE_DISABLE_AUTOUPDATE", "true")
-            // 标识这是由 Axon 启动的 opencode 实例，用于 axon-bridge 插件判断
             .env("AXON_RUNNING", "true")
-            // Plugin API 端口（用于 axon-bridge 插件连接 Axon 后端）
-            .env("AXON_BRIDGE_PORT", crate::plugin_api::DEFAULT_PLUGIN_API_PORT.to_string())
+            .env("AXON_BRIDGE_PORT", self.get_plugin_api_port().to_string())
             // Agents 配置目录（编排页面创建的 agents 保存位置）
             .env("AXON_AGENTS_DIR", app_data_dir.join("agents").to_string_lossy().to_string());
 
@@ -692,6 +700,7 @@ impl Default for OpencodeService {
             downloader: OpencodeDownloader::new(),
             app_handle: RwLock::new(None),
             settings: None,
+            plugin_api_port: RwLock::new(0),
         }
     }
 }
