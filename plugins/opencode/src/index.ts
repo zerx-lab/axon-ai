@@ -4,17 +4,16 @@
  * 此插件实现 Axon Desktop 与 OpenCode 之间的桥接功能：
  * - 与 Axon Rust 后端通过 HTTP 通信
  * - 动态注入和管理 Agent 配置
- * - 事件转发和工具拦截
- * - 支持多代理编排功能
+ * - 事件转发
+ * - 通过 System Prompt 注入实现编排指令
  * - 从 .md 文件加载自定义命令
  *
  * 开发模式：设置 AXON_DEV=true 启用详细日志
  */
 
 import type { Plugin, Hooks } from '@opencode-ai/plugin';
-import { tool } from '@opencode-ai/plugin';
-import { z } from 'zod';
 import path from 'path';
+import fs from 'fs';
 
 // ============================================================================
 // 类型定义
@@ -25,7 +24,7 @@ interface AxonEndpoints {
   events: string;
   config: string;
   agents: string;
-  orchestration: string;
+  orchestrations: string;
 }
 
 interface AxonAgentConfig {
@@ -42,21 +41,61 @@ interface AxonAgentConfig {
   tools?: Record<string, boolean>;
 }
 
-interface OrchestrationNode {
-  id: string;
-  type: 'agent' | 'tool' | 'condition' | 'parallel' | 'sequence';
-  agentId?: string;
-  toolId?: string;
-  config?: Record<string, unknown>;
-  next?: string[];
+/** 编排组中的子代理触发器 */
+interface SubagentTrigger {
+  type: 'keyword' | 'domain' | 'condition' | 'always';
+  pattern: string;
+  description: string;
 }
 
-interface OrchestrationWorkflow {
+/** 嵌入式子代理配置 */
+interface EmbeddedSubagent {
+  id: string;
+  config: {
+    name: string;
+    description?: string;
+    model?: { modelId?: string };
+    parameters?: { temperature?: number; topP?: number };
+    prompt?: { system?: string };
+  };
+  triggers: SubagentTrigger[];
+  runInBackground?: boolean;
+  enabled: boolean;
+}
+
+/** 委托规则 */
+interface DelegationRule {
+  id: string;
+  subagentId: string;
+  domain: string;
+  condition: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  runInBackground?: boolean;
+  enabled: boolean;
+}
+
+/** 委托规则集 */
+interface DelegationRuleset {
+  rules: DelegationRule[];
+  defaultBehavior: 'handle-self' | 'ask-user' | 'delegate-to';
+  defaultSubagentId?: string;
+  customGuidelines?: string;
+}
+
+/** 编排组配置 */
+interface OrchestrationGroup {
   id: string;
   name: string;
-  description?: string;
-  nodes: OrchestrationNode[];
-  entryNodeId: string;
+  description: string;
+  primaryAgent: {
+    name: string;
+    description?: string;
+    model?: { modelId?: string };
+    parameters?: { temperature?: number; topP?: number };
+    prompt?: { system?: string };
+  };
+  subagents: EmbeddedSubagent[];
+  delegationRuleset: DelegationRuleset;
 }
 
 interface AxonBridgeConfig {
@@ -64,7 +103,6 @@ interface AxonBridgeConfig {
   devMode: boolean;
   agents: Record<string, AxonAgentConfig>;
   disabledAgents: string[];
-  workflows: OrchestrationWorkflow[];
 }
 
 interface CommandFrontmatter {
@@ -136,7 +174,7 @@ function buildEndpoints(port: number): AxonEndpoints {
     events: `${baseUrl}/api/plugin/events`,
     config: `${baseUrl}/api/plugin/config`,
     agents: `${baseUrl}/api/plugin/agents`,
-    orchestration: `${baseUrl}/api/plugin/orchestration`,
+    orchestrations: `${baseUrl}/api/plugin/orchestrations`,
   };
 }
 
@@ -236,7 +274,10 @@ interface AgentDefinition {
   prompt?: { system?: string };
 }
 
-function loadAgentsFromDirectory(agentsDir: string, logger: Logger): Record<string, AxonAgentConfig> {
+function loadAgentsFromDirectory(
+  agentsDir: string,
+  logger: Logger
+): Record<string, AxonAgentConfig> {
   if (!agentsDir) {
     return {};
   }
@@ -244,7 +285,6 @@ function loadAgentsFromDirectory(agentsDir: string, logger: Logger): Record<stri
   const agents: Record<string, AxonAgentConfig> = {};
 
   try {
-    const fs = require('fs');
     const files = fs.readdirSync(agentsDir);
 
     for (const file of files) {
@@ -303,6 +343,7 @@ class AxonBridgeClient {
   private endpoints: AxonEndpoints;
   private connected = false;
   private config: AxonBridgeConfig | null = null;
+  private orchestrations: OrchestrationGroup[] = [];
   private logger: Logger;
   private fetchWithTimeout: ReturnType<typeof createFetchWithTimeout>;
 
@@ -392,34 +433,27 @@ class AxonBridgeClient {
     return {};
   }
 
-  async executeWorkflow(
-    workflowId: string,
-    input: Record<string, unknown>
-  ): Promise<{ success: boolean; result?: unknown; error?: string }> {
+  async getOrchestrations(): Promise<OrchestrationGroup[]> {
     if (!this.connected) {
-      return { success: false, error: 'Axon 后端未连接' };
+      return [];
     }
 
     try {
-      const response = await this.fetchWithTimeout(
-        `${this.endpoints.orchestration}/${workflowId}/execute`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        },
-        30000
-      );
-
+      const response = await this.fetchWithTimeout(this.endpoints.orchestrations);
       if (response?.ok) {
-        const result = await response.json();
-        return { success: true, result };
-      } else {
-        return { success: false, error: `HTTP ${response?.status}` };
+        this.orchestrations = await response.json();
+        this.logger.info(`获取 ${this.orchestrations.length} 个编排组配置`);
+        return this.orchestrations;
       }
     } catch (error) {
-      return { success: false, error: (error as Error).message };
+      this.logger.error('获取编排组失败', error);
     }
+
+    return [];
+  }
+
+  getCachedOrchestrations(): OrchestrationGroup[] {
+    return this.orchestrations;
   }
 
   private getDefaultConfig(): AxonBridgeConfig {
@@ -428,8 +462,163 @@ class AxonBridgeClient {
       devMode: DEV_MODE,
       agents: {},
       disabledAgents: [],
-      workflows: [],
     };
+  }
+}
+
+// ============================================================================
+// 编排指令生成器
+// ============================================================================
+
+/**
+ * 根据当前 agent 和编排组配置，生成编排指令
+ */
+function generateOrchestrationDirectives(
+  currentAgent: string,
+  orchestrations: OrchestrationGroup[],
+  logger: Logger
+): string[] {
+  const directives: string[] = [];
+
+  // 查找当前 agent 所属的编排组
+  for (const orch of orchestrations) {
+    // 检查是否是主代理
+    if (orch.primaryAgent.name === currentAgent) {
+      const enabledSubagents = orch.subagents.filter((s) => s.enabled);
+
+      if (enabledSubagents.length === 0) {
+        continue;
+      }
+
+      logger.debug(`为主代理 ${currentAgent} 生成编排指令`, {
+        orchestration: orch.name,
+        subagentCount: enabledSubagents.length,
+      });
+
+      // 生成委托指令
+      const delegationInstructions = generateDelegationInstructions(orch, enabledSubagents);
+      directives.push(delegationInstructions);
+    }
+  }
+
+  return directives;
+}
+
+/**
+ * 生成委托指令
+ */
+function generateDelegationInstructions(
+  orch: OrchestrationGroup,
+  enabledSubagents: EmbeddedSubagent[]
+): string {
+  const lines: string[] = [];
+
+  lines.push(`## 编排组: ${orch.name}`);
+  if (orch.description) {
+    lines.push(`${orch.description}`);
+  }
+  lines.push('');
+  lines.push('### 可用子代理');
+  lines.push('');
+
+  for (const sub of enabledSubagents) {
+    lines.push(`**${sub.config.name}**`);
+    if (sub.config.description) {
+      lines.push(`- 描述: ${sub.config.description}`);
+    }
+
+    // 触发条件
+    if (sub.triggers.length > 0) {
+      lines.push('- 触发条件:');
+      for (const trigger of sub.triggers) {
+        const triggerDesc = formatTrigger(trigger);
+        lines.push(`  - ${triggerDesc}`);
+      }
+    }
+
+    if (sub.runInBackground) {
+      lines.push('- 执行方式: 后台异步');
+    }
+    lines.push('');
+  }
+
+  // 委托规则
+  const { rules, defaultBehavior, customGuidelines } = orch.delegationRuleset;
+  const enabledRules = rules.filter((r) => r.enabled);
+
+  if (enabledRules.length > 0) {
+    lines.push('### 委托规则');
+    lines.push('');
+
+    // 按优先级排序
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const sortedRules = [...enabledRules].sort(
+      (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
+    );
+
+    for (const rule of sortedRules) {
+      const subagent = enabledSubagents.find((s) => s.id === rule.subagentId);
+      if (!subagent) continue;
+
+      lines.push(`- **${rule.domain}** → ${subagent.config.name}`);
+      if (rule.condition) {
+        lines.push(`  - 条件: ${rule.condition}`);
+      }
+      lines.push(`  - 优先级: ${rule.priority}`);
+      if (rule.runInBackground) {
+        lines.push(`  - 后台执行`);
+      }
+    }
+    lines.push('');
+  }
+
+  // 默认行为
+  lines.push('### 默认行为');
+  switch (defaultBehavior) {
+    case 'handle-self':
+      lines.push('当没有匹配的委托规则时，自行处理任务。');
+      break;
+    case 'ask-user':
+      lines.push('当没有匹配的委托规则时，询问用户如何处理。');
+      break;
+    case 'delegate-to':
+      lines.push('当没有匹配的委托规则时，委托给默认子代理处理。');
+      break;
+  }
+  lines.push('');
+
+  // 自定义指南
+  if (customGuidelines) {
+    lines.push('### 自定义指南');
+    lines.push(customGuidelines);
+    lines.push('');
+  }
+
+  // 强制规则
+  lines.push('### 执行要求');
+  lines.push('1. 在处理用户请求前，先检查是否匹配上述委托规则');
+  lines.push('2. 如果匹配，必须使用 Task 工具委托给对应的子代理');
+  lines.push('3. 委托时，提供清晰的任务描述和必要的上下文');
+  lines.push('4. 收集子代理的结果后，整合并回复用户');
+
+  return lines.join('\n');
+}
+
+/**
+ * 格式化触发器描述
+ */
+function formatTrigger(trigger: SubagentTrigger): string {
+  switch (trigger.type) {
+    case 'keyword':
+      return `关键词: "${trigger.pattern}"${trigger.description ? ` (${trigger.description})` : ''}`;
+    case 'domain':
+      return `领域: ${trigger.pattern}${trigger.description ? ` (${trigger.description})` : ''}`;
+    case 'condition':
+      return `条件: ${trigger.pattern}${trigger.description ? ` (${trigger.description})` : ''}`;
+    case 'always':
+      return `始终触发${trigger.description ? ` (${trigger.description})` : ''}`;
+    default:
+      return trigger.pattern;
   }
 }
 
@@ -462,6 +651,10 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
   const customAgents = { ...apiAgents, ...filesystemAgents };
   const commands = await loadCommands(logger);
 
+  // 加载编排组配置
+  await client.getOrchestrations();
+
+  // 会话状态跟踪
   const sessionStates = new Map<
     string,
     {
@@ -470,64 +663,17 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     }
   >();
 
-  const axonOrchestrateTool = tool({
-    description: '执行 Axon 编排工作流，协调多个 Agent 完成复杂任务',
-    args: {
-      workflow_id: z.string().describe('工作流 ID'),
-      input: z.record(z.string(), z.unknown()).optional().describe('工作流输入参数'),
-    },
-    async execute(args) {
-      const result = await client.executeWorkflow(args.workflow_id, args.input ?? {});
-
-      if (result.success) {
-        return JSON.stringify(result.result, null, 2);
-      } else {
-        throw new Error(`工作流执行失败: ${result.error}`);
-      }
-    },
-  });
-
-  const axonBridgeTool = tool({
-    description: '与 Axon Desktop 后端通信，获取配置或发送命令',
-    args: {
-      action: z.enum(['get_config', 'get_agents', 'send_event']).describe('操作类型'),
-      payload: z.record(z.string(), z.unknown()).optional().describe('操作负载'),
-    },
-    async execute(args) {
-      switch (args.action) {
-        case 'get_config': {
-          const cfg = await client.fetchConfig();
-          return JSON.stringify(cfg, null, 2);
-        }
-
-        case 'get_agents': {
-          const agents = await client.getAgents();
-          return JSON.stringify(agents, null, 2);
-        }
-
-        case 'send_event': {
-          if (args.payload && typeof args.payload === 'object') {
-            await client.sendEvent(args.payload as { type: string; properties?: unknown });
-            return '事件已发送';
-          }
-          return '无效的事件负载';
-        }
-
-        default:
-          return `未知操作: ${args.action}`;
-      }
-    },
-  });
-
   const hooks: Hooks = {
+    // 配置钩子：注入自定义 Agent 和命令
     config: async (inputConfig) => {
       logger.debug('处理配置', { hasAgentConfig: !!inputConfig.agent });
 
+      // 注入自定义 Agent
       if (customAgents && Object.keys(customAgents).length > 0) {
         const agentConfig = inputConfig.agent ?? {};
         for (const [name, agentCfg] of Object.entries(customAgents)) {
-          // 某些模型不支持同时指定 temperature 和 top_p，优先使用 temperature
-          const hasTemperature = agentCfg.temperature !== undefined && agentCfg.temperature !== null;
+          const hasTemperature =
+            agentCfg.temperature !== undefined && agentCfg.temperature !== null;
           const hasTopP = agentCfg.top_p !== undefined && agentCfg.top_p !== null;
 
           agentConfig[name] = {
@@ -537,7 +683,6 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
             prompt: agentCfg.prompt,
             color: agentCfg.color,
             disable: agentCfg.disable,
-            // 只传递其中一个采样参数，避免模型报错
             temperature: hasTemperature ? agentCfg.temperature : undefined,
             top_p: hasTemperature ? undefined : hasTopP ? agentCfg.top_p : undefined,
             permission: agentCfg.permission,
@@ -548,6 +693,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
         logger.info('已注入自定义 Agent', Object.keys(customAgents));
       }
 
+      // 禁用指定 Agent
       if (config?.disabledAgents && config.disabledAgents.length > 0) {
         const agentConfig = inputConfig.agent ?? {};
         for (const agentName of config.disabledAgents) {
@@ -560,6 +706,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
         logger.info('已禁用 Agent', config.disabledAgents);
       }
 
+      // 注入自定义命令
       inputConfig.command = inputConfig.command ?? {};
       for (const cmd of commands) {
         inputConfig.command[cmd.name] = {
@@ -578,11 +725,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
       }
     },
 
-    tool: {
-      axon_orchestrate: axonOrchestrateTool,
-      axon_bridge: axonBridgeTool,
-    },
-
+    // 事件钩子：转发事件到 Axon 后端
     event: async (input) => {
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -620,14 +763,45 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
       }
     },
 
+    // 消息钩子：记录当前 agent
     'chat.message': async (input, _output) => {
       logger.debug('处理消息', {
         sessionID: input.sessionID,
         agent: input.agent,
         hasModel: !!input.model,
       });
+
+      // 更新会话状态中的 agent
+      const state = sessionStates.get(input.sessionID);
+      if (state && input.agent) {
+        state.agent = input.agent;
+      }
     },
 
+    // System Prompt 转换钩子：注入编排指令
+    'experimental.chat.system.transform': async (input, output) => {
+      const state = sessionStates.get(input.sessionID);
+      const currentAgent = state?.agent;
+
+      if (!currentAgent) {
+        logger.debug('会话无 agent 信息，跳过编排指令注入', { sessionID: input.sessionID });
+        return;
+      }
+
+      const orchestrations = client.getCachedOrchestrations();
+      if (orchestrations.length === 0) {
+        return;
+      }
+
+      const directives = generateOrchestrationDirectives(currentAgent, orchestrations, logger);
+
+      if (directives.length > 0) {
+        logger.info(`为 agent ${currentAgent} 注入 ${directives.length} 条编排指令`);
+        output.system.push(...directives);
+      }
+    },
+
+    // 工具执行前钩子
     'tool.execute.before': async (input, _output) => {
       logger.debug('工具执行前', {
         tool: input.tool,
@@ -635,6 +809,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
       });
     },
 
+    // 工具执行后钩子
     'tool.execute.after': async (input, output) => {
       logger.debug('工具执行后', {
         tool: input.tool,

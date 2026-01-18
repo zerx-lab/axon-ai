@@ -51,71 +51,6 @@ pub struct AgentConfig {
     pub tools: Option<HashMap<String, bool>>,
 }
 
-/// 编排节点类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum OrchestrationNodeType {
-    Agent,
-    Tool,
-    Condition,
-    Parallel,
-    Sequence,
-}
-
-/// 编排节点
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestrationNode {
-    /// 节点 ID
-    pub id: String,
-    /// 节点类型
-    #[serde(rename = "type")]
-    pub node_type: OrchestrationNodeType,
-    /// 关联的 Agent ID（当类型为 Agent 时）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_id: Option<String>,
-    /// 关联的工具 ID（当类型为 Tool 时）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_id: Option<String>,
-    /// 节点配置
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config: Option<HashMap<String, serde_json::Value>>,
-    /// 后续节点 ID 列表
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub next: Option<Vec<String>>,
-    /// 节点位置（用于 UI 显示）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub position: Option<NodePosition>,
-}
-
-/// 节点位置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodePosition {
-    pub x: f64,
-    pub y: f64,
-}
-
-/// 编排工作流
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestrationWorkflow {
-    /// 工作流 ID
-    pub id: String,
-    /// 工作流名称
-    pub name: String,
-    /// 工作流描述
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    /// 节点列表
-    pub nodes: Vec<OrchestrationNode>,
-    /// 入口节点 ID
-    pub entry_node_id: String,
-    /// 创建时间
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    /// 更新时间
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
 /// 插件事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginEvent {
@@ -140,29 +75,6 @@ pub struct PluginConfigResponse {
     pub agents: HashMap<String, AgentConfig>,
     /// 禁用的默认 Agent 列表
     pub disabled_agents: Vec<String>,
-    /// 工作流列表
-    pub workflows: Vec<OrchestrationWorkflow>,
-}
-
-/// 工作流执行请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteWorkflowRequest {
-    /// 输入参数
-    #[serde(default)]
-    pub input: HashMap<String, serde_json::Value>,
-}
-
-/// 工作流执行响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteWorkflowResponse {
-    /// 是否成功
-    pub success: bool,
-    /// 执行结果
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    /// 错误信息
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
 }
 
 /// 设置 Agent 请求

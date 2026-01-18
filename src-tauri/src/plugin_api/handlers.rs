@@ -13,6 +13,7 @@ use super::{
     types::*,
     PluginApiState,
 };
+use serde::Serialize;
 use crate::utils::paths::get_app_data_dir;
 
 /// 健康检查
@@ -39,14 +40,12 @@ pub async fn get_config(
     }
     
     let disabled_agents = state.get_disabled_agents();
-    let workflows: Vec<OrchestrationWorkflow> = state.get_workflows().into_values().collect();
 
     Json(PluginConfigResponse {
         port: state.get_port(),
         dev_mode: cfg!(debug_assertions),
         agents,
         disabled_agents,
-        workflows,
     })
 }
 
@@ -477,7 +476,6 @@ pub async fn receive_event(
     State(state): State<PluginApiState>,
     Json(event): Json<serde_json::Value>,
 ) -> Json<ApiResponse<&'static str>> {
-    // 解析事件
     let event_type = event
         .get("type")
         .and_then(|v| v.as_str())
@@ -498,65 +496,73 @@ pub async fn receive_event(
     Json(ApiResponse::success("ok"))
 }
 
-/// 获取所有工作流
-pub async fn get_workflows(
-    State(state): State<PluginApiState>,
-) -> Json<Vec<OrchestrationWorkflow>> {
-    let workflows: Vec<OrchestrationWorkflow> = state.get_workflows().into_values().collect();
-    Json(workflows)
+/// 编排组响应结构
+#[derive(Debug, Clone, Serialize)]
+pub struct OrchestrationGroupResponse {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "primaryAgent")]
+    pub primary_agent: serde_json::Value,
+    pub subagents: Vec<serde_json::Value>,
+    #[serde(rename = "delegationRuleset")]
+    pub delegation_ruleset: serde_json::Value,
 }
 
-/// 添加工作流
-pub async fn add_workflow(
-    State(state): State<PluginApiState>,
-    Json(mut workflow): Json<OrchestrationWorkflow>,
-) -> Json<ApiResponse<OrchestrationWorkflow>> {
-    // 设置创建/更新时间
-    let now = Utc::now();
-    workflow.created_at = Some(now);
-    workflow.updated_at = Some(now);
+/// 获取所有编排组配置
+pub async fn get_orchestrations() -> Json<Vec<OrchestrationGroupResponse>> {
+    let orchestrations_dir = match get_orchestrations_dir_path() {
+        Some(dir) => dir,
+        None => return Json(vec![]),
+    };
 
-    let id = workflow.id.clone();
-    state.add_workflow(workflow.clone());
-    info!("已添加工作流: {}", id);
+    if !orchestrations_dir.exists() {
+        return Json(vec![]);
+    }
 
-    Json(ApiResponse::success(workflow))
-}
+    let mut groups = Vec::new();
 
-/// 执行工作流
-pub async fn execute_workflow(
-    State(state): State<PluginApiState>,
-    Path(id): Path<String>,
-    Json(req): Json<ExecuteWorkflowRequest>,
-) -> Json<ExecuteWorkflowResponse> {
-    // 获取工作流
-    let workflows = state.get_workflows();
-    let workflow = match workflows.get(&id) {
-        Some(w) => w,
-        None => {
-            return Json(ExecuteWorkflowResponse {
-                success: false,
-                result: None,
-                error: Some(format!("工作流不存在: {}", id)),
-            });
+    let entries = match std::fs::read_dir(&orchestrations_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            warn!("读取 orchestrations 目录失败: {}", e);
+            return Json(vec![]);
         }
     };
 
-    info!("执行工作流: {} ({})", workflow.name, id);
+    for entry in entries.flatten() {
+        let path = entry.path();
+        
+        if !path.is_file() || path.extension().map(|e| e != "json").unwrap_or(true) {
+            continue;
+        }
 
-    // TODO: 实现实际的工作流执行逻辑
-    // 目前只返回一个模拟结果
-    let result = serde_json::json!({
-        "workflow_id": id,
-        "workflow_name": workflow.name,
-        "input": req.input,
-        "status": "completed",
-        "message": "工作流执行完成（模拟）"
-    });
+        match std::fs::read_to_string(&path) {
+            Ok(content) => {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let group = OrchestrationGroupResponse {
+                        id: json.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        name: json.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        description: json.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        primary_agent: json.get("primaryAgent").cloned().unwrap_or(serde_json::Value::Null),
+                        subagents: json.get("subagents")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| arr.clone())
+                            .unwrap_or_default(),
+                        delegation_ruleset: json.get("delegationRuleset").cloned().unwrap_or(serde_json::Value::Null),
+                    };
+                    
+                    if !group.id.is_empty() {
+                        groups.push(group);
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("跳过无法读取的文件 {:?}: {}", path, e);
+            }
+        }
+    }
 
-    Json(ExecuteWorkflowResponse {
-        success: true,
-        result: Some(result),
-        error: None,
-    })
+    info!("返回 {} 个编排组配置", groups.len());
+    Json(groups)
 }

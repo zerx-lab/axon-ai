@@ -30,8 +30,6 @@ pub struct PluginApiState {
     pub agents: Arc<RwLock<HashMap<String, AgentConfig>>>,
     /// 禁用的默认 Agent 列表
     pub disabled_agents: Arc<RwLock<Vec<String>>>,
-    /// 编排工作流
-    pub workflows: Arc<RwLock<HashMap<String, OrchestrationWorkflow>>>,
     /// 接收到的事件（用于调试）
     pub events: Arc<RwLock<Vec<PluginEvent>>>,
     /// 服务端口（启动后会更新为实际分配的端口）
@@ -43,7 +41,6 @@ impl Default for PluginApiState {
         Self {
             agents: Arc::new(RwLock::new(HashMap::new())),
             disabled_agents: Arc::new(RwLock::new(Vec::new())),
-            workflows: Arc::new(RwLock::new(HashMap::new())),
             events: Arc::new(RwLock::new(Vec::new())),
             port: Arc::new(RwLock::new(0)),
         }
@@ -94,21 +91,6 @@ impl PluginApiState {
     /// 获取禁用的 Agent 列表
     pub fn get_disabled_agents(&self) -> Vec<String> {
         self.disabled_agents.read().clone()
-    }
-
-    /// 添加编排工作流
-    pub fn add_workflow(&self, workflow: OrchestrationWorkflow) {
-        self.workflows.write().insert(workflow.id.clone(), workflow);
-    }
-
-    /// 移除编排工作流
-    pub fn remove_workflow(&self, id: &str) -> Option<OrchestrationWorkflow> {
-        self.workflows.write().remove(id)
-    }
-
-    /// 获取所有工作流
-    pub fn get_workflows(&self) -> HashMap<String, OrchestrationWorkflow> {
-        self.workflows.read().clone()
     }
 
     /// 记录事件
@@ -172,12 +154,7 @@ impl PluginApiServer {
             .route("/api/plugin/agents", post(handlers::set_agent))
             .route("/api/plugin/agents/{name}", axum::routing::delete(handlers::delete_agent))
             .route("/api/plugin/events", post(handlers::receive_event))
-            .route("/api/plugin/orchestration", get(handlers::get_workflows))
-            .route("/api/plugin/orchestration", post(handlers::add_workflow))
-            .route(
-                "/api/plugin/orchestration/{id}/execute",
-                post(handlers::execute_workflow),
-            )
+            .route("/api/plugin/orchestrations", get(handlers::get_orchestrations))
             .with_state(state);
 
         info!("Plugin API 服务器启动于 http://127.0.0.1:{}", actual_port);
