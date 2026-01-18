@@ -32,6 +32,7 @@ import type { OrchestrationGroup, OrchestrationEdge, EmbeddedSubagent } from "@/
 interface OrchestrationCanvasProps {
   group: OrchestrationGroup;
   readOnly?: boolean;
+  onNodeSelect?: () => void;
 }
 
 const nodeTypes = {
@@ -173,7 +174,7 @@ function buildEdges(edges: OrchestrationEdge[], subagents: EmbeddedSubagent[]): 
   }));
 }
 
-export function OrchestrationCanvas({ group, readOnly = false }: OrchestrationCanvasProps) {
+export function OrchestrationCanvas({ group, readOnly = false, onNodeSelect }: OrchestrationCanvasProps) {
   const {
     canvasSelection: selection,
     setCanvasSelection,
@@ -247,8 +248,9 @@ export function OrchestrationCanvas({ group, readOnly = false }: OrchestrationCa
       } else {
         setCanvasSelection({ type: "subagent", id: node.id });
       }
+      onNodeSelect?.();
     },
-    [setCanvasSelection]
+    [setCanvasSelection, onNodeSelect]
   );
 
   const handlePaneClick = useCallback(() => {

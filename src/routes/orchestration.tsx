@@ -120,7 +120,10 @@ function OrchestrationRoute() {
             <div className="relative h-full bg-background">
               {selectedGroup ? (
                 <>
-                  <OrchestrationCanvas group={selectedGroup} />
+                  <OrchestrationCanvas
+                    group={selectedGroup}
+                    onNodeSelect={() => setShowConfigPanel(true)}
+                  />
 
                   <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
                     {hasUnsavedChanges && (
