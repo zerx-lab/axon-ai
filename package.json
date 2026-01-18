@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "dev:link-plugin": "pwsh -ExecutionPolicy Bypass -File scripts/dev-link-plugin.ps1",
     "dev:link-plugin:force": "pwsh -ExecutionPolicy Bypass -File scripts/dev-link-plugin.ps1 -Force",
-    "dev:unlink-plugin": "pwsh -ExecutionPolicy Bypass -File scripts/dev-link-plugin.ps1 -Remove"
+    "dev:unlink-plugin": "pwsh -ExecutionPolicy Bypass -File scripts/dev-link-plugin.ps1 -Remove",
+    "watch:plugin": "bun scripts/watch-plugin.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",
