@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { X, Trash2, Save, Bot, Brain, Search, BookOpen, Palette, FileText, Eye, Settings2, Loader2, ChevronDown, Check } from "lucide-react";
-import { useProviders, useOpencode } from "@/hooks";
+import { useProviders, useOpencode, useModelsRegistry } from "@/hooks";
 import { getToolsSimple } from "@/services/opencode/tools";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,7 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
 
   const { isConnected } = useOpencode();
   const { providers, isLoading: isLoadingModels } = useProviders();
+  const { getCachedModelDefaults } = useModelsRegistry();
 
   // 构建模型选择的当前值
   const currentModelValue = useMemo(() => {
@@ -100,9 +101,13 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
         return `${provider.name} / ${model.name}`;
       }
     }
-    // 如果在列表中找不到，显示原始值
     return currentModelValue;
   }, [currentModelValue, providers]);
+
+  const currentModelCapabilities = useMemo(() => {
+    if (!currentModelValue) return null;
+    return getCachedModelDefaults(currentModelValue) ?? null;
+  }, [currentModelValue, getCachedModelDefaults]);
 
   // 当传入的 agent 变化时更新本地状态
   useEffect(() => {
@@ -131,10 +136,6 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
   // 更新字段的辅助函数
   const updateField = <K extends keyof AgentDefinition>(key: K, value: AgentDefinition[K]) => {
     setEditedAgent((prev) => prev ? { ...prev, [key]: value, updatedAt: Date.now() } : null);
-  };
-
-  const updateModelField = <K extends keyof AgentDefinition["model"]>(key: K, value: AgentDefinition["model"][K]) => {
-    setEditedAgent((prev) => prev ? { ...prev, model: { ...prev.model, [key]: value }, updatedAt: Date.now() } : null);
   };
 
   const updateParameterField = <K extends keyof AgentDefinition["parameters"]>(key: K, value: AgentDefinition["parameters"][K]) => {
@@ -371,9 +372,57 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
                                       key={value}
                                       value={value}
                                       onSelect={() => {
-                                        updateModelField("modelId", value);
-                                        updateModelField("provider", provider.id);
                                         setModelPopoverOpen(false);
+                                        const capabilities = getCachedModelDefaults(value);
+                                        
+                                        setEditedAgent((prev) => {
+                                          if (!prev) return null;
+                                          
+                                          const newModel = {
+                                            ...prev.model,
+                                            modelId: value,
+                                            provider: provider.id,
+                                          };
+                                          
+                                          const newParams = { ...prev.parameters };
+                                          if (capabilities) {
+                                            // Temperature: 当模型不支持时设为 undefined
+                                            if (capabilities.supportsTemperature === false) {
+                                              newParams.temperature = undefined;
+                                            } else if (capabilities.defaultTemperature !== null) {
+                                              newParams.temperature = capabilities.defaultTemperature;
+                                            } else {
+                                              newParams.temperature = 0.7;
+                                            }
+                                            
+                                            // Top P: 与 Temperature 保持一致的处理逻辑
+                                            // 注意：当前 models.dev API 未提供 supportsTopP 字段
+                                            // 因此当 defaultTopP 为 null 时使用默认值 1.0
+                                            if (capabilities.defaultTopP !== null) {
+                                              newParams.topP = capabilities.defaultTopP;
+                                            } else {
+                                              newParams.topP = 1.0;
+                                            }
+                                            
+                                            if (capabilities.defaultMaxTokens !== null) {
+                                              newParams.maxTokens = capabilities.defaultMaxTokens;
+                                            } else if (capabilities.maxOutputTokens > 0) {
+                                              newParams.maxTokens = Math.min(16384, capabilities.maxOutputTokens);
+                                            }
+                                            
+                                            newParams.thinking = { 
+                                              enabled: capabilities.supportsReasoning,
+                                              budgetTokens: capabilities.supportsReasoning ? 10000 : undefined,
+                                            };
+                                          }
+                                          
+                                          return {
+                                            ...prev,
+                                            model: newModel,
+                                            parameters: newParams,
+                                            updatedAt: Date.now(),
+                                          };
+                                        });
                                       }}
                                     >
                                       <div className={cn(
@@ -401,31 +450,45 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
                   </p>
                 </div>
 
-                {/* 备用模型 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">备用模型</Label>
-                  <Textarea
-                    value={editedAgent.model.fallbackModels?.join(", ") || ""}
-                    onChange={(e) => {
-                      const models = e.target.value
-                        .split(",")
-                        .map((m) => m.trim())
-                        .filter(Boolean);
-                      updateModelField("fallbackModels", models.length > 0 ? models : undefined);
-                    }}
-                    placeholder="逗号分隔，如: anthropic/claude-3-5-sonnet"
-                    className="min-h-[60px] text-sm font-mono resize-none"
-                  />
-                </div>
+
               </TabsContent>
 
               {/* 参数 Tab */}
               <TabsContent value="params" className="space-y-4 mt-4">
+                {/* 模型能力信息 */}
+                {currentModelCapabilities && (
+                  <div className="p-2 rounded-md bg-muted/30 border border-border/40 space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
+                      <span>上下文窗口</span>
+                      <span className="font-mono">{currentModelCapabilities.contextWindow.toLocaleString()} tokens</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
+                      <span>最大输出</span>
+                      <span className="font-mono">{currentModelCapabilities.maxOutputTokens.toLocaleString()} tokens</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Temperature */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground/70">Temperature</Label>
-                    <span className="text-xs text-muted-foreground/70 font-mono">
+                    <Label className={cn(
+                      "text-xs",
+                      currentModelCapabilities?.supportsTemperature === false 
+                        ? "text-muted-foreground/40" 
+                        : "text-muted-foreground/70"
+                    )}>
+                      Temperature
+                      {currentModelCapabilities?.supportsTemperature === false && (
+                        <span className="ml-1.5 text-[10px]">(不支持)</span>
+                      )}
+                    </Label>
+                    <span className={cn(
+                      "text-xs font-mono",
+                      currentModelCapabilities?.supportsTemperature === false 
+                        ? "text-muted-foreground/40" 
+                        : "text-muted-foreground/70"
+                    )}>
                       {editedAgent.parameters.temperature?.toFixed(1) ?? "0.3"}
                     </span>
                   </div>
@@ -436,21 +499,28 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
                     step="0.1"
                     value={editedAgent.parameters.temperature ?? 0.3}
                     onChange={(e) => updateParameterField("temperature", parseFloat(e.target.value))}
+                    disabled={currentModelCapabilities?.supportsTemperature === false}
                     className={cn(
-                      "w-full h-1.5 rounded-full appearance-none cursor-pointer",
-                      "bg-muted/50",
+                      "w-full h-1.5 rounded-full appearance-none",
+                      currentModelCapabilities?.supportsTemperature === false 
+                        ? "bg-muted/30 cursor-not-allowed opacity-50" 
+                        : "bg-muted/50 cursor-pointer",
                       "[&::-webkit-slider-thumb]:appearance-none",
                       "[&::-webkit-slider-thumb]:w-3",
                       "[&::-webkit-slider-thumb]:h-3",
                       "[&::-webkit-slider-thumb]:rounded-full",
                       "[&::-webkit-slider-thumb]:bg-foreground",
-                      "[&::-webkit-slider-thumb]:cursor-pointer",
+                      currentModelCapabilities?.supportsTemperature === false 
+                        ? "[&::-webkit-slider-thumb]:cursor-not-allowed [&::-webkit-slider-thumb]:opacity-50"
+                        : "[&::-webkit-slider-thumb]:cursor-pointer",
                       "[&::-moz-range-thumb]:w-3",
                       "[&::-moz-range-thumb]:h-3",
                       "[&::-moz-range-thumb]:rounded-full",
                       "[&::-moz-range-thumb]:bg-foreground",
                       "[&::-moz-range-thumb]:border-0",
-                      "[&::-moz-range-thumb]:cursor-pointer"
+                      currentModelCapabilities?.supportsTemperature === false 
+                        ? "[&::-moz-range-thumb]:cursor-not-allowed"
+                        : "[&::-moz-range-thumb]:cursor-pointer"
                     )}
                   />
                 </div>
@@ -491,12 +561,22 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
 
                 {/* Max Tokens */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">Max Tokens</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground/70">Max Tokens</Label>
+                    {currentModelCapabilities && currentModelCapabilities.maxOutputTokens > 0 && (
+                      <span className="text-[10px] text-muted-foreground/50">
+                        上限 {currentModelCapabilities.maxOutputTokens.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                   <Input
                     type="number"
                     value={editedAgent.parameters.maxTokens ?? ""}
                     onChange={(e) => updateParameterField("maxTokens", e.target.value ? parseInt(e.target.value) : undefined)}
-                    placeholder="如 4096"
+                    placeholder={currentModelCapabilities?.maxOutputTokens 
+                      ? `如 ${Math.min(4096, currentModelCapabilities.maxOutputTokens)}` 
+                      : "如 4096"}
+                    max={currentModelCapabilities?.maxOutputTokens || undefined}
                     className="h-8 text-sm font-mono"
                   />
                 </div>

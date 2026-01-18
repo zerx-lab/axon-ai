@@ -19,7 +19,6 @@ export type TextVerbosity = "low" | "medium" | "high";
 export interface ModelConfig {
   modelId: string;
   provider?: string;
-  fallbackModels?: string[];
 }
 
 export interface ThinkingConfig {

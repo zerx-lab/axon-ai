@@ -75,3 +75,7 @@ export {
   type ProviderModel,
   type UseProvidersReturn,
 } from "./useProviders";
+export {
+  useModelsRegistry,
+  type UseModelsRegistryReturn,
+} from "./useModelsRegistry";

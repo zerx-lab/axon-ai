@@ -4,6 +4,7 @@
 //! 负责初始化 Tauri 应用、设置窗口、管理 OpenCode 服务。
 
 mod commands;
+mod models_registry;
 mod opencode;
 mod plugin_api;
 mod settings;
@@ -131,6 +132,13 @@ pub fn run() {
             save_agent,
             delete_agent,
             save_agents_batch,
+            // 模型注册表命令
+            get_model_defaults,
+            get_all_model_defaults,
+            search_models,
+            get_models_registry_cache_info,
+            refresh_models_registry,
+            trigger_background_refresh,
         ])
         .setup(|app| {
             let setup_start = std::time::Instant::now();
@@ -197,6 +205,9 @@ pub fn run() {
                 let state: tauri::State<'_, AppState> = handle.state();
                 state.opencode.set_app_handle(handle.clone());
                 info!("OpenCode 服务 app_handle 已设置");
+
+                state.models_registry.initialize();
+                info!("模型注册表缓存已加载");
             }
 
             info!("Setup 同步阶段完成，耗时: {:?}", setup_start.elapsed());
@@ -239,6 +250,8 @@ pub fn run() {
                         tracing::error!("初始化 opencode 服务失败: {}", e);
                     }
                 }
+
+                state.models_registry.refresh_in_background().await;
             });
 
             Ok(())
