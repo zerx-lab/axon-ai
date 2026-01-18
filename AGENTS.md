@@ -270,6 +270,200 @@ fn command_name(param: &str) -> Result<String, String> {
 
 ---
 
+## OpenCode 插件开发
+
+OpenCode 支持通过插件扩展功能。插件可以钩入各种事件，自定义行为、添加新功能或集成外部服务。
+
+### 使用插件
+
+#### 本地文件方式
+
+将 JavaScript 或 TypeScript 文件放入插件目录：
+
+- `.opencode/plugin/` - 项目级插件
+- `~/.config/opencode/plugin/` - 全局插件
+
+目录中的文件在启动时自动加载。
+
+#### npm 包方式
+
+在配置文件中指定 npm 包：
+
+```json
+// opencode.json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
+}
+```
+
+### 创建插件
+
+#### 基本结构
+
+```javascript
+// .opencode/plugin/example.js
+export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
+  console.log("Plugin initialized!")
+
+  return {
+    // Hook 实现
+  }
+}
+```
+
+插件函数接收的参数：
+
+| 参数 | 说明 |
+|------|------|
+| `project` | 当前项目信息 |
+| `directory` | 当前工作目录 |
+| `worktree` | Git worktree 路径 |
+| `client` | OpenCode SDK 客户端，用于与 AI 交互 |
+| `$` | Bun 的 shell API，用于执行命令 |
+
+#### TypeScript 支持
+
+```typescript
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
+  return {
+    // 类型安全的 Hook 实现
+  }
+}
+```
+
+#### 依赖管理
+
+本地插件可使用外部 npm 包，在配置目录添加 `package.json`：
+
+```json
+// .opencode/package.json
+{
+  "dependencies": {
+    "shescape": "^2.1.0"
+  }
+}
+```
+
+OpenCode 启动时会运行 `bun install` 安装依赖。
+
+### 可用事件
+
+| 类别 | 事件 |
+|------|------|
+| **Command** | `command.executed` |
+| **File** | `file.edited`, `file.watcher.updated` |
+| **Installation** | `installation.updated` |
+| **LSP** | `lsp.client.diagnostics`, `lsp.updated` |
+| **Message** | `message.part.removed`, `message.part.updated`, `message.removed`, `message.updated` |
+| **Permission** | `permission.replied`, `permission.updated` |
+| **Server** | `server.connected` |
+| **Session** | `session.created`, `session.compacted`, `session.deleted`, `session.diff`, `session.error`, `session.idle`, `session.status`, `session.updated` |
+| **Todo** | `todo.updated` |
+| **Tool** | `tool.execute.before`, `tool.execute.after` |
+| **TUI** | `tui.prompt.append`, `tui.command.execute`, `tui.toast.show` |
+
+### 插件示例
+
+#### 发送通知
+
+```javascript
+export const NotificationPlugin = async ({ $ }) => {
+  return {
+    event: async ({ event }) => {
+      if (event.type === "session.idle") {
+        await $`osascript -e 'display notification "Session completed!" with title "opencode"'`
+      }
+    },
+  }
+}
+```
+
+#### .env 文件保护
+
+```javascript
+export const EnvProtection = async () => {
+  return {
+    "tool.execute.before": async (input, output) => {
+      if (input.tool === "read" && output.args.filePath.includes(".env")) {
+        throw new Error("Do not read .env files")
+      }
+    },
+  }
+}
+```
+
+#### 自定义工具
+
+```typescript
+import { type Plugin, tool } from "@opencode-ai/plugin"
+
+export const CustomToolsPlugin: Plugin = async (ctx) => {
+  return {
+    tool: {
+      mytool: tool({
+        description: "This is a custom tool",
+        args: {
+          foo: tool.schema.string(),
+        },
+        async execute(args, ctx) {
+          return `Hello ${args.foo}!`
+        },
+      }),
+    },
+  }
+}
+```
+
+#### 日志记录
+
+使用 `client.app.log()` 代替 `console.log`：
+
+```typescript
+export const MyPlugin = async ({ client }) => {
+  await client.app.log({
+    service: "my-plugin",
+    level: "info",  // debug, info, warn, error
+    message: "Plugin initialized",
+    extra: { foo: "bar" },
+  })
+}
+```
+
+#### Compaction 钩子
+
+自定义会话压缩时包含的上下文：
+
+```typescript
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const CompactionPlugin: Plugin = async (ctx) => {
+  return {
+    "experimental.session.compacting": async (input, output) => {
+      // 注入额外上下文到压缩提示
+      output.context.push(`## Custom Context
+Include any state that should persist across compaction:
+- Current task status
+- Important decisions made
+- Files being actively worked on`)
+    },
+  }
+}
+```
+
+### 加载顺序
+
+1. 全局配置 (`~/.config/opencode/opencode.json`)
+2. 项目配置 (`opencode.json`)
+3. 全局插件目录 (`~/.config/opencode/plugin/`)
+4. 项目插件目录 (`.opencode/plugin/`)
+
+**参考**: [OpenCode 插件文档](https://opencode.ai/docs/plugins)
+
+---
+
 ## 重要说明
 
 - **Dev server port**: 1420

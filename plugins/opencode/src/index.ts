@@ -89,20 +89,43 @@ const DEV_MODE = process.env.AXON_DEV === 'true' || process.env.NODE_ENV === 'de
 const AXON_PORT = parseInt(process.env.AXON_BRIDGE_PORT || '23517', 10);
 
 // ============================================================================
-// 工具函数
+// 日志模块
 // ============================================================================
 
-function log(message: string, data?: unknown): void {
-  const prefix = '[axon-bridge]';
-  if (DEV_MODE) {
-    console.log(`${prefix} ${message}`, data !== undefined ? JSON.stringify(data, null, 2) : '');
-  } else if (data) {
-    console.log(`${prefix} ${message}`);
-  }
+type PluginClient = Parameters<Plugin>[0]['client'];
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+interface Logger {
+  info: (message: string, data?: unknown) => void;
+  warn: (message: string, data?: unknown) => void;
+  error: (message: string, error?: unknown) => void;
+  debug: (message: string, data?: unknown) => void;
 }
 
-function logError(message: string, error?: unknown): void {
-  console.error(`[axon-bridge] ERROR: ${message}`, error);
+const SERVICE_NAME = 'axon-bridge';
+
+function createLogger(client: PluginClient): Logger {
+  const writeLog = (level: LogLevel, message: string, extra?: unknown) => {
+    if (!DEV_MODE && level !== 'warn' && level !== 'error') {
+      return;
+    }
+
+    client.app.log({
+      body: {
+        service: SERVICE_NAME,
+        level,
+        message,
+        extra: extra !== undefined ? { data: extra } : undefined,
+      },
+    });
+  };
+
+  return {
+    debug: (message, data) => writeLog('debug', message, data),
+    info: (message, data) => writeLog('info', message, data),
+    warn: (message, data) => writeLog('warn', message, data),
+    error: (message, error) => writeLog('error', message, error),
+  };
 }
 
 function buildEndpoints(port: number): AxonEndpoints {
@@ -116,30 +139,32 @@ function buildEndpoints(port: number): AxonEndpoints {
   };
 }
 
-async function fetchWithTimeout(
-  url: string,
-  options: Parameters<typeof fetch>[1] = {},
-  timeout = 5000
-): Promise<Awaited<ReturnType<typeof fetch>> | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+function createFetchWithTimeout(logger: Logger) {
+  return async function fetchWithTimeout(
+    url: string,
+    options: Parameters<typeof fetch>[1] = {},
+    timeout = 5000
+  ): Promise<Awaited<ReturnType<typeof fetch>> | null> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if ((error as Error).name === 'AbortError') {
-      log('请求超时', { url });
-    } else {
-      log('请求失败', { url, error: (error as Error).message });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as Error).name === 'AbortError') {
+        logger.debug('请求超时', { url });
+      } else {
+        logger.debug('请求失败', { url, error: (error as Error).message });
+      }
+      return null;
     }
-    return null;
-  }
+  };
 }
 
 // ============================================================================
@@ -173,7 +198,7 @@ function parseFrontmatter(content: string): { frontmatter: CommandFrontmatter; b
   return { frontmatter, body: body.trim() };
 }
 
-async function loadCommands(): Promise<ParsedCommand[]> {
+async function loadCommands(logger: Logger): Promise<ParsedCommand[]> {
   const commands: ParsedCommand[] = [];
   const commandDir = path.join(import.meta.dir, 'command');
 
@@ -192,7 +217,7 @@ async function loadCommands(): Promise<ParsedCommand[]> {
       });
     }
   } catch {
-    log('命令目录不存在或为空，跳过命令加载');
+    logger.debug('命令目录不存在或为空，跳过命令加载');
   }
 
   return commands;
@@ -206,20 +231,24 @@ class AxonBridgeClient {
   private endpoints: AxonEndpoints;
   private connected = false;
   private config: AxonBridgeConfig | null = null;
+  private logger: Logger;
+  private fetchWithTimeout: ReturnType<typeof createFetchWithTimeout>;
 
-  constructor(port: number) {
+  constructor(port: number, logger: Logger) {
     this.endpoints = buildEndpoints(port);
+    this.logger = logger;
+    this.fetchWithTimeout = createFetchWithTimeout(logger);
   }
 
   async checkConnection(): Promise<boolean> {
     try {
-      const response = await fetchWithTimeout(
+      const response = await this.fetchWithTimeout(
         `${this.endpoints.baseUrl}/api/plugin/health`,
         { method: 'GET' },
         2000
       );
       this.connected = response?.ok ?? false;
-      log(`Axon 后端连接状态: ${this.connected ? '已连接' : '未连接'}`);
+      this.logger.info(`Axon 后端连接状态: ${this.connected ? '已连接' : '未连接'}`);
       return this.connected;
     } catch {
       this.connected = false;
@@ -233,19 +262,19 @@ class AxonBridgeClient {
     }
 
     if (!this.connected) {
-      log('Axon 后端未连接，使用默认配置');
+      this.logger.debug('Axon 后端未连接，使用默认配置');
       return this.getDefaultConfig();
     }
 
     try {
-      const response = await fetchWithTimeout(this.endpoints.config);
+      const response = await this.fetchWithTimeout(this.endpoints.config);
       if (response?.ok) {
         this.config = await response.json();
-        log('获取 Axon 配置成功', this.config);
+        this.logger.info('获取 Axon 配置成功', this.config);
         return this.config;
       }
     } catch (error) {
-      logError('获取配置失败', error);
+      this.logger.error('获取配置失败', error);
     }
 
     return this.getDefaultConfig();
@@ -255,7 +284,7 @@ class AxonBridgeClient {
     if (!this.connected) return;
 
     try {
-      await fetchWithTimeout(
+      await this.fetchWithTimeout(
         this.endpoints.events,
         {
           method: 'POST',
@@ -264,10 +293,10 @@ class AxonBridgeClient {
         },
         2000
       );
-      log('事件已发送', { type: event.type });
+      this.logger.debug('事件已发送', { type: event.type });
     } catch (error) {
       if (DEV_MODE) {
-        logError('发送事件失败', error);
+        this.logger.error('发送事件失败', error);
       }
     }
   }
@@ -278,14 +307,14 @@ class AxonBridgeClient {
     }
 
     try {
-      const response = await fetchWithTimeout(this.endpoints.agents);
+      const response = await this.fetchWithTimeout(this.endpoints.agents);
       if (response?.ok) {
         const agents = await response.json();
-        log('获取 Agent 配置成功', agents);
+        this.logger.info('获取 Agent 配置成功', agents);
         return agents;
       }
     } catch (error) {
-      logError('获取 Agent 失败', error);
+      this.logger.error('获取 Agent 失败', error);
     }
 
     return {};
@@ -300,7 +329,7 @@ class AxonBridgeClient {
     }
 
     try {
-      const response = await fetchWithTimeout(
+      const response = await this.fetchWithTimeout(
         `${this.endpoints.orchestration}/${workflowId}/execute`,
         {
           method: 'POST',
@@ -341,21 +370,23 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     return {};
   }
 
-  log('初始化 Axon Bridge 插件', {
+  const logger = createLogger(ctx.client);
+
+  logger.info('初始化 Axon Bridge 插件', {
     directory: ctx.directory,
     devMode: DEV_MODE,
     port: AXON_PORT,
   });
 
-  const client = new AxonBridgeClient(AXON_PORT);
+  const client = new AxonBridgeClient(AXON_PORT, logger);
   const connected = await client.checkConnection();
   if (!connected) {
-    log('警告: Axon 后端未运行，部分功能将不可用');
+    logger.warn('Axon 后端未运行，部分功能将不可用');
   }
 
   const config = await client.fetchConfig();
   const customAgents = await client.getAgents();
-  const commands = await loadCommands();
+  const commands = await loadCommands(logger);
 
   const sessionStates = new Map<
     string,
@@ -416,7 +447,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
 
   const hooks: Hooks = {
     config: async (inputConfig) => {
-      log('处理配置', { hasAgentConfig: !!inputConfig.agent });
+      logger.debug('处理配置', { hasAgentConfig: !!inputConfig.agent });
 
       if (customAgents && Object.keys(customAgents).length > 0) {
         const agentConfig = inputConfig.agent ?? {};
@@ -433,7 +464,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
           };
         }
         inputConfig.agent = agentConfig;
-        log('已注入自定义 Agent', Object.keys(customAgents));
+        logger.info('已注入自定义 Agent', Object.keys(customAgents));
       }
 
       if (config?.disabledAgents && config.disabledAgents.length > 0) {
@@ -445,7 +476,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
           };
         }
         inputConfig.agent = agentConfig;
-        log('已禁用 Agent', config.disabledAgents);
+        logger.info('已禁用 Agent', config.disabledAgents);
       }
 
       inputConfig.command = inputConfig.command ?? {};
@@ -459,10 +490,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
         };
       }
       if (commands.length > 0) {
-        log(
-          '已加载命令',
-          commands.map((c) => c.name)
-        );
+        logger.info('已加载命令', commands.map((c) => c.name));
       }
     },
 
@@ -483,7 +511,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
           sessionStates.set(sessionInfo.id, {
             startTime: Date.now(),
           });
-          log('会话创建', { sessionId: sessionInfo.id });
+          logger.debug('会话创建', { sessionId: sessionInfo.id });
         }
       }
 
@@ -491,7 +519,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
         const sessionInfo = props?.info as { id?: string } | undefined;
         if (sessionInfo?.id) {
           sessionStates.delete(sessionInfo.id);
-          log('会话删除', { sessionId: sessionInfo.id });
+          logger.debug('会话删除', { sessionId: sessionInfo.id });
         }
       }
 
@@ -509,7 +537,7 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     },
 
     'chat.message': async (input, _output) => {
-      log('处理消息', {
+      logger.debug('处理消息', {
         sessionID: input.sessionID,
         agent: input.agent,
         hasModel: !!input.model,
@@ -517,14 +545,14 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
     },
 
     'tool.execute.before': async (input, _output) => {
-      log('工具执行前', {
+      logger.debug('工具执行前', {
         tool: input.tool,
         sessionID: input.sessionID,
       });
     },
 
     'tool.execute.after': async (input, output) => {
-      log('工具执行后', {
+      logger.debug('工具执行后', {
         tool: input.tool,
         title: output.title,
       });
