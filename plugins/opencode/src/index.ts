@@ -535,6 +535,8 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
             disable: agentCfg.disable,
             temperature: agentCfg.temperature,
             top_p: agentCfg.top_p,
+            permission: agentCfg.permission,
+            tools: agentCfg.tools,
           };
         }
         inputConfig.agent = agentConfig;
