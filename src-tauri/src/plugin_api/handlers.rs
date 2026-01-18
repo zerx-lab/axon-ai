@@ -6,23 +6,32 @@ use axum::{
 };
 use chrono::Utc;
 use std::collections::HashMap;
-use tracing::info;
+use std::path::PathBuf;
+use tracing::{debug, info, warn};
 
 use super::{
     types::*,
     PluginApiState,
 };
+use crate::utils::paths::get_app_data_dir;
 
 /// 健康检查
 pub async fn health_check() -> Json<ApiResponse<&'static str>> {
     Json(ApiResponse::success("ok"))
 }
 
-/// 获取配置
+/// 获取配置（包含从文件系统加载的 agents）
 pub async fn get_config(
     State(state): State<PluginApiState>,
 ) -> Json<PluginConfigResponse> {
-    let agents = state.get_agents();
+    let mut agents = state.get_agents();
+    
+    if let Some(file_agents) = load_agents_from_filesystem() {
+        for (name, config) in file_agents {
+            agents.entry(name).or_insert(config);
+        }
+    }
+    
     let disabled_agents = state.get_disabled_agents();
     let workflows: Vec<OrchestrationWorkflow> = state.get_workflows().into_values().collect();
 
@@ -36,10 +45,201 @@ pub async fn get_config(
 }
 
 /// 获取所有 Agent 配置
+/// 
+/// 从两个来源合并 Agent 配置：
+/// 1. 内存状态中的 agents（通过 API 动态添加的）
+/// 2. 文件系统中的 agents（编排页面创建的，保存在 {app_data}/agents/*.json）
 pub async fn get_agents(
     State(state): State<PluginApiState>,
 ) -> Json<HashMap<String, AgentConfig>> {
-    Json(state.get_agents())
+    let mut agents = state.get_agents();
+    
+    // 从文件系统读取编排页面创建的 agents
+    if let Some(file_agents) = load_agents_from_filesystem() {
+        for (name, config) in file_agents {
+            // 文件系统的 agent 优先级低于内存状态（允许 API 覆盖）
+            agents.entry(name).or_insert(config);
+        }
+    }
+    
+    Json(agents)
+}
+
+/// 获取 agents 目录路径
+fn get_agents_dir_path() -> Option<PathBuf> {
+    get_app_data_dir().map(|p| p.join("agents"))
+}
+
+/// 从文件系统加载 Agent 配置
+/// 
+/// 读取 {app_data}/agents/ 目录下的所有 JSON 文件，
+/// 将 AgentDefinition 格式转换为 AgentConfig 格式
+fn load_agents_from_filesystem() -> Option<HashMap<String, AgentConfig>> {
+    let agents_dir = get_agents_dir_path()?;
+    
+    if !agents_dir.exists() {
+        debug!("agents 目录不存在: {:?}", agents_dir);
+        return None;
+    }
+    
+    let mut agents = HashMap::new();
+    
+    let entries = match std::fs::read_dir(&agents_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            warn!("读取 agents 目录失败: {:?}, 错误: {}", agents_dir, e);
+            return None;
+        }
+    };
+    
+    for entry in entries.flatten() {
+        let path = entry.path();
+        
+        // 只处理 .json 文件
+        if !path.is_file() || path.extension().map(|e| e != "json").unwrap_or(true) {
+            continue;
+        }
+        
+        // 读取并解析 JSON
+        match parse_agent_definition(&path) {
+            Ok((name, config)) => {
+                debug!("加载 agent 文件: {} -> {}", path.display(), name);
+                agents.insert(name, config);
+            }
+            Err(e) => {
+                debug!("跳过无法解析的 agent 文件 {:?}: {}", path, e);
+            }
+        }
+    }
+    
+    if !agents.is_empty() {
+        info!("从文件系统加载了 {} 个 agent 配置", agents.len());
+    }
+    
+    Some(agents)
+}
+
+/// 解析 AgentDefinition JSON 文件并转换为 AgentConfig
+/// 
+/// AgentDefinition (编排页面格式) -> AgentConfig (Plugin API 格式)
+fn parse_agent_definition(path: &std::path::Path) -> Result<(String, AgentConfig), String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("读取文件失败: {}", e))?;
+    
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析 JSON 失败: {}", e))?;
+    
+    // 提取 name（必需）
+    let name = json.get("name")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 name 字段")?
+        .to_string();
+    
+    // 提取 description
+    let description = json.get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    
+    // 提取 runtime.mode 并转换
+    let mode = json.get("runtime")
+        .and_then(|r| r.get("mode"))
+        .and_then(|m| m.as_str())
+        .map(|m| match m {
+            "primary" => AgentMode::Primary,
+            "subagent" => AgentMode::Subagent,
+            "all" => AgentMode::All,
+            _ => AgentMode::Subagent,
+        })
+        .unwrap_or(AgentMode::Subagent);
+    
+    // 提取 model.modelId
+    let model = json.get("model")
+        .and_then(|m| m.get("modelId"))
+        .and_then(|m| m.as_str())
+        .map(|s| s.to_string());
+    
+    // 提取 prompt.system（作为主提示词）
+    let prompt = json.get("prompt")
+        .and_then(|p| p.get("system"))
+        .and_then(|s| s.as_str())
+        .map(|s| s.to_string());
+    
+    // 提取 color
+    let color = json.get("color")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    
+    // 提取 runtime.hidden
+    let hidden = json.get("runtime")
+        .and_then(|r| r.get("hidden"))
+        .and_then(|h| h.as_bool());
+    
+    // 提取 runtime.disabled
+    let disable = json.get("runtime")
+        .and_then(|r| r.get("disabled"))
+        .and_then(|d| d.as_bool());
+    
+    // 提取 parameters.temperature
+    let temperature = json.get("parameters")
+        .and_then(|p| p.get("temperature"))
+        .and_then(|t| t.as_f64())
+        .map(|t| t as f32);
+    
+    // 提取 parameters.topP
+    let top_p = json.get("parameters")
+        .and_then(|p| p.get("topP"))
+        .and_then(|t| t.as_f64())
+        .map(|t| t as f32);
+    
+    // 提取 permissions 并转换格式
+    let permission = json.get("permissions")
+        .and_then(|p| p.as_object())
+        .map(|obj| {
+            obj.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<HashMap<String, serde_json::Value>>()
+        });
+    
+    // 提取 tools 配置并转换格式
+    // AgentDefinition 格式: { mode: "whitelist"|"blacklist"|"all", list: string[] }
+    // AgentConfig 格式: { [toolName]: boolean }
+    let tools = json.get("tools")
+        .and_then(|t| {
+            let mode = t.get("mode").and_then(|m| m.as_str()).unwrap_or("all");
+            let list = t.get("list")
+                .and_then(|l| l.as_array())
+                .map(|arr| arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+                )
+                .unwrap_or_default();
+            
+            // 只有在非 "all" 模式且有工具列表时才转换
+            if mode != "all" && !list.is_empty() {
+                let is_whitelist = mode == "whitelist";
+                let tools_map: HashMap<String, bool> = list.iter()
+                    .map(|tool| (tool.clone(), is_whitelist))
+                    .collect();
+                Some(tools_map)
+            } else {
+                None
+            }
+        });
+    
+    Ok((name.clone(), AgentConfig {
+        name,
+        description,
+        mode,
+        model,
+        prompt,
+        color,
+        hidden,
+        disable,
+        temperature,
+        top_p,
+        permission,
+        tools,
+    }))
 }
 
 /// 设置 Agent 配置

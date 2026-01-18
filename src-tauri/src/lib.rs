@@ -124,6 +124,13 @@ pub fn run() {
             load_workspace_layout,
             delete_workspace_layout,
             list_workspace_layouts,
+            // Agent 配置命令
+            get_agents_directory,
+            list_agents,
+            read_agent,
+            save_agent,
+            delete_agent,
+            save_agents_batch,
         ])
         .setup(|app| {
             let setup_start = std::time::Instant::now();

@@ -291,7 +291,10 @@ impl OpencodeService {
             .env("OPENCODE_DISABLE_AUTOUPDATE", "true")
             // 标识这是由 Axon 启动的 opencode 实例，用于 axon-bridge 插件判断
             .env("AXON_RUNNING", "true")
-            .env("AXON_BRIDGE_PORT", &actual_port.to_string());
+            // Plugin API 端口（用于 axon-bridge 插件连接 Axon 后端）
+            .env("AXON_BRIDGE_PORT", crate::plugin_api::DEFAULT_PLUGIN_API_PORT.to_string())
+            // Agents 配置目录（编排页面创建的 agents 保存位置）
+            .env("AXON_AGENTS_DIR", app_data_dir.join("agents").to_string_lossy().to_string());
 
         // Windows 平台：设置 CREATE_NO_WINDOW 标志，避免弹出 CMD 控制台窗口
         #[cfg(target_os = "windows")]

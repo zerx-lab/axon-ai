@@ -87,6 +87,7 @@ interface ParsedCommand {
 const AXON_RUNNING = process.env.AXON_RUNNING === 'true';
 const DEV_MODE = process.env.AXON_DEV === 'true' || process.env.NODE_ENV === 'development';
 const AXON_PORT = parseInt(process.env.AXON_BRIDGE_PORT || '23517', 10);
+const AXON_AGENTS_DIR = process.env.AXON_AGENTS_DIR || '';
 
 // ============================================================================
 // 日志模块
@@ -221,6 +222,77 @@ async function loadCommands(logger: Logger): Promise<ParsedCommand[]> {
   }
 
   return commands;
+}
+
+interface AgentDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  model?: { modelId?: string };
+  parameters?: { temperature?: number; topP?: number };
+  runtime?: { mode?: string; hidden?: boolean; disabled?: boolean };
+  tools?: { mode?: string; list?: string[] };
+  permissions?: Record<string, unknown>;
+  prompt?: { system?: string };
+}
+
+function loadAgentsFromDirectory(agentsDir: string, logger: Logger): Record<string, AxonAgentConfig> {
+  if (!agentsDir) {
+    return {};
+  }
+
+  const agents: Record<string, AxonAgentConfig> = {};
+
+  try {
+    const fs = require('fs');
+    const files = fs.readdirSync(agentsDir);
+
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+
+      const filePath = path.join(agentsDir, file);
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const def: AgentDefinition = JSON.parse(content);
+
+        const mode = (def.runtime?.mode || 'subagent') as 'primary' | 'subagent' | 'all';
+
+        let tools: Record<string, boolean> | undefined;
+        if (def.tools?.mode && def.tools.mode !== 'all' && def.tools.list?.length) {
+          const isWhitelist = def.tools.mode === 'whitelist';
+          tools = {};
+          for (const t of def.tools.list) {
+            tools[t] = isWhitelist;
+          }
+        }
+
+        agents[def.name] = {
+          name: def.name,
+          description: def.description,
+          mode,
+          model: def.model?.modelId,
+          prompt: def.prompt?.system,
+          disable: def.runtime?.disabled,
+          temperature: def.parameters?.temperature,
+          top_p: def.parameters?.topP,
+          permission: def.permissions,
+          tools,
+        };
+
+        logger.debug(`加载 agent: ${def.name}`, { file });
+      } catch (e) {
+        logger.debug(`跳过无法解析的 agent 文件: ${file}`, e);
+      }
+    }
+
+    if (Object.keys(agents).length > 0) {
+      logger.info(`从目录加载了 ${Object.keys(agents).length} 个 agent`, Object.keys(agents));
+    }
+  } catch (e) {
+    logger.debug('agents 目录不存在或无法读取', e);
+  }
+
+  return agents;
 }
 
 // ============================================================================
@@ -385,7 +457,9 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
   }
 
   const config = await client.fetchConfig();
-  const customAgents = await client.getAgents();
+  const filesystemAgents = loadAgentsFromDirectory(AXON_AGENTS_DIR, logger);
+  const apiAgents = await client.getAgents();
+  const customAgents = { ...apiAgents, ...filesystemAgents };
   const commands = await loadCommands(logger);
 
   const sessionStates = new Map<
@@ -490,7 +564,10 @@ const AxonBridgePlugin: Plugin = async (ctx) => {
         };
       }
       if (commands.length > 0) {
-        logger.info('已加载命令', commands.map((c) => c.name));
+        logger.info(
+          '已加载命令',
+          commands.map((c) => c.name)
+        );
       }
     },
 

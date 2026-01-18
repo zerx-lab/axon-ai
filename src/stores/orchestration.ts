@@ -1,332 +1,165 @@
 /**
- * 编排状态管理
+ * Agent 状态管理
  * 
- * 管理工作流编排相关的状态，包括：
- * - 节点和边的管理
- * - 工作流的保存/加载
- * - Agent 配置
+ * 管理 Agent 配置的状态，包括加载、保存、删除
+ * Agent 配置保存到本地文件
  */
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { Node, Edge } from "@xyflow/react";
+import type { AgentDefinition } from "@/types/agent";
+import {
+  listAgents,
+  readAgent,
+  saveAgent as saveAgentToFile,
+  deleteAgent as deleteAgentFromFile,
+  type AgentSummary,
+} from "@/services/agent";
 
-// ============================================================================
-// 类型定义
-// ============================================================================
-
-/** 节点类型 */
-export type OrchestrationNodeType = "agent" | "parallel" | "sequence" | "start" | "end";
-
-/** 节点数据 */
-export interface OrchestrationNodeData extends Record<string, unknown> {
-  label: string;
-  type: OrchestrationNodeType;
-  agentId?: string;
-  toolId?: string;
-  config?: Record<string, unknown>;
-  description?: string;
+interface AgentState {
+  agents: AgentDefinition[];
+  agentSummaries: AgentSummary[];
+  isLoadingAgents: boolean;
+  agentsError: string | null;
 }
 
-/** 工作流定义 */
-export interface Workflow {
-  id: string;
-  name: string;
-  description?: string;
-  nodes: Node<OrchestrationNodeData>[];
-  edges: Edge[];
-  createdAt: number;
-  updatedAt: number;
-}
-
-/** Agent 配置 */
-export interface AgentConfig {
-  name: string;
-  description?: string;
-  mode: "primary" | "subagent" | "all";
-  model?: string;
-  prompt?: string;
-  color?: string;
-  hidden?: boolean;
-  disable?: boolean;
-}
-
-// ============================================================================
-// Store 定义
-// ============================================================================
-
-interface OrchestrationState {
-  // 当前编辑的工作流
-  currentWorkflow: Workflow | null;
-  // 保存的工作流列表
-  workflows: Workflow[];
-  // 可用的 Agent 列表
-  agents: AgentConfig[];
-  // 选中的节点 ID
-  selectedNodeId: string | null;
-  // 是否有未保存的更改
-  hasUnsavedChanges: boolean;
-}
-
-interface OrchestrationActions {
-  // 工作流操作
-  createWorkflow: (name: string, description?: string) => Workflow;
-  loadWorkflow: (id: string) => void;
-  saveWorkflow: () => void;
-  deleteWorkflow: (id: string) => void;
-  
-  // 节点操作
-  setNodes: (nodes: Node<OrchestrationNodeData>[]) => void;
-  addNode: (node: Node<OrchestrationNodeData>) => void;
-  updateNode: (id: string, data: Partial<OrchestrationNodeData>) => void;
-  removeNode: (id: string) => void;
-  
-  // 边操作
-  setEdges: (edges: Edge[]) => void;
-  addEdge: (edge: Edge) => void;
-  removeEdge: (id: string) => void;
-  
-  // 选择操作
-  setSelectedNodeId: (id: string | null) => void;
-  
-  // Agent 操作
-  setAgents: (agents: AgentConfig[]) => void;
-  addAgent: (agent: AgentConfig) => void;
-  updateAgent: (name: string, config: Partial<AgentConfig>) => void;
-  removeAgent: (name: string) => void;
-  
-  // 工具函数
+interface AgentActions {
+  loadAgents: () => Promise<void>;
+  loadAgent: (agentId: string) => Promise<AgentDefinition | null>;
+  saveAgent: (agent: AgentDefinition) => Promise<void>;
+  deleteAgent: (agentId: string) => Promise<void>;
+  getAgentById: (agentId: string) => AgentDefinition | undefined;
   reset: () => void;
 }
 
-type OrchestrationStore = OrchestrationState & OrchestrationActions;
+type AgentStore = AgentState & AgentActions;
 
-// 初始状态
-const initialState: OrchestrationState = {
-  currentWorkflow: null,
-  workflows: [],
+const initialState: AgentState = {
   agents: [],
-  selectedNodeId: null,
-  hasUnsavedChanges: false,
+  agentSummaries: [],
+  isLoadingAgents: false,
+  agentsError: null,
 };
 
-// 生成唯一 ID
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+export const useOrchestrationStore = create<AgentStore>()((set, get) => ({
+  ...initialState,
 
-export const useOrchestrationStore = create<OrchestrationStore>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
+  loadAgents: async () => {
+    set({ isLoadingAgents: true, agentsError: null });
+    
+    try {
+      const summaries = await listAgents();
+      set({ agentSummaries: summaries });
+      
+      const agents = await Promise.all(
+        summaries.map(async (summary) => {
+          try {
+            return await readAgent(summary.id);
+          } catch {
+            console.error(`加载 agent ${summary.id} 失败`);
+            return null;
+          }
+        })
+      );
+      
+      set({
+        agents: agents.filter((a): a is AgentDefinition => a !== null),
+        isLoadingAgents: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({
+        isLoadingAgents: false,
+        agentsError: message,
+      });
+      console.error("加载 agents 失败:", message);
+    }
+  },
 
-      // 创建新工作流
-      createWorkflow: (name, description) => {
-        const now = Date.now();
-        const workflow: Workflow = {
-          id: generateId(),
-          name,
-          description,
-          nodes: [],
-          edges: [],
-          createdAt: now,
-          updatedAt: now,
-        };
-        
-        set({
-          currentWorkflow: workflow,
-          hasUnsavedChanges: true,
-        });
-        
-        return workflow;
-      },
-
-      // 加载工作流
-      loadWorkflow: (id) => {
-        const workflow = get().workflows.find((w) => w.id === id);
-        if (workflow) {
-          set({
-            currentWorkflow: { ...workflow },
-            hasUnsavedChanges: false,
-          });
-        }
-      },
-
-      // 保存工作流
-      saveWorkflow: () => {
-        const { currentWorkflow, workflows } = get();
-        if (!currentWorkflow) return;
-
-        const updatedWorkflow = {
-          ...currentWorkflow,
-          updatedAt: Date.now(),
-        };
-
-        const existingIndex = workflows.findIndex((w) => w.id === currentWorkflow.id);
-        const updatedWorkflows = [...workflows];
+  loadAgent: async (agentId) => {
+    try {
+      const agent = await readAgent(agentId);
+      
+      set((state) => {
+        const existingIndex = state.agents.findIndex((a) => a.id === agentId);
+        const newAgents = [...state.agents];
         
         if (existingIndex >= 0) {
-          updatedWorkflows[existingIndex] = updatedWorkflow;
+          newAgents[existingIndex] = agent;
         } else {
-          updatedWorkflows.push(updatedWorkflow);
+          newAgents.push(agent);
         }
-
-        set({
-          workflows: updatedWorkflows,
-          currentWorkflow: updatedWorkflow,
-          hasUnsavedChanges: false,
-        });
-      },
-
-      // 删除工作流
-      deleteWorkflow: (id) => {
-        const { workflows, currentWorkflow } = get();
-        set({
-          workflows: workflows.filter((w) => w.id !== id),
-          currentWorkflow: currentWorkflow?.id === id ? null : currentWorkflow,
-        });
-      },
-
-      // 设置节点
-      setNodes: (nodes) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: { ...currentWorkflow, nodes },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 添加节点
-      addNode: (node) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: {
-            ...currentWorkflow,
-            nodes: [...currentWorkflow.nodes, node],
-          },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 更新节点
-      updateNode: (id, data) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: {
-            ...currentWorkflow,
-            nodes: currentWorkflow.nodes.map((node) =>
-              node.id === id ? { ...node, data: { ...node.data, ...data } } : node
-            ),
-          },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 移除节点
-      removeNode: (id) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: {
-            ...currentWorkflow,
-            nodes: currentWorkflow.nodes.filter((node) => node.id !== id),
-            edges: currentWorkflow.edges.filter(
-              (edge) => edge.source !== id && edge.target !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          selectedNodeId: get().selectedNodeId === id ? null : get().selectedNodeId,
-        });
-      },
-
-      // 设置边
-      setEdges: (edges) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: { ...currentWorkflow, edges },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 添加边
-      addEdge: (edge) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: {
-            ...currentWorkflow,
-            edges: [...currentWorkflow.edges, edge],
-          },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 移除边
-      removeEdge: (id) => {
-        const { currentWorkflow } = get();
-        if (!currentWorkflow) return;
-
-        set({
-          currentWorkflow: {
-            ...currentWorkflow,
-            edges: currentWorkflow.edges.filter((edge) => edge.id !== id),
-          },
-          hasUnsavedChanges: true,
-        });
-      },
-
-      // 设置选中节点
-      setSelectedNodeId: (id) => {
-        set({ selectedNodeId: id });
-      },
-
-      // 设置 Agent 列表
-      setAgents: (agents) => {
-        set({ agents });
-      },
-
-      // 添加 Agent
-      addAgent: (agent) => {
-        const { agents } = get();
-        if (agents.some((a) => a.name === agent.name)) return;
-        set({ agents: [...agents, agent] });
-      },
-
-      // 更新 Agent
-      updateAgent: (name, config) => {
-        const { agents } = get();
-        set({
-          agents: agents.map((a) =>
-            a.name === name ? { ...a, ...config } : a
-          ),
-        });
-      },
-
-      // 移除 Agent
-      removeAgent: (name) => {
-        const { agents } = get();
-        set({ agents: agents.filter((a) => a.name !== name) });
-      },
-
-      // 重置
-      reset: () => {
-        set(initialState);
-      },
-    }),
-    {
-      name: "axon-orchestration",
-      partialize: (state) => ({
-        workflows: state.workflows,
-        agents: state.agents,
-      }),
+        
+        return { agents: newAgents };
+      });
+      
+      return agent;
+    } catch (error) {
+      console.error(`加载 agent ${agentId} 失败:`, error);
+      return null;
     }
-  )
-);
+  },
+
+  saveAgent: async (agent) => {
+    try {
+      agent.updatedAt = Date.now();
+      await saveAgentToFile(agent);
+      
+      set((state) => {
+        const existingIndex = state.agents.findIndex((a) => a.id === agent.id);
+        const newAgents = [...state.agents];
+        
+        if (existingIndex >= 0) {
+          newAgents[existingIndex] = agent;
+        } else {
+          newAgents.push(agent);
+        }
+        
+        const summaryIndex = state.agentSummaries.findIndex((s) => s.id === agent.id);
+        const newSummaries = [...state.agentSummaries];
+        const summary: AgentSummary = {
+          id: agent.id,
+          name: agent.name,
+          description: agent.description,
+          icon: agent.icon,
+          color: agent.color,
+          modelId: agent.model.modelId,
+          builtin: agent.builtin,
+          updatedAt: agent.updatedAt,
+        };
+        
+        if (summaryIndex >= 0) {
+          newSummaries[summaryIndex] = summary;
+        } else {
+          newSummaries.push(summary);
+        }
+        
+        return { agents: newAgents, agentSummaries: newSummaries };
+      });
+    } catch (error) {
+      console.error(`保存 agent ${agent.id} 失败:`, error);
+      throw error;
+    }
+  },
+
+  deleteAgent: async (agentId) => {
+    try {
+      await deleteAgentFromFile(agentId);
+      
+      set((state) => ({
+        agents: state.agents.filter((a) => a.id !== agentId),
+        agentSummaries: state.agentSummaries.filter((s) => s.id !== agentId),
+      }));
+    } catch (error) {
+      console.error(`删除 agent ${agentId} 失败:`, error);
+      throw error;
+    }
+  },
+
+  getAgentById: (agentId) => {
+    return get().agents.find((a) => a.id === agentId);
+  },
+
+  reset: () => {
+    set(initialState);
+  },
+}));

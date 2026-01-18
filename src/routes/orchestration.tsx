@@ -1,125 +1,119 @@
 /**
- * 编排页面路由
+ * Agent 管理页面路由
  * 
- * 提供多代理工作流的可视化编排功能
- * 使用与首页相同的 ActivityBar + Sidebar 布局结构
+ * 提供 Agent 的创建、编辑、删除功能
  */
 
-import { useRef, useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { OrchestrationPage } from "@/components/orchestration/OrchestrationPage";
-import { OrchestrationSidebar } from "@/components/orchestration/OrchestrationSidebar";
+import { AgentListPanel } from "@/components/orchestration/AgentListPanel";
+import { AgentConfigPanel } from "@/components/orchestration/AgentConfigPanel";
 import { ActivityBar } from "@/components/activitybar";
 import { UsagePanel } from "@/components/usage-panel";
 import { useActivityBar } from "@/stores/activityBar";
+import { useOrchestrationStore } from "@/stores/orchestration";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import type { AgentDefinition } from "@/types/agent";
+import { createDefaultAgentDefinition } from "@/types/agent";
 
-// 侧边栏面板配置（像素值）
-const SIDEBAR_CONFIG = {
-  defaultSize: 220, // 编排侧边栏可以稍微窄一点
-  minSize: 180,
-  maxSize: 320,
+const AGENT_LIST_CONFIG = {
+  defaultSize: 280,
+  minSize: 200,
+  maxSize: 400,
 };
 
 export const Route = createFileRoute("/orchestration")({
-  component: OrchestrationRoute,
+  component: AgentManagementRoute,
 });
 
-function OrchestrationRoute() {
-  // 活动栏状态
-  const { position: activityBarPosition, sidebarVisible } = useActivityBar();
+function AgentManagementRoute() {
+  const { position: activityBarPosition } = useActivityBar();
+  const { loadAgents, saveAgent, deleteAgent } = useOrchestrationStore();
 
-  // 用于从 OrchestrationPage 获取回调函数的引用
-  const onAddNodeRef = useRef<((type: string) => void) | null>(null);
-  const onNewWorkflowRef = useRef<(() => void) | null>(null);
-  const onSaveRef = useRef<(() => void) | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentDefinition | null>(null);
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
 
-  // 包装回调函数，确保引用存在时才调用
-  const handleAddNode = useCallback((type: string) => {
-    onAddNodeRef.current?.(type);
+  useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
+
+  const handleCreateAgent = useCallback(() => {
+    const newAgent = createDefaultAgentDefinition({
+      name: "新建 Agent",
+      description: "自定义 Agent",
+    });
+    setSelectedAgent(newAgent);
+    setShowConfigPanel(true);
   }, []);
 
-  const handleNewWorkflow = useCallback(() => {
-    onNewWorkflowRef.current?.();
+  const handleSelectAgent = useCallback((agent: AgentDefinition) => {
+    setSelectedAgent(agent);
+    setShowConfigPanel(true);
   }, []);
 
-  const handleSave = useCallback(() => {
-    onSaveRef.current?.();
+  const handleSaveAgent = useCallback(async (agent: AgentDefinition) => {
+    await saveAgent(agent);
+    setSelectedAgent(agent);
+  }, [saveAgent]);
+
+  const handleDeleteAgent = useCallback(async (agentId: string) => {
+    await deleteAgent(agentId);
+    setSelectedAgent(null);
+    setShowConfigPanel(false);
+  }, [deleteAgent]);
+
+  const handleCloseConfigPanel = useCallback(() => {
+    setShowConfigPanel(false);
   }, []);
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden">
-      {/* 主体区域（活动栏 + 内容） */}
       <div className="flex flex-1 overflow-hidden">
-        {/* 活动栏 - 左侧位置 */}
         {activityBarPosition === "left" && <ActivityBar />}
-
-        {/* 使用量面板 - 左侧位置（编排页面也可以查看使用量） */}
         {activityBarPosition === "left" && <UsagePanel messages={[]} />}
 
-        {/* 主内容区域 */}
         <div className="flex flex-1 h-full overflow-hidden">
-          <ResizablePanelGroup
-            orientation="horizontal"
-            className="flex-1"
-          >
-            {/* 活动栏在左侧时：侧边栏在左 */}
-            {activityBarPosition === "left" && sidebarVisible && (
-              <>
-                <ResizablePanel
-                  id="orchestration-sidebar"
-                  defaultSize={SIDEBAR_CONFIG.defaultSize}
-                  minSize={SIDEBAR_CONFIG.minSize}
-                  maxSize={SIDEBAR_CONFIG.maxSize}
-                >
-                  <OrchestrationSidebar
-                    onAddNode={handleAddNode}
-                    onNewWorkflow={handleNewWorkflow}
-                    onSave={handleSave}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            )}
-
-            {/* 主内容区域 - 编排画布 */}
-            <ResizablePanel id="orchestration-main" minSize={sidebarVisible ? "50%" : "100%"}>
-              <OrchestrationPage
-                onAddNodeRef={onAddNodeRef}
-                onNewWorkflowRef={onNewWorkflowRef}
-                onSaveRef={onSaveRef}
+          <ResizablePanelGroup orientation="horizontal" className="flex-1">
+            <ResizablePanel
+              id="agent-list"
+              defaultSize={AGENT_LIST_CONFIG.defaultSize}
+              minSize={AGENT_LIST_CONFIG.minSize}
+              maxSize={AGENT_LIST_CONFIG.maxSize}
+            >
+              <AgentListPanel
+                onCreateAgent={handleCreateAgent}
+                onSelectAgent={handleSelectAgent}
+                selectedAgentId={selectedAgent?.id}
               />
             </ResizablePanel>
 
-            {/* 活动栏在右侧时：侧边栏在右 */}
-            {activityBarPosition === "right" && sidebarVisible && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel
-                  id="orchestration-sidebar"
-                  defaultSize={SIDEBAR_CONFIG.defaultSize}
-                  minSize={SIDEBAR_CONFIG.minSize}
-                  maxSize={SIDEBAR_CONFIG.maxSize}
-                >
-                  <OrchestrationSidebar
-                    onAddNode={handleAddNode}
-                    onNewWorkflow={handleNewWorkflow}
-                    onSave={handleSave}
-                  />
-                </ResizablePanel>
-              </>
-            )}
+            <ResizableHandle withHandle />
+
+            <ResizablePanel
+              id="agent-content"
+              minSize="50%"
+            >
+              {showConfigPanel ? (
+                <AgentConfigPanel
+                  agent={selectedAgent}
+                  onSave={handleSaveAgent}
+                  onDelete={handleDeleteAgent}
+                  onClose={handleCloseConfigPanel}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground/50">
+                  选择一个 Agent 进行编辑，或创建新的 Agent
+                </div>
+              )}
+            </ResizablePanel>
           </ResizablePanelGroup>
         </div>
 
-        {/* 使用量面板 - 右侧位置 */}
         {activityBarPosition === "right" && <UsagePanel messages={[]} />}
-
-        {/* 活动栏 - 右侧位置 */}
         {activityBarPosition === "right" && <ActivityBar />}
       </div>
     </div>
