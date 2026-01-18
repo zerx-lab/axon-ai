@@ -69,3 +69,9 @@ export {
   toAbsolutePath,
   type UseFileReaderReturn,
 } from "./useFileReader";
+export {
+  useProviders,
+  type Provider,
+  type ProviderModel,
+  type UseProvidersReturn,
+} from "./useProviders";

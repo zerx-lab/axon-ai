@@ -52,11 +52,7 @@ export interface ToolsConfig {
 export type BashPermission = PermissionValue | Record<string, PermissionValue>;
 
 export interface AgentPermissions {
-  edit?: PermissionValue;
-  bash?: BashPermission;
-  webfetch?: PermissionValue;
-  externalDirectory?: PermissionValue;
-  doomLoop?: PermissionValue;
+  [toolId: string]: PermissionValue | BashPermission | undefined;
 }
 
 export interface PromptConfig {

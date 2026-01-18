@@ -5,14 +5,25 @@
  * 遵循 Zed 风格极简设计
  */
 
-import { useState, useEffect } from "react";
-import { X, Trash2, Save, Bot, Brain, Search, BookOpen, Palette, FileText, Eye, Settings2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { X, Trash2, Save, Bot, Brain, Search, BookOpen, Palette, FileText, Eye, Settings2, Loader2, ChevronDown, Check } from "lucide-react";
+import { useProviders, useOpencode } from "@/hooks";
+import { getToolsSimple } from "@/services/opencode/tools";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,11 +72,59 @@ interface AgentConfigPanelProps {
 export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConfigPanelProps) {
   const [editedAgent, setEditedAgent] = useState<AgentDefinition | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
+  const [toolIds, setToolIds] = useState<string[]>([]);
+  const [isLoadingTools, setIsLoadingTools] = useState(false);
+
+  const { isConnected } = useOpencode();
+  const { providers, isLoading: isLoadingModels } = useProviders();
+
+  // 构建模型选择的当前值
+  const currentModelValue = useMemo(() => {
+    if (!editedAgent?.model.modelId) return "";
+    // 如果 modelId 已经包含 provider，直接返回
+    if (editedAgent.model.modelId.includes("/")) {
+      return editedAgent.model.modelId;
+    }
+    // 否则拼接 provider 和 modelId
+    const provider = editedAgent.model.provider || "";
+    return provider ? `${provider}/${editedAgent.model.modelId}` : editedAgent.model.modelId;
+  }, [editedAgent?.model.modelId, editedAgent?.model.provider]);
+
+  // 获取当前模型的显示名称
+  const currentModelDisplay = useMemo(() => {
+    if (!currentModelValue) return "选择模型...";
+    for (const provider of providers) {
+      const model = provider.models.find(m => `${provider.id}/${m.id}` === currentModelValue);
+      if (model) {
+        return `${provider.name} / ${model.name}`;
+      }
+    }
+    // 如果在列表中找不到，显示原始值
+    return currentModelValue;
+  }, [currentModelValue, providers]);
 
   // 当传入的 agent 变化时更新本地状态
   useEffect(() => {
     setEditedAgent(agent ? { ...agent } : null);
   }, [agent]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    
+    const loadTools = async () => {
+      setIsLoadingTools(true);
+      try {
+        const tools = await getToolsSimple();
+        setToolIds(tools.map(t => t.id));
+      } catch (e) {
+        console.error("加载工具列表失败:", e);
+      } finally {
+        setIsLoadingTools(false);
+      }
+    };
+    loadTools();
+  }, [isConnected]);
 
   if (!editedAgent) return null;
 
@@ -98,7 +157,10 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
     setEditedAgent((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [key]: value }, updatedAt: Date.now() } : null);
   };
 
-  // 保存处理
+  const updateToolsField = <K extends keyof AgentDefinition["tools"]>(key: K, value: AgentDefinition["tools"][K]) => {
+    setEditedAgent((prev) => prev ? { ...prev, tools: { ...prev.tools, [key]: value }, updatedAt: Date.now() } : null);
+  };
+
   const handleSave = () => {
     onSave(editedAgent);
   };
@@ -265,29 +327,78 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
 
               {/* 模型 Tab */}
               <TabsContent value="model" className="space-y-4 mt-4">
-                {/* 模型 ID */}
+                {/* 模型选择 */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">模型 ID</Label>
-                  <Input
-                    value={editedAgent.model.modelId}
-                    onChange={(e) => updateModelField("modelId", e.target.value)}
-                    placeholder="如 anthropic/claude-sonnet-4-5"
-                    className="h-8 text-sm font-mono"
-                  />
+                  <Label className="text-xs text-muted-foreground/70">模型</Label>
+                  {isLoadingModels ? (
+                    <div className="flex items-center gap-2 h-8 px-3 text-sm text-muted-foreground border border-input rounded-sm">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>加载中...</span>
+                    </div>
+                  ) : (
+                    <Popover open={modelPopoverOpen} onOpenChange={setModelPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex items-center justify-between w-full h-8 px-3",
+                            "text-sm rounded-sm border border-input bg-background",
+                            "hover:bg-accent/50 transition-colors",
+                            "focus:outline-none focus:ring-1 focus:ring-ring"
+                          )}
+                        >
+                          <span className={cn(
+                            "truncate",
+                            !currentModelValue && "text-muted-foreground"
+                          )}>
+                            {currentModelDisplay}
+                          </span>
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="搜索模型..." />
+                          <CommandList>
+                            <CommandEmpty>未找到模型</CommandEmpty>
+                            {providers.map((provider) => (
+                              <CommandGroup key={provider.id} heading={provider.name}>
+                                {provider.models.map((model) => {
+                                  const value = `${provider.id}/${model.id}`;
+                                  const isSelected = currentModelValue === value;
+                                  return (
+                                    <CommandItem
+                                      key={value}
+                                      value={value}
+                                      onSelect={() => {
+                                        updateModelField("modelId", value);
+                                        updateModelField("provider", provider.id);
+                                        setModelPopoverOpen(false);
+                                      }}
+                                    >
+                                      <div className={cn(
+                                        "flex items-center justify-center h-4 w-4 shrink-0 mr-2",
+                                        "rounded-sm border",
+                                        isSelected
+                                          ? "bg-primary border-primary text-primary-foreground"
+                                          : "border-input bg-transparent"
+                                      )}>
+                                        {isSelected && <Check className="h-3 w-3" />}
+                                      </div>
+                                      <span className="truncate">{model.name}</span>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   <p className="text-[10px] text-muted-foreground/60">
-                    格式: provider/model-name
+                    当前: <code className="bg-muted px-1 rounded">{currentModelValue || "未选择"}</code>
                   </p>
-                </div>
-
-                {/* 提供商（可选） */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">提供商（可选）</Label>
-                  <Input
-                    value={editedAgent.model.provider || ""}
-                    onChange={(e) => updateModelField("provider", e.target.value || undefined)}
-                    placeholder="如 anthropic, openai, google"
-                    className="h-8 text-sm"
-                  />
                 </div>
 
                 {/* 备用模型 */}
@@ -302,7 +413,7 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
                         .filter(Boolean);
                       updateModelField("fallbackModels", models.length > 0 ? models : undefined);
                     }}
-                    placeholder="逗号分隔，如: model1, model2"
+                    placeholder="逗号分隔，如: anthropic/claude-3-5-sonnet"
                     className="min-h-[60px] text-sm font-mono resize-none"
                   />
                 </div>
@@ -494,79 +605,117 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
 
               {/* 权限 Tab */}
               <TabsContent value="perms" className="space-y-4 mt-4">
-                {/* 文件编辑 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">文件编辑</Label>
-                  <Select
-                    value={editedAgent.permissions.edit ?? "ask"}
-                    onValueChange={(value: PermissionValue) => updatePermissionField("edit", value)}
-                  >
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ask">询问</SelectItem>
-                      <SelectItem value="allow">允许</SelectItem>
-                      <SelectItem value="deny">拒绝</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isLoadingTools ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">加载工具列表...</span>
+                  </div>
+                ) : toolIds.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground/60 text-sm">
+                    无可用工具
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {toolIds.map((toolId) => {
+                      const permValue = editedAgent.permissions[toolId];
+                      const currentValue = typeof permValue === "string" ? permValue : "ask";
+                      return (
+                        <div key={toolId} className="flex items-center justify-between gap-4">
+                          <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded flex-1 min-w-0 truncate">
+                            {toolId}
+                          </code>
+                          <Select
+                            value={currentValue}
+                            onValueChange={(value: PermissionValue) => updatePermissionField(toolId, value)}
+                          >
+                            <SelectTrigger className="w-24 h-8 text-xs shrink-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ask">
+                                <span className="text-yellow-600 dark:text-yellow-400">询问</span>
+                              </SelectItem>
+                              <SelectItem value="allow">
+                                <span className="text-green-600 dark:text-green-400">允许</span>
+                              </SelectItem>
+                              <SelectItem value="deny">
+                                <span className="text-red-600 dark:text-red-400">拒绝</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-                {/* Bash 命令 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">Bash 命令</Label>
-                  <Select
-                    value={typeof editedAgent.permissions.bash === "string" ? editedAgent.permissions.bash : "ask"}
-                    onValueChange={(value: PermissionValue) => updatePermissionField("bash", value)}
-                  >
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ask">询问</SelectItem>
-                      <SelectItem value="allow">允许</SelectItem>
-                      <SelectItem value="deny">拒绝</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground/60">
-                    注：细粒度命令权限暂不支持编辑
-                  </p>
-                </div>
+                <Separator className="bg-border/50" />
 
-                {/* 网页请求 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">网页请求</Label>
-                  <Select
-                    value={editedAgent.permissions.webfetch ?? "ask"}
-                    onValueChange={(value: PermissionValue) => updatePermissionField("webfetch", value)}
-                  >
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ask">询问</SelectItem>
-                      <SelectItem value="allow">允许</SelectItem>
-                      <SelectItem value="deny">拒绝</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* 工具访问模式 */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground/70">工具访问模式</Label>
+                    <Select
+                      value={editedAgent.tools.mode}
+                      onValueChange={(value: "whitelist" | "blacklist" | "all") => updateToolsField("mode", value)}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部允许</SelectItem>
+                        <SelectItem value="whitelist">白名单模式</SelectItem>
+                        <SelectItem value="blacklist">黑名单模式</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground/60">
+                      白名单：仅允许列表中的工具；黑名单：禁用列表中的工具
+                    </p>
+                  </div>
 
-                {/* 外部目录 */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground/70">外部目录</Label>
-                  <Select
-                    value={editedAgent.permissions.externalDirectory ?? "ask"}
-                    onValueChange={(value: PermissionValue) => updatePermissionField("externalDirectory", value)}
-                  >
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ask">询问</SelectItem>
-                      <SelectItem value="allow">允许</SelectItem>
-                      <SelectItem value="deny">拒绝</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {editedAgent.tools.mode !== "all" && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground/70">
+                        {editedAgent.tools.mode === "whitelist" ? "允许的工具" : "禁用的工具"}
+                      </Label>
+                      <div className="border border-input rounded-sm p-2 max-h-[150px] overflow-y-auto space-y-1">
+                        {toolIds.map((toolId) => {
+                          const isSelected = editedAgent.tools.list.includes(toolId);
+                          return (
+                            <button
+                              key={toolId}
+                              type="button"
+                              onClick={() => {
+                                const newList = isSelected
+                                  ? editedAgent.tools.list.filter((t) => t !== toolId)
+                                  : [...editedAgent.tools.list, toolId];
+                                updateToolsField("list", newList);
+                              }}
+                              className={cn(
+                                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm",
+                                "hover:bg-accent transition-colors",
+                                isSelected && "bg-accent"
+                              )}
+                            >
+                              <div className={cn(
+                                "flex items-center justify-center h-4 w-4 shrink-0",
+                                "rounded-sm border",
+                                isSelected
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-input bg-transparent"
+                              )}>
+                                {isSelected && <Check className="h-3 w-3" />}
+                              </div>
+                              <code className="text-xs">{toolId}</code>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        已选择 {editedAgent.tools.list.length} 个工具
+                      </p>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
