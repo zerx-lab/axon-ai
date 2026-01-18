@@ -132,6 +132,13 @@ pub fn run() {
             save_agent,
             delete_agent,
             save_agents_batch,
+            // Workflow 配置命令
+            get_workflows_directory,
+            list_workflows,
+            read_workflow,
+            save_workflow,
+            delete_workflow,
+            save_workflows_batch,
             // 模型注册表命令
             get_model_defaults,
             get_all_model_defaults,

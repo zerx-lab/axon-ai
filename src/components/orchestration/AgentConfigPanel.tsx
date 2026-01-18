@@ -175,7 +175,7 @@ export function AgentConfigPanel({ agent, onSave, onDelete, onClose }: AgentConf
   return (
     <>
       {/* 主面板 */}
-      <div className="fixed right-0 top-0 h-full w-[400px] bg-sidebar border-l border-sidebar-border/50 flex flex-col z-40">
+      <div className="h-full bg-sidebar border-l border-sidebar-border/50 flex flex-col">
         {/* 顶部栏 */}
         <div className="flex items-center justify-between h-12 px-4 border-b border-sidebar-border/50 shrink-0">
           <div className="flex items-center gap-2 min-w-0">

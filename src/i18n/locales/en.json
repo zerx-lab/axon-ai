@@ -536,6 +536,9 @@
   },
   "orchestration": {
     "title": "Orchestration",
+    "agents": "Agent List",
+    "createAgent": "Create Agent",
+    "searchAgents": "Search Agents...",
     "newWorkflow": "New Workflow",
     "save": "Save",
     "noWorkflow": "No workflow selected",

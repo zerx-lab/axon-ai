@@ -547,6 +547,9 @@
   },
   "orchestration": {
     "title": "编排",
+    "agents": "Agent 列表",
+    "createAgent": "创建 Agent",
+    "searchAgents": "搜索 Agent...",
     "newWorkflow": "新建工作流",
     "save": "保存",
     "noWorkflow": "未选择工作流",

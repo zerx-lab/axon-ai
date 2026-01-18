@@ -1,12 +1,16 @@
-/**
- * Agent 状态管理
- * 
- * 管理 Agent 配置的状态，包括加载、保存、删除
- * Agent 配置保存到本地文件
- */
-
 import { create } from "zustand";
-import type { AgentDefinition } from "@/types/agent";
+import type {
+  AgentDefinition,
+  SubagentConfig,
+  DelegationRule,
+  DelegationRuleset,
+  CanvasViewport,
+  CanvasNodePosition,
+} from "@/types/agent";
+import {
+  createDefaultSubagentConfig,
+  createDefaultDelegationRule,
+} from "@/types/agent";
 import {
   listAgents,
   readAgent,
@@ -15,11 +19,20 @@ import {
   type AgentSummary,
 } from "@/services/agent";
 
+interface CanvasSelection {
+  type: "primary" | "subagent" | "edge" | null;
+  id: string | null;
+}
+
 interface AgentState {
   agents: AgentDefinition[];
   agentSummaries: AgentSummary[];
   isLoadingAgents: boolean;
   agentsError: string | null;
+  
+  selectedAgentId: string | null;
+  canvasSelection: CanvasSelection;
+  hasUnsavedChanges: boolean;
 }
 
 interface AgentActions {
@@ -28,6 +41,28 @@ interface AgentActions {
   saveAgent: (agent: AgentDefinition) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;
   getAgentById: (agentId: string) => AgentDefinition | undefined;
+  
+  selectAgent: (agentId: string | null) => void;
+  getSelectedAgent: () => AgentDefinition | undefined;
+  updateSelectedAgent: (updates: Partial<AgentDefinition>) => void;
+  
+  addSubagent: (agentId: string, position?: CanvasNodePosition) => SubagentConfig | null;
+  removeSubagent: (subagentId: string) => void;
+  updateSubagent: (subagentId: string, updates: Partial<SubagentConfig>) => void;
+  updateSubagentPosition: (subagentId: string, position: CanvasNodePosition) => void;
+  toggleSubagentEnabled: (subagentId: string) => void;
+  
+  updatePrimaryPosition: (position: CanvasNodePosition) => void;
+  
+  addDelegationRule: (subagentId: string) => DelegationRule | null;
+  removeDelegationRule: (ruleId: string) => void;
+  updateDelegationRule: (ruleId: string, updates: Partial<DelegationRule>) => void;
+  updateDelegationRuleset: (updates: Partial<DelegationRuleset>) => void;
+  
+  setCanvasSelection: (selection: CanvasSelection) => void;
+  clearCanvasSelection: () => void;
+  updateCanvasViewport: (viewport: CanvasViewport) => void;
+  
   reset: () => void;
 }
 
@@ -38,6 +73,9 @@ const initialState: AgentState = {
   agentSummaries: [],
   isLoadingAgents: false,
   agentsError: null,
+  selectedAgentId: null,
+  canvasSelection: { type: null, id: null },
+  hasUnsavedChanges: false,
 };
 
 export const useOrchestrationStore = create<AgentStore>()((set, get) => ({
@@ -157,6 +195,261 @@ export const useOrchestrationStore = create<AgentStore>()((set, get) => ({
 
   getAgentById: (agentId) => {
     return get().agents.find((a) => a.id === agentId);
+  },
+
+  selectAgent: (agentId) => {
+    set({
+      selectedAgentId: agentId,
+      canvasSelection: { type: null, id: null },
+      hasUnsavedChanges: false,
+    });
+  },
+
+  getSelectedAgent: () => {
+    const { agents, selectedAgentId } = get();
+    return agents.find((a) => a.id === selectedAgentId);
+  },
+
+  updateSelectedAgent: (updates) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) =>
+          a.id === state.selectedAgentId ? { ...a, ...updates, updatedAt: Date.now() } : a
+        ),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  addSubagent: (agentId, position) => {
+    const { selectedAgentId, agents } = get();
+    if (!selectedAgentId) return null;
+
+    const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+    if (!selectedAgent) return null;
+
+    const yOffset = (selectedAgent.subagents?.length ?? 0) * 120;
+    const subagent = createDefaultSubagentConfig(agentId, {
+      position: position || { x: 200, y: 300 + yOffset },
+    });
+
+    set((state) => ({
+      agents: state.agents.map((a) =>
+        a.id === state.selectedAgentId
+          ? { ...a, subagents: [...(a.subagents ?? []), subagent], updatedAt: Date.now() }
+          : a
+      ),
+      hasUnsavedChanges: true,
+    }));
+
+    return subagent;
+  },
+
+  removeSubagent: (subagentId) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          const currentRuleset = a.delegationRuleset ?? { rules: [], defaultBehavior: "handle-self" as const };
+          return {
+            ...a,
+            subagents: (a.subagents ?? []).filter((s) => s.id !== subagentId),
+            delegationRuleset: {
+              ...currentRuleset,
+              rules: (currentRuleset.rules ?? []).filter((r) => r.subagentId !== subagentId),
+            },
+            updatedAt: Date.now(),
+          };
+        }),
+        canvasSelection:
+          state.canvasSelection.id === subagentId
+            ? { type: null, id: null }
+            : state.canvasSelection,
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  updateSubagent: (subagentId, updates) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          return {
+            ...a,
+            subagents: (a.subagents ?? []).map((s) =>
+              s.id === subagentId ? { ...s, ...updates } : s
+            ),
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  updateSubagentPosition: (subagentId, position) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          return {
+            ...a,
+            subagents: (a.subagents ?? []).map((s) =>
+              s.id === subagentId ? { ...s, position } : s
+            ),
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  toggleSubagentEnabled: (subagentId) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          return {
+            ...a,
+            subagents: (a.subagents ?? []).map((s) =>
+              s.id === subagentId ? { ...s, enabled: !s.enabled } : s
+            ),
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  updatePrimaryPosition: (position) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) =>
+          a.id === state.selectedAgentId
+            ? { ...a, primaryPosition: position, updatedAt: Date.now() }
+            : a
+        ),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  addDelegationRule: (subagentId) => {
+    const { selectedAgentId } = get();
+    if (!selectedAgentId) return null;
+
+    const rule = createDefaultDelegationRule(subagentId);
+
+    set((state) => ({
+      agents: state.agents.map((a) => {
+        if (a.id !== state.selectedAgentId) return a;
+        const currentRuleset = a.delegationRuleset ?? { rules: [], defaultBehavior: "handle-self" as const };
+        return {
+          ...a,
+          delegationRuleset: {
+            ...currentRuleset,
+            rules: [...(currentRuleset.rules ?? []), rule],
+          },
+          updatedAt: Date.now(),
+        };
+      }),
+      hasUnsavedChanges: true,
+    }));
+
+    return rule;
+  },
+
+  removeDelegationRule: (ruleId) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          const currentRuleset = a.delegationRuleset ?? { rules: [], defaultBehavior: "handle-self" as const };
+          return {
+            ...a,
+            delegationRuleset: {
+              ...currentRuleset,
+              rules: (currentRuleset.rules ?? []).filter((r) => r.id !== ruleId),
+            },
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  updateDelegationRule: (ruleId, updates) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          const currentRuleset = a.delegationRuleset ?? { rules: [], defaultBehavior: "handle-self" as const };
+          return {
+            ...a,
+            delegationRuleset: {
+              ...currentRuleset,
+              rules: (currentRuleset.rules ?? []).map((r) =>
+                r.id === ruleId ? { ...r, ...updates } : r
+              ),
+            },
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  updateDelegationRuleset: (updates) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) => {
+          if (a.id !== state.selectedAgentId) return a;
+          const currentRuleset = a.delegationRuleset ?? { rules: [], defaultBehavior: "handle-self" as const };
+          return {
+            ...a,
+            delegationRuleset: { ...currentRuleset, ...updates },
+            updatedAt: Date.now(),
+          };
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  setCanvasSelection: (selection) => {
+    set({ canvasSelection: selection });
+  },
+
+  clearCanvasSelection: () => {
+    set({ canvasSelection: { type: null, id: null } });
+  },
+
+  updateCanvasViewport: (viewport) => {
+    set((state) => {
+      if (!state.selectedAgentId) return state;
+      return {
+        agents: state.agents.map((a) =>
+          a.id === state.selectedAgentId
+            ? { ...a, canvasViewport: viewport, updatedAt: Date.now() }
+            : a
+        ),
+        hasUnsavedChanges: true,
+      };
+    });
   },
 
   reset: () => {
