@@ -102,7 +102,7 @@ fn get_orchestrations_dir_path() -> Option<PathBuf> {
     get_app_data_dir_with_fallback().map(|p| p.join("orchestrations"))
 }
 
-/// 从 orchestrations 目录加载主 Agent 配置
+/// 从 orchestrations 目录加载所有 Agent 配置（主代理 + 子代理）
 fn load_agents_from_orchestrations() -> Option<HashMap<String, AgentConfig>> {
     let app_data_dir = get_app_data_dir();
     info!("[DEBUG] get_app_data_dir() 返回: {:?}", app_data_dir);
@@ -136,10 +136,13 @@ fn load_agents_from_orchestrations() -> Option<HashMap<String, AgentConfig>> {
             continue;
         }
         
-        match parse_orchestration_primary_agent(&path) {
-            Ok((name, config)) => {
-                info!("[DEBUG] 成功加载编排组主 Agent: {} -> {}", path.display(), name);
-                agents.insert(name, config);
+        // 加载编排组中的所有代理（主代理 + 子代理）
+        match parse_orchestration_agents(&path) {
+            Ok(parsed_agents) => {
+                for (name, config) in parsed_agents {
+                    info!("[DEBUG] 成功加载编排组 Agent: {} -> {} (mode: {:?})", path.display(), name, config.mode);
+                    agents.insert(name, config);
+                }
             }
             Err(e) => {
                 info!("[DEBUG] 解析编排组文件失败 {:?}: {}", path, e);
@@ -147,56 +150,88 @@ fn load_agents_from_orchestrations() -> Option<HashMap<String, AgentConfig>> {
         }
     }
     
-    info!("[DEBUG] 从编排组加载了 {} 个主 Agent 配置", agents.len());
+    info!("[DEBUG] 从编排组加载了 {} 个 Agent 配置", agents.len());
     
     Some(agents)
 }
 
-/// 解析编排组的 primaryAgent 并转换为 AgentConfig
-fn parse_orchestration_primary_agent(path: &std::path::Path) -> Result<(String, AgentConfig), String> {
+/// 解析编排组的所有 Agent（primaryAgent + subagents）并转换为 AgentConfig
+fn parse_orchestration_agents(path: &std::path::Path) -> Result<Vec<(String, AgentConfig)>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("读取文件失败: {}", e))?;
     
     let json: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| format!("解析 JSON 失败: {}", e))?;
     
-    let primary_agent = json.get("primaryAgent")
-        .ok_or("缺少 primaryAgent 字段")?;
+    let mut agents = Vec::new();
     
-    let name = primary_agent.get("name")
-        .and_then(|v| v.as_str())
-        .ok_or("缺少 primaryAgent.name 字段")?
+    // 1. 解析 primaryAgent（主代理）
+    if let Some(primary_agent) = json.get("primaryAgent") {
+        if let Some(config) = parse_agent_config_from_value(primary_agent, AgentMode::Primary) {
+            agents.push(config);
+        }
+    }
+    
+    // 2. 解析 subagents（子代理）
+    if let Some(subagents) = json.get("subagents").and_then(|s| s.as_array()) {
+        for subagent in subagents {
+            // 检查子代理是否启用
+            let enabled = subagent.get("enabled").and_then(|e| e.as_bool()).unwrap_or(true);
+            if !enabled {
+                continue;
+            }
+            
+            // 从 config 字段获取代理配置（EmbeddedSubagent 格式）
+            if let Some(config_value) = subagent.get("config") {
+                if let Some(config) = parse_agent_config_from_value(config_value, AgentMode::Subagent) {
+                    agents.push(config);
+                }
+            }
+        }
+    }
+    
+    if agents.is_empty() {
+        return Err("未找到有效的 Agent 配置".to_string());
+    }
+    
+    Ok(agents)
+}
+
+/// 从 JSON Value 解析 AgentConfig
+fn parse_agent_config_from_value(value: &serde_json::Value, mode: AgentMode) -> Option<(String, AgentConfig)> {
+    let name = value.get("name")
+        .and_then(|v| v.as_str())?
         .to_string();
     
-    let description = primary_agent.get("description")
+    let description = value.get("description")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
     
-    let model = primary_agent.get("model")
+    let model = value.get("model")
         .and_then(|m| m.get("modelId"))
         .and_then(|m| m.as_str())
         .map(|s| s.to_string());
     
-    let prompt = primary_agent.get("prompt")
+    let prompt = value.get("prompt")
         .and_then(|p| p.get("system"))
         .and_then(|s| s.as_str())
         .map(|s| s.to_string());
     
-    let color = primary_agent.get("color")
+    let color = value.get("color")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
     
-    let temperature = primary_agent.get("parameters")
+    let temperature = value.get("parameters")
         .and_then(|p| p.get("temperature"))
         .and_then(|t| t.as_f64())
         .map(|t| t as f32);
     
-    let top_p = primary_agent.get("parameters")
+    let top_p = value.get("parameters")
         .and_then(|p| p.get("topP"))
         .and_then(|t| t.as_f64())
         .map(|t| t as f32);
     
-    let permission = primary_agent.get("permissions")
+    let permission = value.get("permissions")
         .and_then(|p| p.as_object())
         .map(|obj| {
             obj.iter()
@@ -204,7 +239,7 @@ fn parse_orchestration_primary_agent(path: &std::path::Path) -> Result<(String, 
                 .collect::<HashMap<String, serde_json::Value>>()
         });
     
-    let tools = primary_agent.get("tools")
+    let tools = value.get("tools")
         .and_then(|t| {
             let mode = t.get("mode").and_then(|m| m.as_str()).unwrap_or("all");
             let list = t.get("list")
@@ -226,10 +261,10 @@ fn parse_orchestration_primary_agent(path: &std::path::Path) -> Result<(String, 
             }
         });
     
-    Ok((name.clone(), AgentConfig {
+    Some((name.clone(), AgentConfig {
         name,
         description,
-        mode: AgentMode::All,
+        mode,
         model,
         prompt,
         color,

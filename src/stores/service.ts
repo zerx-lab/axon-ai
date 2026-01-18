@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import type { McpServersStatus, McpConfig } from "@/types/mcp";
 import type { PermissionConfig, PermissionActionType } from "@/types/permission";
+import type { Agent } from "@/types/chat";
 import { getToolsSimple } from "@/services/opencode/tools";
 import { opencode as tauriOpencode, settings as tauriSettings, fs as tauriFs } from "@/services/tauri";
 import type { OpencodeClient } from "@/services/opencode/types";
@@ -49,10 +50,14 @@ interface ServiceState {
   tools: ToolWithPermission[];
   permissionConfig: PermissionConfig;
 
+  // Agents（所有代理，包含主代理和子代理）
+  agents: Agent[];
+
   // 加载状态
   isRestarting: boolean;
   isLoadingMcp: boolean;
   isLoadingTools: boolean;
+  isLoadingAgents: boolean;
 
   // 时间戳（用于判断数据新鲜度）
   lastRefreshTime: number | null;
@@ -70,6 +75,7 @@ interface ServiceActions {
   // 数据加载
   loadMcpStatus: () => Promise<void>;
   loadTools: () => Promise<void>;
+  loadAgents: (directory?: string) => Promise<void>;
   refreshAll: () => Promise<void>;
 
   // MCP 操作
@@ -93,9 +99,11 @@ const initialState: ServiceState = {
   mcpConfigs: {},
   tools: [],
   permissionConfig: {},
+  agents: [],
   isRestarting: false,
   isLoadingMcp: false,
   isLoadingTools: false,
+  isLoadingAgents: false,
   lastRefreshTime: null,
 };
 
@@ -134,6 +142,7 @@ export const useServiceStore = create<ServiceStore>()((set, get) => ({
         mcpConfigs: {},
         tools: [],
         permissionConfig: {},
+        agents: [],
         lastRefreshTime: null,
       });
     }
@@ -286,13 +295,34 @@ export const useServiceStore = create<ServiceStore>()((set, get) => ({
     }
   },
 
+  loadAgents: async (directory?: string) => {
+    if (!clientRef || !isConnectedRef) {
+      console.log("[ServiceStore] 无法加载 Agents：未连接");
+      return;
+    }
+
+    set({ isLoadingAgents: true });
+    try {
+      const response = await clientRef.app.agents({ directory });
+      if (response.data) {
+        set({ agents: response.data as Agent[] });
+        console.log("[ServiceStore] Agents 加载完成，共", (response.data as Agent[]).length, "个");
+      }
+    } catch (error) {
+      console.error("[ServiceStore] 加载 Agents 失败:", error);
+    } finally {
+      set({ isLoadingAgents: false });
+    }
+  },
+
   refreshAll: async () => {
     console.log("[ServiceStore] 刷新所有数据...");
-    const { loadMcpStatus, loadTools } = get();
+    const { loadMcpStatus, loadTools, loadAgents } = get();
 
     await Promise.all([
       loadMcpStatus(),
       loadTools(),
+      loadAgents(),
     ]);
 
     set({ lastRefreshTime: Date.now() });
@@ -443,20 +473,11 @@ export const useServiceStore = create<ServiceStore>()((set, get) => ({
 
 // ============== 选择器 Hooks ==============
 
-/** 获取 MCP 服务器状态 */
 export const useMcpServers = () => useServiceStore(state => state.mcpServers);
-
-/** 获取工具列表 */
 export const useTools = () => useServiceStore(state => state.tools);
-
-/** 获取重启状态 */
+export const useAgents = () => useServiceStore(state => state.agents);
 export const useIsRestarting = () => useServiceStore(state => state.isRestarting);
-
-/** 获取 MCP 加载状态 */
 export const useIsLoadingMcp = () => useServiceStore(state => state.isLoadingMcp);
-
-/** 获取工具加载状态 */
 export const useIsLoadingTools = () => useServiceStore(state => state.isLoadingTools);
-
-/** 获取上次刷新时间 */
+export const useIsLoadingAgents = () => useServiceStore(state => state.isLoadingAgents);
 export const useLastRefreshTime = () => useServiceStore(state => state.lastRefreshTime);

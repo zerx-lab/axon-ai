@@ -20,6 +20,9 @@ import {
   X,
   ChevronRight,
   Terminal,
+  Bot,
+  Crown,
+  Users,
 } from "lucide-react";
 import {
   Popover,
@@ -76,10 +79,16 @@ export function StatusBar() {
   const updatePermission = useServiceStore(s => s.updatePermission);
   const isRestarting = useServiceStore(s => s.isRestarting);
 
+  // Agents
+  const agents = useServiceStore(s => s.agents);
+  const isLoadingAgents = useServiceStore(s => s.isLoadingAgents);
+  const loadAgents = useServiceStore(s => s.loadAgents);
+
   // 本地 UI 状态
   const [togglingServer, setTogglingServer] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const [isAgentsOpen, setIsAgentsOpen] = useState(false);
   const [updatingPermission, setUpdatingPermission] = useState<string | null>(null);
 
   // 判断后端是否就绪
@@ -99,6 +108,18 @@ export function StatusBar() {
     });
     return grouped;
   }, [tools]);
+
+  const agentStats = useMemo(() => {
+    const primaryAgents = agents.filter(a => a.mode !== "subagent" && !a.hidden);
+    const subagents = agents.filter(a => a.mode !== "primary" && !a.hidden);
+    return {
+      total: agents.length,
+      primary: primaryAgents.length,
+      subagent: subagents.length,
+      primaryAgents,
+      subagents,
+    };
+  }, [agents]);
 
   // 切换 MCP 服务器状态
   const handleToggle = async (name: string) => {
@@ -600,6 +621,191 @@ export function StatusBar() {
                     <span className="flex items-center gap-1">
                       <X className="h-2.5 w-2.5 text-red-500" />
                       {t("statusBar.permissionDeny", "拒绝")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </TooltipProvider>
+          </PopoverContent>
+        </Popover>
+
+        {/* Agents 列表 */}
+        <Popover open={isAgentsOpen} onOpenChange={setIsAgentsOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className={cn(
+                "flex items-center gap-1.5 px-2 h-full ml-2",
+                "text-muted-foreground/70 hover:text-foreground",
+                "hover:bg-accent/50",
+                "transition-colors duration-150"
+              )}
+            >
+              <Bot className="h-3.5 w-3.5" />
+              <span className="tabular-nums">
+                {agentStats.total} {t("statusBar.agents", "Agents")}
+              </span>
+            </button>
+          </PopoverTrigger>
+
+          <PopoverContent
+            side="top"
+            align="end"
+            sideOffset={4}
+            className="w-80 p-0 overflow-hidden"
+          >
+            <TooltipProvider delayDuration={300}>
+              {/* 标题栏 */}
+              <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/50">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10">
+                    <Bot className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-foreground">
+                      {t("statusBar.availableAgents", "可用代理")}
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground">
+                        {t("statusBar.totalCount", "共 {{count}} 个", { count: agentStats.total })}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          <Crown className="h-2.5 w-2.5" />
+                          {agentStats.primary}
+                        </span>
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                          <Users className="h-2.5 w-2.5" />
+                          {agentStats.subagent}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-md"
+                  onClick={() => loadAgents()}
+                  disabled={isLoadingAgents || isRestarting}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", (isLoadingAgents || isRestarting) && "animate-spin")} />
+                </Button>
+              </div>
+
+              {/* Agents 列表 */}
+              <ScrollArea className="h-72">
+                {agentStats.total === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Bot className="h-8 w-8 mb-2 opacity-30" />
+                    <span className="text-xs">{t("statusBar.noAgents", "暂无可用代理")}</span>
+                  </div>
+                ) : (
+                  <div className="p-2 space-y-3">
+                    {/* 主代理 */}
+                    {agentStats.primaryAgents.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 px-2 py-1.5">
+                          <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            {t("statusBar.primaryAgents", "主代理")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50">
+                            ({agentStats.primaryAgents.length})
+                          </span>
+                          <div className="flex-1 h-px bg-border/50" />
+                        </div>
+                        <div className="space-y-0.5">
+                          {agentStats.primaryAgents.map(agent => (
+                            <div
+                              key={agent.name}
+                              className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/50 transition-all duration-150"
+                            >
+                              <div className="flex items-center justify-center w-5 h-5 rounded shrink-0 bg-amber-500/10">
+                                <Crown className="h-3 w-3 text-amber-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-[11px] font-mono font-medium text-foreground">
+                                    {agent.name}
+                                  </code>
+                                  {agent.native && (
+                                    <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {t("statusBar.builtIn", "内置")}
+                                    </span>
+                                  )}
+                                </div>
+                                {agent.description && (
+                                  <p className="text-[10px] text-muted-foreground/80 truncate mt-0.5 leading-tight">
+                                    {agent.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 子代理 */}
+                    {agentStats.subagents.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 px-2 py-1.5">
+                          <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            {t("statusBar.subagents", "子代理")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50">
+                            ({agentStats.subagents.length})
+                          </span>
+                          <div className="flex-1 h-px bg-border/50" />
+                        </div>
+                        <div className="space-y-0.5">
+                          {agentStats.subagents.map(agent => (
+                            <div
+                              key={agent.name}
+                              className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/50 transition-all duration-150"
+                            >
+                              <div className="flex items-center justify-center w-5 h-5 rounded shrink-0 bg-blue-500/10">
+                                <Users className="h-3 w-3 text-blue-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-[11px] font-mono font-medium text-foreground">
+                                    {agent.name}
+                                  </code>
+                                  {agent.native && (
+                                    <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {t("statusBar.builtIn", "内置")}
+                                    </span>
+                                  )}
+                                </div>
+                                {agent.description && (
+                                  <p className="text-[10px] text-muted-foreground/80 truncate mt-0.5 leading-tight">
+                                    {agent.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+
+              {/* 底部提示栏 */}
+              <div className="px-4 py-2.5 border-t border-border/50 bg-muted/20">
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{t("statusBar.agentsHint", "通过 @ 提及调用子代理")}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <Crown className="h-2.5 w-2.5 text-amber-500" />
+                      {t("statusBar.primary", "主代理")}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="h-2.5 w-2.5 text-blue-500" />
+                      {t("statusBar.subagent", "子代理")}
                     </span>
                   </div>
                 </div>

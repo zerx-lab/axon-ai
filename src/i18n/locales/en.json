@@ -473,7 +473,16 @@
     "lspError": "errors",
     "lspConnectedHint": "Connected",
     "lspErrorHint": "Connection failed",
-    "lspMoreServers": "{{count}} more servers"
+    "lspMoreServers": "{{count}} more servers",
+    "agents": "Agents",
+    "availableAgents": "Available Agents",
+    "noAgents": "No agents available",
+    "primaryAgents": "Primary Agents",
+    "subagents": "Subagents",
+    "builtIn": "Built-in",
+    "agentsHint": "Use @ to mention subagents",
+    "primary": "Primary",
+    "subagent": "Subagent"
   },
   "usagePanel": {
     "title": "Usage",

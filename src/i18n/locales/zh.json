@@ -477,7 +477,16 @@
     "lspError": "错误",
     "lspConnectedHint": "已连接",
     "lspErrorHint": "连接失败",
-    "lspMoreServers": "还有 {{count}} 个服务器"
+    "lspMoreServers": "还有 {{count}} 个服务器",
+    "agents": "Agents",
+    "availableAgents": "可用代理",
+    "noAgents": "暂无可用代理",
+    "primaryAgents": "主代理",
+    "subagents": "子代理",
+    "builtIn": "内置",
+    "agentsHint": "通过 @ 提及调用子代理",
+    "primary": "主代理",
+    "subagent": "子代理"
   },
   "questionPrompt": {
     "otherCustom": "其他（自定义输入）",
