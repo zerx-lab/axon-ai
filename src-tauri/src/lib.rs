@@ -182,7 +182,6 @@ pub fn run() {
             .inner_size(1200.0, 800.0)
             .min_inner_size(800.0, 600.0)
             .decorations(false)
-            .transparent(false)
             .visible(false)
             .background_color(bg_color)
             .additional_browser_args(webview_args)
