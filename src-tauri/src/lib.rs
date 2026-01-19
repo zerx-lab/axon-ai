@@ -56,6 +56,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(
@@ -82,6 +83,10 @@ pub fn run() {
             get_version_info,
             check_for_update,
             update_opencode,
+            // 应用更新命令
+            check_app_update,
+            install_app_update,
+            get_app_version,
             // 应用设置命令
             get_app_settings,
             set_app_settings,

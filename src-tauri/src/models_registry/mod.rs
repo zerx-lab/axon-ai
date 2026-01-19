@@ -30,7 +30,4 @@ mod manager;
 mod types;
 
 pub use manager::ModelsRegistryManager;
-pub use types::{
-    CachedModelsRegistry, CostInfo, DefaultParams, LimitInfo, Modalities, ModelDefaults, ModelInfo,
-    ModelsRegistryData, ProviderInfo,
-};
+pub use types::ModelDefaults;

@@ -9,7 +9,6 @@
 mod handlers;
 mod types;
 
-pub use handlers::*;
 pub use types::*;
 
 use axum::{
@@ -76,6 +75,7 @@ impl PluginApiState {
     }
 
     /// 禁用默认 Agent
+    #[allow(dead_code)]
     pub fn disable_agent(&self, name: String) {
         let mut disabled = self.disabled_agents.write();
         if !disabled.contains(&name) {
@@ -84,6 +84,7 @@ impl PluginApiState {
     }
 
     /// 启用默认 Agent
+    #[allow(dead_code)]
     pub fn enable_agent(&self, name: &str) {
         self.disabled_agents.write().retain(|n| n != name);
     }
@@ -182,6 +183,7 @@ impl PluginApiServer {
     }
 
     /// 检查服务器是否在运行
+    #[allow(dead_code)]
     pub fn is_running(&self) -> bool {
         self.shutdown_tx.is_some()
     }

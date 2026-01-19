@@ -9,6 +9,7 @@ mod opencode;
 mod orchestration;
 mod provider;
 mod settings;
+mod update;
 mod window;
 mod workflow;
 
@@ -21,5 +22,6 @@ pub use opencode::*;
 pub use orchestration::*;
 pub use provider::*;
 pub use settings::*;
+pub use update::*;
 pub use window::*;
 pub use workflow::*;

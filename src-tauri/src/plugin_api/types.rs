@@ -108,6 +108,7 @@ impl<T> ApiResponse<T> {
     }
 
     /// 创建错误响应
+    #[allow(dead_code)]
     pub fn error(msg: impl Into<String>) -> Self {
         Self {
             success: false,
