@@ -27,7 +27,7 @@ if (-not $ProjectRoot) {
     $ProjectRoot = (Get-Location).Path
 }
 # 插件源目录：plugins/opencode（独立于 .opencode，避免污染项目配置）
-$SourcePlugin = Join-Path $ProjectRoot "axon_desktop\plugins\opencode"
+$SourcePlugin = Join-Path $ProjectRoot "axon-desktop\plugins\opencode"
 $AppDataDir = Join-Path $env:APPDATA "com.zero.axon-desktop"
 $OpencodeConfigDir = Join-Path $AppDataDir "opencode"
 # 目标：在 Axon 配置目录下创建 plugins/opencode 链接
