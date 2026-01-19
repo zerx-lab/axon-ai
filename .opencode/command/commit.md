@@ -1,7 +1,6 @@
 ---
 description: git commit and push
 model: anthropic/claude-haiku-4-5
-subtask: true
 ---
 
 commit
