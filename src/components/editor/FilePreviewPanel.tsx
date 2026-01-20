@@ -4,10 +4,11 @@
  * 支持多标签页的文件预览面板：
  * - Tab 栏显示打开的文件
  * - 文件内容预览（带语法高亮）
+ * - 支持 PDF、Word、Excel 等文档预览
  * - 支持关闭单个/全部标签
  */
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, Suspense, lazy } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
@@ -38,9 +39,20 @@ import {
   RefreshCw,
   AlertCircle,
   FileX,
+  Loader2,
+  CircleAlert,
 } from "lucide-react";
+import { 
+  FileCategory, 
+  getFileCategory as getFileCategoryUtil,
+} from "@/utils/fileType";
 import { MonacoViewer } from "./MonacoViewer";
 import { ImageViewer } from "./ImageViewer";
+
+// 懒加载文档预览组件，优化性能
+const PdfViewer = lazy(() => import("./PdfViewer").then(m => ({ default: m.PdfViewer })));
+const ExcelViewer = lazy(() => import("./ExcelViewer").then(m => ({ default: m.ExcelViewer })));
+const WordViewer = lazy(() => import("./WordViewer").then(m => ({ default: m.WordViewer })));
 
 // ============== 文件图标辅助函数 ==============
 
@@ -49,6 +61,7 @@ function getFileIcon(fileName: string, className?: string): React.ReactNode {
   const iconClass = cn("h-4 w-4 shrink-0", className);
 
   switch (ext) {
+    // 代码文件
     case "ts":
     case "tsx":
     case "js":
@@ -64,15 +77,18 @@ function getFileIcon(fileName: string, className?: string): React.ReactNode {
     case "vue":
     case "svelte":
       return <FileCode className={cn(iconClass, "text-blue-400")} />;
+    // JSON/配置文件
     case "json":
     case "yaml":
     case "yml":
     case "toml":
       return <FileJson className={cn(iconClass, "text-yellow-400")} />;
+    // 文本文件
     case "md":
     case "txt":
     case "readme":
       return <FileText className={cn(iconClass, "text-muted-foreground")} />;
+    // 图片文件
     case "png":
     case "jpg":
     case "jpeg":
@@ -81,8 +97,25 @@ function getFileIcon(fileName: string, className?: string): React.ReactNode {
     case "webp":
     case "ico":
       return <Image className={cn(iconClass, "text-green-400")} />;
+    // PDF 文件
+    case "pdf":
+      return <FileText className={cn(iconClass, "text-red-400")} />;
+    // Word 文件
+    case "doc":
+    case "docx":
+    case "rtf":
+    case "odt":
+      return <FileText className={cn(iconClass, "text-blue-500")} />;
+    // Excel 文件
+    case "xls":
+    case "xlsx":
+    case "csv":
+    case "ods":
+      return <FileCode className={cn(iconClass, "text-green-500")} />;
+    // 锁文件
     case "lock":
       return <Package className={cn(iconClass, "text-orange-400")} />;
+    // TypeScript 声明文件
     case "d":
       if (fileName.endsWith(".d.ts")) {
         return <FileType className={cn(iconClass, "text-blue-300")} />;
@@ -95,23 +128,44 @@ function getFileIcon(fileName: string, className?: string): React.ReactNode {
 
 // ============== 文件类型检测 ==============
 
-type FileCategory = "text" | "image" | "unsupported";
-
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp"]);
-const UNSUPPORTED_EXTENSIONS = new Set([
-  "pdf", "exe", "dll", "bin", "so", "dylib",
+// 不支持预览的扩展名
+const TRULY_UNSUPPORTED = new Set([
+  "exe", "dll", "bin", "so", "dylib",
   "zip", "tar", "gz", "rar", "7z",
   "mp3", "mp4", "avi", "mov", "mkv", "wav", "flac",
-  "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "ppt", "pptx",
   "ttf", "otf", "woff", "woff2",
   "sqlite", "db",
 ]);
 
-function getFileCategory(fileName: string): FileCategory {
+// 获取文件预览类型
+type PreviewType = "text" | "image" | "pdf" | "word" | "excel" | "unsupported";
+
+function getPreviewType(fileName: string): PreviewType {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
-  if (IMAGE_EXTENSIONS.has(ext)) return "image";
-  if (UNSUPPORTED_EXTENSIONS.has(ext)) return "unsupported";
-  return "text";
+  const category = getFileCategoryUtil(fileName);
+  
+  // 先检查完全不支持的类型
+  if (TRULY_UNSUPPORTED.has(ext)) return "unsupported";
+  
+  // 根据 FileCategory 返回预览类型
+  switch (category) {
+    case FileCategory.Image:
+      return "image";
+    case FileCategory.PDF:
+      return "pdf";
+    case FileCategory.Word:
+      return "word";
+    case FileCategory.Excel:
+      return "excel";
+    case FileCategory.Text:
+    case FileCategory.Code:
+    case FileCategory.Json:
+    case FileCategory.Markdown:
+      return "text";
+    default:
+      return "unsupported";
+  }
 }
 
 // ============== 标签页组件 ==============
@@ -165,6 +219,18 @@ function EditorTabItem({
             {tab.name}
             {tab.isDirty && <span className="ml-0.5 text-[8px] text-muted-foreground">●</span>}
           </span>
+          
+          {/* 外部修改提示 */}
+          {tab.isExternallyModified && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CircleAlert className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">{t("editor.externallyModified", "文件已被外部修改，点击刷新查看")}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* 保存中状态 */}
           {tab.isSaving ? (
@@ -214,16 +280,18 @@ interface FileContentViewerProps {
 
 function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileContentViewerProps) {
   const { t } = useTranslation();
-  const fileCategory = getFileCategory(tab.name);
+  const previewType = getPreviewType(tab.name);
 
+  // 加载中状态
   if (tab.isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
+  // 错误状态
   if (tab.error) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -237,7 +305,8 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
-  if (fileCategory === "unsupported") {
+  // 不支持的文件类型
+  if (previewType === "unsupported") {
     const ext = tab.name.split(".").pop()?.toUpperCase() || "UNKNOWN";
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -250,7 +319,8 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
-  if (fileCategory === "image") {
+  // 图片预览
+  if (previewType === "image") {
     return (
       <div className="flex-1 h-full overflow-hidden">
         <ImageViewer
@@ -264,7 +334,49 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
-  if (tab.content === undefined) {
+  // PDF 预览
+  if (previewType === "pdf") {
+    return (
+      <div className="flex-1 h-full overflow-hidden">
+        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+          <PdfViewer
+            path={tab.path}
+            data={tab.content || ""}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Word 预览
+  if (previewType === "word") {
+    return (
+      <div className="flex-1 h-full overflow-hidden">
+        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+          <WordViewer
+            path={tab.path}
+            data={tab.content || ""}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Excel 预览
+  if (previewType === "excel") {
+    return (
+      <div className="flex-1 h-full overflow-hidden">
+        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+          <ExcelViewer
+            data={tab.content || ""}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // 文本内容为空
+  if (tab.content === undefined || tab.content === "") {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         {t("editor.emptyFile", "文件为空")}
@@ -272,6 +384,7 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
     );
   }
 
+  // 默认：文本/代码预览
   return (
     <div className="flex-1 h-full overflow-hidden">
       <MonacoViewer 
@@ -288,7 +401,7 @@ function FileContentViewer({ tab, onRetry, onContentChange, onSave }: FileConten
 
 export function FilePreviewPanel() {
   const { t } = useTranslation();
-  const {
+const {
     tabs,
     activeTabPath,
     setActiveTab,
@@ -300,6 +413,7 @@ export function FilePreviewPanel() {
     updateContent,
     setFileSaving,
     markAsSaved,
+    clearExternallyModified,
   } = useEditor();
 
   // 当前活动的标签
@@ -320,22 +434,27 @@ export function FilePreviewPanel() {
       loadingPathsRef.current.add(path);
 
       const fileName = path.split(/[/\\]/).pop() || "";
-      const fileCategory = getFileCategory(fileName);
+      const previewType = getPreviewType(fileName);
 
-      if (fileCategory === "unsupported") {
+      // 不支持的文件类型
+      if (previewType === "unsupported") {
         setFileContent(path, "");
         loadingPathsRef.current.delete(path);
         return;
       }
 
       try {
-        if (fileCategory === "image") {
+        // 二进制文件：图片、PDF、Word、Excel
+        if (previewType === "image" || previewType === "pdf" || previewType === "word" || previewType === "excel") {
           const content = await invoke<string>("read_file_binary", { path });
           setFileContent(path, content);
         } else {
+          // 文本文件
           const content = await invoke<string>("read_file_content", { path });
           setFileContent(path, content);
         }
+        // 刷新完成后清除外部修改标记
+        clearExternallyModified(path);
       } catch (error) {
         setFileError(path, String(error));
       } finally {

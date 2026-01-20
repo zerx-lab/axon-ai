@@ -149,21 +149,50 @@ export class OpencodeService {
     const prevStatus = this.backendStatus;
     this.backendStatus = status;
 
-    // 当服务启动完成时，自动连接
-    if (
-      this.config.autoConnect &&
-      prevStatus.type !== "running" &&
-      status.type === "running"
-    ) {
-      this.connect().catch(console.error);
-    }
-
     // 当服务停止时，断开连接
     if (status.type === "stopped" || status.type === "error") {
       this.disconnect();
     }
 
+    // 当服务启动完成时，检查是否需要（重新）连接
+    if (this.config.autoConnect && status.type === "running") {
+      const newPort = status.port;
+      const currentPort = this.getCurrentPort();
+      
+      // 如果之前不是 running 状态，或者端口发生了变化，需要重新连接
+      if (prevStatus.type !== "running" || currentPort !== newPort) {
+        console.log(
+          `[OpencodeService] 服务状态变化: ${prevStatus.type} -> running, 端口: ${currentPort} -> ${newPort}`
+        );
+        
+        // 如果已有连接但端口变化，需要先断开旧连接
+        if (currentPort !== null && currentPort !== newPort) {
+          console.log("[OpencodeService] 端口变化，断开旧连接并重新连接...");
+          this.disconnect();
+        }
+        
+        this.connect().catch(console.error);
+      }
+    }
+
     this.notifyListeners();
+  }
+
+  /**
+   * 获取当前连接的端口号
+   * 从当前 endpoint URL 中提取端口
+   */
+  private getCurrentPort(): number | null {
+    if (!this.endpoint) {
+      return null;
+    }
+    
+    try {
+      const url = new URL(this.endpoint);
+      return parseInt(url.port, 10) || null;
+    } catch {
+      return null;
+    }
   }
 
   /**

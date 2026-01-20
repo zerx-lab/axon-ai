@@ -208,14 +208,17 @@ export function useSSEHandler({
           
           scheduleFlush();
           
+          // 检测文件编辑工具完成，标记文件为外部修改
           if (part.type === "tool") {
             const FILE_EDIT_TOOLS = ["write", "edit", "multiedit", "patch"];
             if (FILE_EDIT_TOOLS.includes(part.tool) && part.state?.status === "completed") {
               const input = part.state.input as { path?: string; file_path?: string; filePath?: string };
               const filePath = input.path || input.file_path || input.filePath;
               if (filePath) {
+                // 标记文件为外部修改，让用户手动刷新
+                // 避免自动刷新导致性能问题或打断用户操作
                 setTimeout(() => {
-                  useEditor.getState().reloadFileIfOpen(filePath);
+                  useEditor.getState().markAsExternallyModified(filePath);
                 }, 100);
               }
             }

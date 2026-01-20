@@ -23,6 +23,8 @@ export interface EditorTab {
   isLoading: boolean;
   error: string | null;
   language: string;
+  /** 文件是否被外部修改（如 AI 编辑）*/
+  isExternallyModified: boolean;
 }
 
 interface EditorState {
@@ -52,6 +54,10 @@ interface EditorActions {
   setVisible: (visible: boolean) => void;
   restoreFromLayout: (tabs: OpenedTab[], activeTabPath: string | null, isVisible: boolean) => void;
   getTabsForPersistence: () => OpenedTab[];
+  /** 标记文件被外部修改（如 AI 编辑）*/
+  markAsExternallyModified: (path: string) => void;
+  /** 清除外部修改标记（刷新后调用）*/
+  clearExternallyModified: (path: string) => void;
 }
 
 type EditorStore = EditorState & EditorActions;
@@ -185,6 +191,7 @@ export const useEditor = create<EditorStore>()((set, get) => ({
         isLoading: true,
         error: null,
         language: getLanguageFromPath(path),
+        isExternallyModified: false,
       };
       set({
         tabs: [...tabs, newTab],
@@ -353,6 +360,7 @@ export const useEditor = create<EditorStore>()((set, get) => ({
       isSaving: false,
       isLoading: true,
       error: null,
+      isExternallyModified: false,
     }));
 
     const validActiveTabPath = activeTabPath && restoredTabs.some(t => t.path === activeTabPath)
@@ -375,6 +383,29 @@ export const useEditor = create<EditorStore>()((set, get) => ({
       path: t.path,
       name: t.name,
       language: t.language,
+    }));
+  },
+
+  // 标记文件被外部修改
+  markAsExternallyModified: (path: string) => {
+    const normalizedPath = path.replace(/\\/g, "/");
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path.replace(/\\/g, "/") === normalizedPath
+          ? { ...tab, isExternallyModified: true }
+          : tab
+      ),
+    }));
+  },
+
+  // 清除外部修改标记
+  clearExternallyModified: (path: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.path === path
+          ? { ...tab, isExternallyModified: false }
+          : tab
+      ),
     }));
   },
 }));

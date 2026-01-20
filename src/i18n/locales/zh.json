@@ -23,6 +23,8 @@
     "defaultWorkspace": "默认工作区",
     "switchingProject": "正在切换项目目录...",
     "projectSwitched": "项目目录已切换，Agent 列表已更新",
+    "showSubagentPanel": "显示子任务面板",
+    "hideSubagentPanel": "隐藏子任务面板",
     "theme": {
       "light": "浅色模式",
       "dark": "深色模式",
@@ -508,7 +510,8 @@
     "closeTab": "关闭",
     "closeOthers": "关闭其他",
     "closeAll": "关闭全部",
-    "emptyFile": "文件为空"
+    "emptyFile": "文件为空",
+    "externallyModified": "文件已被外部修改，点击刷新查看"
   },
   "usagePanel": {
     "title": "使用量",

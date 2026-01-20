@@ -23,6 +23,8 @@
     "defaultWorkspace": "Default Workspace",
     "switchingProject": "Switching project directory...",
     "projectSwitched": "Project directory switched, Agent list updated",
+    "showSubagentPanel": "Show Subagent Panel",
+    "hideSubagentPanel": "Hide Subagent Panel",
     "theme": {
       "light": "Light Mode",
       "dark": "Dark Mode",
@@ -483,6 +485,14 @@
     "agentsHint": "Use @ to mention subagents",
     "primary": "Primary",
     "subagent": "Subagent"
+  },
+  "editor": {
+    "refresh": "Refresh file",
+    "closeTab": "Close",
+    "closeOthers": "Close Others",
+    "closeAll": "Close All",
+    "emptyFile": "File is empty",
+    "externallyModified": "File modified externally, click refresh to view"
   },
   "usagePanel": {
     "title": "Usage",
